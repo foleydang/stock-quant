@@ -1,0 +1,129 @@
+{
+  "timestamp": "2026-04-02T15:06:49.197982",
+  "signals": [
+    {
+      "symbol": "600048.SH",
+      "stock_name": "保利发展",
+      "action": "卖出",
+      "shares": 20000,
+      "price": 5.77,
+      "reason": "触发止损(亏损17.6%)",
+      "up_prob": 0,
+      "profit": -24600.000000000007,
+      "profit_pct": -17.571428571428577
+    },
+    {
+      "symbol": "3690.HK",
+      "stock_name": "美团-W",
+      "action": "卖出",
+      "shares": 1300,
+      "price": 84.1,
+      "reason": "触发止损(亏损22.1%)",
+      "up_prob": 0,
+      "profit": -31070.000000000007,
+      "profit_pct": -22.129629629629637
+    }
+  ],
+  "account": {
+    "cash": 13013.0,
+    "positions": {
+      "002594.SZ": {
+        "symbol": "002594.SZ",
+        "stock_name": "比亚迪",
+        "shares": 100,
+        "cost_price": 104.08,
+        "current_price": 101.65,
+        "entry_date": "2026-03-26",
+        "entry_time": "13:30",
+        "available": 1,
+        "stop_loss": 95.7536,
+        "take_profit": 114.48800000000001
+      },
+      "300015.SZ": {
+        "symbol": "300015.SZ",
+        "stock_name": "爱尔眼科",
+        "shares": 2000,
+        "cost_price": 9.64,
+        "current_price": 9.7,
+        "entry_date": "2026-03-24",
+        "entry_time": "13:30",
+        "available": 1,
+        "stop_loss": 8.8688,
+        "take_profit": 10.604000000000001
+      },
+      "600000.SH": {
+        "symbol": "600000.SH",
+        "stock_name": "浦发银行",
+        "shares": 1900,
+        "cost_price": 10.04,
+        "current_price": 10.32,
+        "entry_date": "2026-03-27",
+        "entry_time": "13:30",
+        "available": 1,
+        "stop_loss": 9.236799999999999,
+        "take_profit": 11.044
+      },
+      "600009.SH": {
+        "symbol": "600009.SH",
+        "stock_name": "上海机场",
+        "shares": 700,
+        "cost_price": 27.35,
+        "current_price": 28.05,
+        "entry_date": "2026-03-24",
+        "entry_time": "13:30",
+        "available": 1,
+        "stop_loss": 25.162000000000003,
+        "take_profit": 30.085000000000004
+      },
+      "600015.SH": {
+        "symbol": "600015.SH",
+        "stock_name": "华夏银行",
+        "shares": 2800,
+        "cost_price": 7.13,
+        "current_price": 7.49,
+        "entry_date": "2026-03-27",
+        "entry_time": "13:30",
+        "available": 1,
+        "stop_loss": 6.5596000000000005,
+        "take_profit": 7.843000000000001
+      },
+      "300124.SZ": {
+        "symbol": "300124.SZ",
+        "stock_name": "汇川技术",
+        "shares": 800,
+        "cost_price": 65.0,
+        "current_price": 66.43,
+        "entry_date": "2025-03-01",
+        "entry_time": "",
+        "available": 1,
+        "stop_loss": 59.8,
+        "take_profit": 71.5
+      },
+      "600048.SH": {
+        "symbol": "600048.SH",
+        "stock_name": "保利发展",
+        "shares": 20000,
+        "cost_price": 7.0,
+        "current_price": 5.77,
+        "entry_date": "2025-03-01",
+        "entry_time": "",
+        "available": 1,
+        "stop_loss": 6.44,
+        "take_profit": 7.7
+      },
+      "3690.HK": {
+        "symbol": "3690.HK",
+        "stock_name": "美团-W",
+        "shares": 1300,
+        "cost_price": 108.0,
+        "current_price": 84.1,
+        "entry_date": "2025-03-01",
+        "entry_time": "",
+        "available": 1,
+        "stop_loss": 99.36,
+        "take_profit": 118.8
+      }
+    },
+    "total_value": 380667.0
+  }
+}
