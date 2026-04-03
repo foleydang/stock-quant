@@ -282,8 +282,64 @@ class EnhancedFeatureEngineer:
         return target
 
 
+def load_data_from_db(db_path: str) -> Dict[str, pd.DataFrame]:
+    """从数据库加载所有股票数据"""
+    import sqlite3
+
+    all_data = {}
+
+    if not os.path.exists(db_path):
+        print(f"数据库不存在: {db_path}")
+        return all_data
+
+    conn = sqlite3.connect(db_path)
+
+    # 获取所有股票列表
+    cursor = conn.execute("SELECT DISTINCT symbol FROM kline_30m ORDER BY symbol")
+    symbols = [row[0] for row in cursor.fetchall()]
+    print(f"数据库中共有 {len(symbols)} 只股票")
+
+    for i, symbol in enumerate(symbols):
+        try:
+            cursor = conn.execute(
+                "SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol = ? ORDER BY date",
+                (symbol,)
+            )
+            rows = cursor.fetchall()
+
+            if len(rows) < 100:
+                continue
+
+            df = pd.DataFrame(rows, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+            df['date'] = pd.to_datetime(df['date'])
+            df = df.sort_values('date').reset_index(drop=True)
+
+            # 数值转换
+            for col in ['open', 'high', 'low', 'close', 'volume']:
+                df[col] = df[col].astype(float)
+
+            all_data[symbol] = df
+
+        except Exception as e:
+            print(f"  加载失败 {symbol}: {e}")
+
+        if (i + 1) % 50 == 0:
+            print(f"  已加载 {i + 1}/{len(symbols)} 只股票")
+
+    conn.close()
+    print(f"成功加载 {len(all_data)} 只股票数据")
+
+    return all_data
+
+
 def load_data(cache_dir: str, use_csv: bool = True) -> Dict[str, pd.DataFrame]:
-    """加载数据"""
+    """加载数据（优先从数据库）"""
+    # 优先从数据库加载
+    db_path = os.path.join(os.path.dirname(__file__), '../data/stock_data.db')
+    if os.path.exists(db_path):
+        return load_data_from_db(db_path)
+
+    # 备用：从缓存加载
     all_data = {}
 
     # 加载沪深300缓存
@@ -471,17 +527,20 @@ def main():
     print("=" * 60)
     print("增强版 LightGBM 模型训练")
     print("=" * 60)
+    print(f"数据源: SQLite 数据库")
     print(f"特征数量: 50+")
     print(f"预测目标: 未来3根K线（90分钟）走势")
     print("=" * 60)
 
     # 加载数据
-    cache_dir = os.path.join(os.path.dirname(__file__), '../data/hs300_cache')
-    all_data = load_data(cache_dir, use_csv=True)
+    db_path = os.path.join(os.path.dirname(__file__), '../data/stock_data.db')
+    all_data = load_data_from_db(db_path)
 
     if not all_data:
         print("未加载到任何数据")
         return
+
+    print(f"\n加载了 {len(all_data)} 只股票，开始训练...")
 
     # 准备训练数据
     X, y = prepare_training_data(all_data, horizon=3)
