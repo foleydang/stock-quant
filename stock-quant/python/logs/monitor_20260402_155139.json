@@ -1,0 +1,113 @@
+{
+  "timestamp": "2026-04-02T15:51:39.803492",
+  "summary": {
+    "total_cost": 882400.0,
+    "total_value": 733896.0,
+    "total_profit": -148504.0,
+    "available_cash": 150000
+  },
+  "positions": [
+    {
+      "symbol": "300124.SZ",
+      "stock_name": "汇川技术",
+      "shares": 800,
+      "cost_price": 65.0,
+      "current_price": 66.87,
+      "entry_date": ""
+    },
+    {
+      "symbol": "600048.SH",
+      "stock_name": "保利发展",
+      "shares": 20000,
+      "cost_price": 7.0,
+      "current_price": 5.7,
+      "entry_date": ""
+    },
+    {
+      "symbol": "3690.HK",
+      "stock_name": "美团-W",
+      "shares": 1300,
+      "cost_price": 108.0,
+      "current_price": 80.2,
+      "entry_date": ""
+    },
+    {
+      "symbol": "300015.SZ",
+      "stock_name": "爱尔眼科",
+      "shares": 2000,
+      "cost_price": 11.0,
+      "current_price": 9.64,
+      "entry_date": ""
+    },
+    {
+      "symbol": "159792.SZ",
+      "stock_name": "港股通互联网ETF",
+      "shares": 660000,
+      "cost_price": 0.8,
+      "current_price": 0.671,
+      "entry_date": ""
+    }
+  ],
+  "suggestions": [
+    {
+      "symbol": "300124.SZ",
+      "stock_name": "汇川技术",
+      "shares": 800,
+      "cost_price": 65.0,
+      "current_price": 66.87,
+      "profit": 1496.0000000000036,
+      "profit_pct": 2.876923076923084,
+      "up_prob": 0.2978120757477844,
+      "action": "持有",
+      "reason": "持有观望，等待机会"
+    },
+    {
+      "symbol": "600048.SH",
+      "stock_name": "保利发展",
+      "shares": 20000,
+      "cost_price": 7.0,
+      "current_price": 5.7,
+      "profit": -25999.999999999996,
+      "profit_pct": -18.57142857142857,
+      "up_prob": 0.573690104116338,
+      "action": "持有",
+      "reason": "持有观望，等待机会"
+    },
+    {
+      "symbol": "3690.HK",
+      "stock_name": "美团-W",
+      "shares": 1300,
+      "cost_price": 108.0,
+      "current_price": 80.2,
+      "profit": -36139.99999999999,
+      "profit_pct": -25.740740740740737,
+      "up_prob": 0.39759057933201414,
+      "action": "观望",
+      "reason": "浮亏-26%，但模型看跌，暂不补仓"
+    },
+    {
+      "symbol": "300015.SZ",
+      "stock_name": "爱尔眼科",
+      "shares": 2000,
+      "cost_price": 11.0,
+      "current_price": 9.64,
+      "profit": -2719.999999999999,
+      "profit_pct": -12.363636363636358,
+      "up_prob": 0.43706363632685397,
+      "action": "持有",
+      "reason": "持有观望，等待机会"
+    },
+    {
+      "symbol": "159792.SZ",
+      "stock_name": "港股通互联网ETF",
+      "shares": 660000,
+      "cost_price": 0.8,
+      "current_price": 0.671,
+      "profit": -85140.0,
+      "profit_pct": -16.125,
+      "up_prob": 0.4525110919535534,
+      "action": "持有",
+      "reason": "持有观望，等待机会"
+    }
+  ]
+}

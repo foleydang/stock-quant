@@ -1,0 +1,13 @@
+# 30 分钟级别多因子交易策略依赖
+
+# 原有依赖
+flask
+flask-cors
+pandas
+numpy
+scikit-learn
+yfinance
+
+# 新增依赖
+schedule>=1.2.0
+requests>=2.28.0

@@ -5,51 +5,127 @@ import json
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import subprocess
 
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = Flask(__name__)
-# 添加CORS支持，允许所有跨域请求
 CORS(app)
-
-# Python模型路径
-PYTHON_MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'python/models/model_runner.py')
 
 @app.route('/stock/<symbol>', methods=['GET'])
 def get_stock_data(symbol):
     """获取股票数据"""
     try:
-        print(f"Fetching data for symbol: {symbol}")
-        print(f"Python model path: {PYTHON_MODEL_PATH}")
-        
-        if not os.path.exists(PYTHON_MODEL_PATH):
-            print(f"Python model file not found: {PYTHON_MODEL_PATH}")
-            return jsonify({"error": "Python model file not found"}), 500
-        
-        result = subprocess.run(
-            ['python3', PYTHON_MODEL_PATH, 'fetch', symbol],
-            capture_output=True,
-            text=True
-        )
-        
-        print(f"Return code: {result.returncode}")
-        print(f"Stdout: {result.stdout}")
-        print(f"Stderr: {result.stderr}")
-        
-        if result.returncode == 0:
-            try:
-                data = json.loads(result.stdout)
-                return jsonify(data)
-            except json.JSONDecodeError as e:
-                print(f"JSON decode error: {e}")
-                return jsonify({"error": "Failed to parse JSON response"}), 500
-        else:
-            return jsonify({"error": "Failed to fetch stock data", "stderr": result.stderr}), 500
+        import pandas as pd
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from data.data_handler import DataHandler
+
+        handler = DataHandler()
+        df = handler.fetch_stock_data(symbol, force_refresh=False)
+
+        if df is None or df.empty:
+            return jsonify({"status": "error", "error": "无法获取数据"}), 404
+
+        # 转换为JSON格式
+        data = []
+        for _, row in df.iterrows():
+            data.append({
+                'date': row['date'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(row['date'], 'strftime') else str(row['date']),
+                'open': float(row['open']),
+                'high': float(row['high']),
+                'low': float(row['low']),
+                'close': float(row['close']),
+                'volume': int(row['volume'])
+            })
+
+        return jsonify({"status": "success", "data": data})
+
     except Exception as e:
-        print(f"Exception: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
+@app.route('/stock/<symbol>/<period>', methods=['GET'])
+def get_stock_data_by_period(symbol, period):
+    """获取不同周期的股票数据: daily(日线), weekly(周线), monthly(月线)"""
+    try:
+        import pandas as pd
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from data.data_handler import DataHandler
+
+        # 优先从数据库获取30分钟数据
+        handler = DataHandler()
+        df = handler.fetch_stock_data(symbol, force_refresh=False)
+
+        if df is None or df.empty:
+            return jsonify({"status": "error", "error": "无法获取数据"}), 404
+
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.sort_values('date')
+
+        if period == '30m':
+            result_df = df
+
+        elif period == 'daily':
+            # 日线：按日期聚合
+            df['date_only'] = df['date'].dt.date
+            daily_df = df.groupby('date_only').agg({
+                'date': 'first',
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }).reset_index(drop=True)
+            result_df = daily_df
+
+        elif period == 'weekly':
+            # 周线：按周聚合
+            df['week'] = df['date'].dt.isocalendar().week
+            df['year'] = df['date'].dt.year
+            weekly_df = df.groupby(['year', 'week']).agg({
+                'date': 'first',
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }).reset_index(drop=True)
+            result_df = weekly_df
+
+        elif period == 'monthly':
+            # 月线：按月聚合
+            df['month'] = df['date'].dt.month
+            df['year'] = df['date'].dt.year
+            monthly_df = df.groupby(['year', 'month']).agg({
+                'date': 'first',
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }).reset_index(drop=True)
+            result_df = monthly_df
+        else:
+            result_df = df
+
+        # 转换为JSON格式
+        data = []
+        for _, row in result_df.iterrows():
+            data.append({
+                'date': row['date'].strftime('%Y-%m-%d') if hasattr(row['date'], 'strftime') else str(row['date'])[:10],
+                'open': round(float(row['open']), 2),
+                'high': round(float(row['high']), 2),
+                'low': round(float(row['low']), 2),
+                'close': round(float(row['close']), 2),
+                'volume': int(row['volume'])
+            })
+
+        return jsonify({"status": "success", "data": data, "period": period})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route('/train/<symbol>', methods=['GET'])
 def train_model(symbol):
@@ -1033,6 +1109,738 @@ def portfolio_strategy():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ===== 30 分钟级别多因子交易策略端点 =====
+
+@app.route('/intraday_strategy', methods=['GET'])
+def intraday_strategy():
+    """
+    30 分钟级别多因子交易策略
+    支持指定股票池：爱尔眼科，汇川技术，保利发展，美团
+    """
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from strategy.intraday_strategy import IntradayStrategy, WATCHLIST_STOCKS
+
+        # 获取自定义股票池
+        custom_watchlist = request.args.get('watchlist')
+        if custom_watchlist:
+            # 解析自定义股票池
+            watchlist = []
+            for item in custom_watchlist.split(','):
+                item = item.strip()
+                if item:
+                    watchlist.append({'symbol': item, 'name': item})
+        else:
+            watchlist = WATCHLIST_STOCKS
+
+        # 创建策略实例
+        strategy = IntradayStrategy(
+            watchlist=watchlist,
+            notify_enabled=True
+        )
+
+        # 执行策略
+        signals = strategy.check_all_stocks()
+
+        # 整理结果
+        buy_signals = [s for s in signals if "买入" in s.get('signal', '')]
+        sell_signals = [s for s in signals if "卖出" in s.get('signal', '')]
+        hold_signals = [s for s in signals if s.get('signal') == '持有']
+
+        return jsonify({
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "watchlist": watchlist,
+            "signals": signals,
+            "summary": {
+                "total": len(signals),
+                "buy": len(buy_signals),
+                "sell": len(sell_signals),
+                "hold": len(hold_signals)
+            },
+            "latest_signals": strategy.get_latest_signals()
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/intraday_signal/<symbol>', methods=['GET'])
+def intraday_signal(symbol):
+    """获取单个股票的 30 分钟级别交易信号"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from strategy.intraday_strategy import IntradayStrategy
+
+        strategy = IntradayStrategy(
+            watchlist=[{'symbol': symbol, 'name': symbol}],
+            notify_enabled=False
+        )
+
+        signal = strategy.check_all_stocks()
+
+        if signal:
+            return jsonify({
+                "status": "success",
+                "signal": signal[0]
+            })
+        else:
+            return jsonify({
+                "status": "success",
+                "signal": None,
+                "message": "数据不足或无法生成信号"
+            })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/intraday_history', methods=['GET'])
+def intraday_history():
+    """获取交易信号历史"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from strategy.intraday_strategy import IntradayStrategy
+
+        strategy = IntradayStrategy(notify_enabled=False)
+        limit = request.args.get('limit', 100, type=int)
+
+        history = strategy.get_signals_history(limit)
+
+        return jsonify({
+            "status": "success",
+            "history": history,
+            "count": len(history)
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============ 数据库查询接口 ============
+
+@app.route('/db/signals', methods=['GET'])
+def db_get_signals():
+    """从数据库获取交易信号"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from database import get_db
+
+        db = get_db()
+        symbol = request.args.get('symbol')
+        days = request.args.get('days', 30, type=int)
+        limit = request.args.get('limit', 500, type=int)
+
+        signals = db.get_signals(symbol=symbol, days=days, limit=limit)
+
+        return jsonify({
+            "status": "success",
+            "signals": signals,
+            "count": len(signals)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/db/signals/latest', methods=['GET'])
+def db_get_latest_signals():
+    """获取每只股票的最新信号"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from database import get_db
+
+        db = get_db()
+        signals = db.get_latest_signals()
+
+        return jsonify({
+            "status": "success",
+            "signals": signals,
+            "count": len(signals)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/db/signals/stats', methods=['GET'])
+def db_get_signal_stats():
+    """获取信号统计"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from database import get_db
+
+        db = get_db()
+        days = request.args.get('days', 30, type=int)
+        stats = db.get_signal_stats(days=days)
+
+        return jsonify({
+            "status": "success",
+            "data": stats
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/db/portfolio', methods=['GET'])
+def db_get_portfolio():
+    """获取持仓历史"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from database import get_db
+
+        db = get_db()
+        days = request.args.get('days', 30, type=int)
+        history = db.get_portfolio_history(days=days)
+
+        return jsonify({
+            "status": "success",
+            "history": history,
+            "count": len(history)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/db/trades', methods=['GET'])
+def db_get_trades():
+    """获取交易记录"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from database import get_db
+
+        db = get_db()
+        symbol = request.args.get('symbol')
+        days = request.args.get('days', 30, type=int)
+
+        trades = db.get_trades(symbol=symbol, days=days)
+
+        return jsonify({
+            "status": "success",
+            "trades": trades,
+            "count": len(trades)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/db/export/<table>', methods=['GET'])
+def db_export_csv(table):
+    """导出数据到CSV"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from database import get_db
+
+        if table not in ['signals', 'portfolio_snapshots', 'trades']:
+            return jsonify({"error": "Invalid table name"}), 400
+
+        db = get_db()
+        csv_path = db.export_to_csv(table)
+
+        return jsonify({
+            "status": "success",
+            "message": f"Exported to {csv_path}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/lgbm_backtest/<symbol>', methods=['GET'])
+def lgbm_backtest_single(symbol):
+    """单只股票 LGBM 模型回测 - 支持加仓减仓做T"""
+    try:
+        import pickle
+        import pandas as pd
+        import numpy as np
+        import sqlite3
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+        from data.data_handler import DataHandler
+
+        # 加载模型
+        model_dir = os.path.join(os.path.dirname(__file__), '../python/models')
+        model_paths = [
+            os.path.join(model_dir, 'lgb_hs300/model.pkl'),
+            os.path.join(model_dir, 'lgb_30m/model.pkl'),
+            os.path.join(model_dir, 'lgb_enhanced/model.pkl'),
+        ]
+
+        model_data = None
+        for mp in model_paths:
+            if os.path.exists(mp):
+                with open(mp, 'rb') as f:
+                    model_data = pickle.load(f)
+                break
+
+        if model_data is None:
+            return jsonify({"error": "模型未找到，请先训练模型"}), 404
+
+        model = model_data.get('model')
+
+        # 优先从数据库加载股票数据
+        handler = DataHandler()
+        df = handler.fetch_stock_data(symbol, force_refresh=False)
+
+        if df is None or df.empty:
+            # 备用：从CSV文件加载
+            data_dir = os.path.join(os.path.dirname(__file__), '../python/data')
+            data_path = os.path.join(data_dir, f'{symbol}_30m.csv')
+            if os.path.exists(data_path):
+                df = pd.read_csv(data_path)
+                df['date'] = pd.to_datetime(df['date'])
+            else:
+                return jsonify({"error": f"股票数据不存在: {symbol}"}), 404
+
+        df = df.sort_values('date').reset_index(drop=True)
+
+        # 回测参数 - 更合理的设置
+        initial_capital = 100000.0
+        cash = initial_capital
+        stop_loss_pct = 0.10  # 止损10%
+        take_profit_pct = 0.10  # 止盈10%
+        min_hold_periods = 16  # T+1 (16个30分钟 = 1交易日)
+        min_trade_amount = 5000  # 最小交易金额5000元（覆盖手续费）
+
+        # 模型预测阈值
+        buy_threshold = 0.55
+        sell_threshold = 0.40
+        strong_buy_threshold = 0.65
+        strong_sell_threshold = 0.35
+
+        # 回测结果
+        portfolio_values = []
+        trades = []
+        buy_points = []
+        sell_points = []
+        predictions = []
+
+        # 持仓状态
+        holding_shares = 0
+        total_cost = 0
+        position_records = []
+        last_trade_idx = -999  # 上次交易时间点，避免频繁交易
+        trade_cooldown = 8  # 交易冷却期（8个30分钟bar = 4小时）
+
+        # 遍历数据
+        for i in range(150, len(df)):
+            current_time = df['date'].iloc[i]
+            current_price = round(df['close'].iloc[i], 2)
+
+            # 计算特征和预测
+            df_slice = df.iloc[:i+1]
+            try:
+                features = EnhancedFeatureEngineer.calculate_features(df_slice)
+                if features.iloc[-1].isna().any():
+                    up_prob = 0.5
+                else:
+                    prob = model.predict_proba([features.iloc[-1].values])[0]
+                    up_prob = prob[1] if len(prob) > 1 else prob[0]
+            except:
+                up_prob = 0.5
+
+            predictions.append({
+                "date": str(current_time),
+                "price": current_price,
+                "up_prob": round(up_prob * 100, 1)
+            })
+
+            # 计算当前持仓状态
+            avg_cost = total_cost / holding_shares if holding_shares > 0 else 0
+            position_value = holding_shares * current_price if holding_shares > 0 else 0
+            position_ratio = position_value / initial_capital if holding_shares > 0 else 0
+            profit_pct = (current_price - avg_cost) / avg_cost if avg_cost > 0 else 0
+
+            # 更新T+1可用状态
+            available_shares = 0
+            for pr in position_records:
+                periods_held = i - pr['entry_idx']
+                if periods_held >= min_hold_periods:
+                    available_shares += pr['shares']
+
+            # 检查交易冷却期
+            in_cooldown = (i - last_trade_idx) < trade_cooldown
+
+            # ===== 卖出逻辑 =====
+            # 卖出原则：1.模型预测下跌 2.止盈(盈利且模型看跌) 3.止损(亏损且模型看跌)
+            # 不再机械地因为持仓比例减仓
+            sell_reason = None
+            sell_shares = 0
+
+            if holding_shares > 0 and available_shares > 0 and not in_cooldown:
+
+                # 1. 模型强烈看跌 - 清仓
+                if up_prob < strong_sell_threshold:
+                    sell_reason = f"模型强烈看跌({up_prob:.0%})"
+                    sell_shares = holding_shares  # 清仓
+
+                # 2. 模型看跌 - 减半仓
+                elif up_prob < sell_threshold:
+                    sell_reason = f"模型看跌({up_prob:.0%})"
+                    sell_shares = min(int(holding_shares * 0.5 / 100) * 100, available_shares)
+                    if sell_shares * current_price < min_trade_amount:
+                        sell_shares = min(available_shares, holding_shares)  # 太少就直接清仓
+
+                # 3. 有盈利 + 模型看跌 - 止盈减仓
+                elif profit_pct >= take_profit_pct and up_prob < 0.50:
+                    sell_reason = f"止盈({profit_pct*100:.1f}%,模型看跌)"
+                    sell_shares = min(int(holding_shares * 0.5 / 100) * 100, available_shares)
+
+                # 4. 有盈利 + 模型强烈看跌 - 止盈清仓
+                elif profit_pct >= take_profit_pct and up_prob < sell_threshold:
+                    sell_reason = f"止盈清仓({profit_pct*100:.1f}%,模型看跌)"
+                    sell_shares = holding_shares
+
+                # 5. 大幅盈利(>15%) + 模型看跌 - 锁定利润
+                elif profit_pct >= 0.15 and up_prob < 0.55:
+                    sell_reason = f"锁定利润({profit_pct*100:.1f}%)"
+                    sell_shares = min(int(holding_shares * 0.7 / 100) * 100, available_shares)
+
+                # 6. 止损 - 亏损超过阈值且模型也看跌
+                elif profit_pct <= -stop_loss_pct and up_prob < 0.48:
+                    sell_reason = f"止损(亏损{profit_pct*100:.1f}%,模型看跌)"
+                    sell_shares = holding_shares  # 清仓止损
+
+                # 7. 大幅亏损(>15%) - 必须止损
+                elif profit_pct <= -0.15:
+                    sell_reason = f"深度止损(亏损{profit_pct*100:.1f}%)"
+                    sell_shares = holding_shares
+
+                # 确保卖出金额足够（避免小额交易）
+                if sell_shares > 0 and sell_shares * current_price < min_trade_amount:
+                    if sell_shares * current_price < min_trade_amount * 0.5:
+                        sell_shares = 0
+                        sell_reason = None
+                    else:
+                        sell_shares = min(available_shares, holding_shares)
+
+                # 执行卖出
+                if sell_reason and sell_shares >= 100:
+                    sell_amount = sell_shares * current_price
+                    profit = (current_price - avg_cost) * sell_shares
+
+                    cash = round(cash + sell_amount, 2)
+
+                    # 更新持仓记录
+                    remaining_shares = sell_shares
+                    new_position_records = []
+                    for pr in position_records:
+                        if remaining_shares <= 0:
+                            new_position_records.append(pr)
+                        elif pr['shares'] <= remaining_shares:
+                            remaining_shares -= pr['shares']
+                        else:
+                            new_pr = pr.copy()
+                            new_pr['shares'] = pr['shares'] - remaining_shares
+                            remaining_shares = 0
+                            new_position_records.append(new_pr)
+                    position_records = new_position_records
+
+                    holding_shares -= sell_shares
+                    total_cost = avg_cost * holding_shares if holding_shares > 0 else 0
+                    last_trade_idx = i
+
+                    sell_points.append({
+                        "date": str(current_time),
+                        "price": current_price,
+                        "shares": sell_shares,
+                        "amount": round(sell_amount, 2),
+                        "profit": round(profit, 2),
+                        "profit_pct": round(profit_pct * 100, 2),
+                        "reason": sell_reason,
+                        "up_prob": round(up_prob * 100, 1),
+                        "remaining_shares": holding_shares
+                    })
+
+                    trades.append({
+                        "date": str(current_time),
+                        "symbol": symbol,
+                        "type": "SELL",
+                        "price": current_price,
+                        "shares": sell_shares,
+                        "amount": round(sell_amount, 2),
+                        "profit": round(profit, 2),
+                        "reason": sell_reason,
+                        "up_prob": round(up_prob * 100, 1)
+                    })
+
+            # ===== 买入逻辑 =====
+            # 买入原则：1.模型预测上涨 2.亏损时模型看涨可补仓
+            buy_reason = None
+            buy_amount = 0
+
+            if not in_cooldown:
+                # 1. 模型强烈看涨 - 建仓或加仓
+                if up_prob > strong_buy_threshold:
+                    if holding_shares == 0:
+                        buy_amount = initial_capital * 0.30  # 首次建仓30%
+                        buy_reason = f"强烈买入({up_prob:.0%})"
+                    else:
+                        buy_amount = initial_capital * 0.20  # 加仓20%
+                        buy_reason = f"加仓({up_prob:.0%})"
+
+                # 2. 模型看涨 - 建仓
+                elif up_prob > buy_threshold and holding_shares == 0:
+                    buy_amount = initial_capital * 0.25  # 建仓25%
+                    buy_reason = f"建仓({up_prob:.0%})"
+
+                # 3. 亏损 + 模型看涨 - 补仓（摊薄成本）
+                elif holding_shares > 0 and profit_pct < -0.05 and up_prob > buy_threshold:
+                    buy_amount = initial_capital * 0.15  # 补仓15%
+                    buy_reason = f"补仓({up_prob:.0%},亏损{profit_pct*100:.1f}%)"
+
+                # 4. 大幅亏损 + 模型强烈看涨 - 大额补仓
+                elif holding_shares > 0 and profit_pct < -0.10 and up_prob > strong_buy_threshold:
+                    buy_amount = initial_capital * 0.25  # 大额补仓25%
+                    buy_reason = f"大额补仓({up_prob:.0%},亏损{profit_pct*100:.1f}%)"
+
+                # 确保买入金额足够
+                if buy_amount > 0 and buy_amount < min_trade_amount:
+                    buy_amount = min_trade_amount
+
+                # 执行买入
+                if buy_reason and cash >= buy_amount:
+                    shares = int(buy_amount / current_price / 100) * 100
+                    actual_amount = shares * current_price
+
+                    if shares >= 100 and actual_amount <= cash:
+                        cash = round(cash - actual_amount, 2)
+
+                        if holding_shares == 0:
+                            total_cost = actual_amount
+                        else:
+                            total_cost += actual_amount
+
+                        holding_shares += shares
+
+                        position_records.append({
+                            'shares': shares,
+                            'cost_price': current_price,
+                            'entry_idx': i,
+                            'amount': actual_amount
+                        })
+
+                        avg_cost = total_cost / holding_shares
+                        last_trade_idx = i
+
+                        buy_points.append({
+                            "date": str(current_time),
+                            "price": current_price,
+                            "shares": shares,
+                            "amount": round(actual_amount, 2),
+                            "up_prob": round(up_prob * 100, 1),
+                            "reason": buy_reason,
+                            "total_shares": holding_shares,
+                            "avg_cost": round(avg_cost, 2)
+                        })
+
+                        trades.append({
+                            "date": str(current_time),
+                            "symbol": symbol,
+                            "type": "BUY",
+                            "price": current_price,
+                            "shares": shares,
+                            "amount": round(actual_amount, 2),
+                            "up_prob": round(up_prob * 100, 1),
+                            "reason": buy_reason
+                        })
+
+            # 记录市值
+            stock_value = holding_shares * current_price if holding_shares > 0 else 0
+            portfolio_value = round(cash + stock_value, 2)
+            portfolio_values.append({
+                "date": str(current_time),
+                "price": current_price,
+                "portfolioValue": portfolio_value,
+                "cash": cash,
+                "stockValue": round(stock_value, 2),
+                "holdingShares": holding_shares,
+                "avgCost": round(avg_cost, 2) if holding_shares > 0 else 0,
+                "profitPct": round(profit_pct * 100, 2) if holding_shares > 0 else 0,
+                "upProb": round(up_prob * 100, 1),
+                "positionRatio": round(position_ratio * 100, 1) if holding_shares > 0 else 0
+            })
+
+        # 计算最终结果
+        final_price = df['close'].iloc[-1]
+        final_stock_value = holding_shares * final_price if holding_shares > 0 else 0
+        final_portfolio = cash + final_stock_value
+        total_profit = final_portfolio - initial_capital
+
+        # 计算胜率
+        sell_trades = [t for t in trades if t['type'] == 'SELL']
+        wins = [t for t in sell_trades if t['profit'] > 0]
+        win_rate = len(wins) / max(len(sell_trades), 1) * 100
+
+        # 计算最大回撤
+        peak = initial_capital
+        max_drawdown = 0
+        for pv in portfolio_values:
+            if pv['portfolioValue'] > peak:
+                peak = pv['portfolioValue']
+            drawdown = (peak - pv['portfolioValue']) / peak
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+
+        return jsonify({
+            "status": "success",
+            "symbol": symbol,
+            "portfolioValues": portfolio_values,
+            "trades": trades,
+            "buyPoints": buy_points,
+            "sellPoints": sell_points,
+            "predictions": predictions[-200:] if len(predictions) > 200 else predictions,
+            "summary": {
+                "initialCapital": initial_capital,
+                "finalCash": round(cash, 2),
+                "finalStockValue": round(final_stock_value, 2),
+                "finalPortfolio": round(final_portfolio, 2),
+                "totalProfit": round(total_profit, 2),
+                "profitRate": round(total_profit / initial_capital * 100, 2),
+                "tradeCount": len(trades),
+                "buyCount": len(buy_points),
+                "sellCount": len(sell_points),
+                "winCount": len(wins),
+                "lossCount": len(sell_trades) - len(wins),
+                "winRate": round(win_rate, 1),
+                "maxDrawdown": round(max_drawdown * 100, 2),
+                "holdingShares": holding_shares,
+                "avgCost": round(avg_cost, 2) if holding_shares > 0 else 0,
+                "modelAccuracy": round(model_data.get('cv_accuracy', 0) * 100, 1) if model_data else 0
+            },
+            "params": {
+                "stop_loss_pct": stop_loss_pct,
+                "take_profit_pct": take_profit_pct,
+                "buy_threshold": buy_threshold,
+                "sell_threshold": sell_threshold,
+                "strong_buy_threshold": strong_buy_threshold,
+                "strong_sell_threshold": strong_sell_threshold,
+                "min_trade_amount": min_trade_amount,
+                "trade_cooldown": trade_cooldown,
+                "strategy": "基于模型预测的买卖决策，不设持仓比例限制"
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/lgbm_backtest_batch', methods=['GET'])
+def lgbm_backtest_batch():
+    """批量 LGBM 回测（多只股票）"""
+    try:
+        import pickle
+        import pandas as pd
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+
+        # 获取股票列表
+        symbols_param = request.args.get('symbols', '')
+        if symbols_param:
+            symbols = symbols_param.split(',')
+        else:
+            symbols = [s['symbol'] for s in HS300_STOCKS[:10]]
+
+        results = []
+        for symbol in symbols:
+            try:
+                # 调用单只股票回测
+                result = lgbm_backtest_single(symbol)
+                if result.status_code == 200:
+                    data = result.get_json()
+                    if data.get('status') == 'success':
+                        results.append({
+                            "symbol": symbol,
+                            "profitRate": data['summary']['profitRate'],
+                            "winRate": data['summary']['winRate'],
+                            "tradeCount": data['summary']['tradeCount']
+                        })
+            except:
+                continue
+
+        results.sort(key=lambda x: x['profitRate'], reverse=True)
+
+        return jsonify({
+            "status": "success",
+            "results": results,
+            "count": len(results)
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/db/stats', methods=['GET'])
+def db_get_data_stats():
+    """获取数据库统计信息"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from data.data_handler import DataHandler
+
+        handler = DataHandler()
+        stats = handler.get_data_stats()
+
+        if stats:
+            return jsonify({
+                "status": "success",
+                "stats": stats
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "数据库不存在或无数据"
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/db/stocks', methods=['GET'])
+def db_get_stock_list():
+    """获取数据库中的股票列表"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
+        from data.data_handler import DataHandler
+        import sqlite3
+
+        handler = DataHandler()
+
+        if not os.path.exists(handler.db_path):
+            return jsonify({"status": "success", "stocks": [], "count": 0})
+
+        conn = sqlite3.connect(handler.db_path)
+        cursor = conn.cursor()
+
+        # 获取每只股票的数据量
+        cursor.execute('''
+            SELECT s.symbol, s.name, COUNT(k.id) as cnt, MAX(k.date) as last_date
+            FROM stock_info s
+            LEFT JOIN kline_30m k ON s.symbol = k.symbol
+            GROUP BY s.symbol
+            ORDER BY cnt DESC
+        ''')
+
+        stocks = []
+        for row in cursor.fetchall():
+            stocks.append({
+                "symbol": row[0],
+                "name": row[1],
+                "count": row[2],
+                "last_date": row[3]
+            })
+
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "stocks": stocks,
+            "count": len(stocks)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)

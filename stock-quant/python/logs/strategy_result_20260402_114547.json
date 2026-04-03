@@ -1,0 +1,3474 @@
+{
+  "selected_stocks": [
+    {
+      "symbol": "301200.SZ",
+      "profit_rate": 48.06,
+      "win_rate": 89.7,
+      "trade_count": 70,
+      "trades": [
+        {
+          "date": "2025-04-24 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 37.3,
+          "shares": 500,
+          "reason": "建仓(59%)"
+        },
+        {
+          "date": "2025-04-25 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 37.31,
+          "shares": 400,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-04-30 11:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 37.98,
+          "shares": 400,
+          "profit": 270.22222222222183,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-05-19 13:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 39.65,
+          "shares": 200,
+          "profit": 469.11111111111126,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-05-27 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 36.45,
+          "shares": 300,
+          "profit": -256.33333333333184,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-05-28 15:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 36.34,
+          "shares": 500,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-06-09 15:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 36.69,
+          "shares": 200,
+          "profit": 69.99999999999886,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-06-18 14:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 40.14,
+          "shares": 300,
+          "profit": 1139.999999999999,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2025-06-19 14:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 41.68,
+          "shares": 400,
+          "reason": "建仓(63%)"
+        },
+        {
+          "date": "2025-07-01 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 42.86,
+          "shares": 400,
+          "profit": 471.9999999999999,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2025-07-03 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 41.78,
+          "shares": 400,
+          "reason": "建仓(58%)"
+        },
+        {
+          "date": "2025-07-08 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 47.19,
+          "shares": 200,
+          "profit": 1081.9999999999993,
+          "reason": "止盈(12.9%)"
+        },
+        {
+          "date": "2025-07-09 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 47.39,
+          "shares": 200,
+          "profit": 1122.0,
+          "reason": "止盈(13.4%)"
+        },
+        {
+          "date": "2025-07-11 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 44.6,
+          "shares": 400,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-07-16 11:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 46.5,
+          "shares": 200,
+          "profit": 379.9999999999997,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-07-21 13:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 49.87,
+          "shares": 200,
+          "profit": 1053.999999999999,
+          "reason": "止盈(11.8%)"
+        },
+        {
+          "date": "2025-07-23 11:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 48.98,
+          "shares": 400,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-07-28 13:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 69.14,
+          "shares": 200,
+          "profit": 4032.000000000001,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-07-29 13:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 71.07,
+          "shares": 100,
+          "profit": 2208.9999999999995,
+          "reason": "止盈(45.1%)"
+        },
+        {
+          "date": "2025-07-31 11:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 80.88,
+          "shares": 100,
+          "profit": 3190.0,
+          "reason": "强烈看跌(29%)"
+        },
+        {
+          "date": "2025-08-04 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 70.31,
+          "shares": 200,
+          "reason": "强烈买入(73%)"
+        },
+        {
+          "date": "2025-08-05 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 77.23,
+          "shares": 100,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-08-06 11:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 88.19,
+          "shares": 100,
+          "profit": 1557.3333333333337,
+          "reason": "止盈(21.4%)"
+        },
+        {
+          "date": "2025-08-07 11:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 85.81,
+          "shares": 100,
+          "reason": "加仓(70%)"
+        },
+        {
+          "date": "2025-08-11 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 96.13,
+          "shares": 100,
+          "profit": 1911.5555555555559,
+          "reason": "止盈(24.8%)"
+        },
+        {
+          "date": "2025-08-12 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 98.18,
+          "shares": 100,
+          "profit": 2116.555555555557,
+          "reason": "止盈(27.5%)"
+        },
+        {
+          "date": "2025-08-19 11:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 90.36,
+          "shares": 100,
+          "profit": 1334.5555555555563,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2025-09-01 11:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 89.05,
+          "shares": 200,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-09-02 14:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 84.02,
+          "shares": 100,
+          "reason": "补仓(58%)"
+        },
+        {
+          "date": "2025-09-03 14:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 86.31,
+          "shares": 100,
+          "profit": -106.33333333333326,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-09-05 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 82.72,
+          "shares": 100,
+          "reason": "补仓(64%)"
+        },
+        {
+          "date": "2025-09-09 11:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 92.22,
+          "shares": 100,
+          "profit": 639.7777777777776,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-09-10 13:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 97.75,
+          "shares": 100,
+          "profit": 1192.7777777777778,
+          "reason": "止盈(13.9%)"
+        },
+        {
+          "date": "2025-09-25 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 104.65,
+          "shares": 100,
+          "profit": 1882.7777777777783,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2025-09-26 14:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 98.4,
+          "shares": 200,
+          "reason": "建仓(63%)"
+        },
+        {
+          "date": "2025-10-09 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 98.55,
+          "shares": 100,
+          "profit": 14.999999999999147,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-10-13 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 91.8,
+          "shares": 100,
+          "reason": "补仓(59%)"
+        },
+        {
+          "date": "2025-10-14 14:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 88.74,
+          "shares": 100,
+          "reason": "补仓(55%)"
+        },
+        {
+          "date": "2025-10-16 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 92.06,
+          "shares": 100,
+          "profit": -92.00000000000017,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-10-17 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 93.37,
+          "shares": 100,
+          "profit": 39.00000000000006,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-10-29 15:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 133.0,
+          "shares": 100,
+          "profit": 4001.9999999999995,
+          "reason": "强烈看跌(29%)"
+        },
+        {
+          "date": "2025-11-03 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 117.94,
+          "shares": 100,
+          "reason": "建仓(55%)"
+        },
+        {
+          "date": "2025-11-05 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 120.33,
+          "shares": 100,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-11-06 14:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 124.0,
+          "shares": 100,
+          "profit": 486.4999999999995,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-11-14 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 117.15,
+          "shares": 100,
+          "profit": -198.49999999999994,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2025-11-21 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 107.12,
+          "shares": 100,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-12-01 14:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 111.43,
+          "shares": 100,
+          "profit": 431.0000000000002,
+          "reason": "强烈看跌(26%)"
+        },
+        {
+          "date": "2025-12-04 13:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 102.56,
+          "shares": 100,
+          "reason": "建仓(55%)"
+        },
+        {
+          "date": "2025-12-05 13:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 103.19,
+          "shares": 100,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2025-12-09 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 114.67,
+          "shares": 100,
+          "profit": 1179.5000000000002,
+          "reason": "止盈(11.5%)"
+        },
+        {
+          "date": "2025-12-23 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 123.05,
+          "shares": 100,
+          "profit": 2017.4999999999998,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2025-12-24 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 120.08,
+          "shares": 100,
+          "reason": "建仓(55%)"
+        },
+        {
+          "date": "2026-01-05 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 120.11,
+          "shares": 100,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2026-01-07 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 138.0,
+          "shares": 100,
+          "profit": 1790.5,
+          "reason": "看跌(36%)"
+        },
+        {
+          "date": "2026-01-08 15:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 128.35,
+          "shares": 100,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-01-14 11:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 135.99,
+          "shares": 200,
+          "profit": 2353.5000000000027,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2026-01-15 14:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 139.04,
+          "shares": 100,
+          "reason": "建仓(61%)"
+        },
+        {
+          "date": "2026-01-21 14:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 159.9,
+          "shares": 100,
+          "profit": 2086.0000000000014,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2026-01-23 11:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 167.2,
+          "shares": 100,
+          "reason": "建仓(59%)"
+        },
+        {
+          "date": "2026-01-27 14:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 176.99,
+          "shares": 100,
+          "profit": 979.000000000002,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2026-01-30 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 156.57,
+          "shares": 100,
+          "reason": "建仓(64%)"
+        },
+        {
+          "date": "2026-02-26 11:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 167.2,
+          "shares": 100,
+          "profit": 1062.9999999999995,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2026-03-04 13:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 145.15,
+          "shares": 100,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2026-03-09 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 137.78,
+          "shares": 100,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-03-10 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 150.0,
+          "shares": 100,
+          "profit": 853.4999999999997,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-03-11 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 157.66,
+          "shares": 100,
+          "profit": 1619.4999999999993,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2026-03-13 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 145.53,
+          "shares": 100,
+          "reason": "建仓(60%)"
+        },
+        {
+          "date": "2026-03-25 10:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 163.71,
+          "shares": 100,
+          "profit": 1818.0000000000007,
+          "reason": "强烈看跌(32%)"
+        },
+        {
+          "date": "2026-03-26 10:30:00",
+          "symbol": "301200.SZ",
+          "type": "BUY",
+          "price": 161.09,
+          "shares": 100,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2026-03-30 14:00:00",
+          "symbol": "301200.SZ",
+          "type": "SELL",
+          "price": 179.65,
+          "shares": 100,
+          "profit": 1856.0000000000002,
+          "reason": "强烈看跌(31%)"
+        }
+      ],
+      "summary": {
+        "initial_capital": 100000,
+        "final_value": 148062.0,
+        "profit": 48062.0,
+        "profit_rate": 48.06,
+        "trade_count": 70,
+        "win_rate": 89.7,
+        "holding_shares": 0,
+        "avg_cost": 0,
+        "positions": []
+      }
+    },
+    {
+      "symbol": "002402.SZ",
+      "profit_rate": 43.71,
+      "win_rate": 82.5,
+      "trade_count": 83,
+      "trades": [
+        {
+          "date": "2025-04-24 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 19.28,
+          "shares": 1000,
+          "reason": "建仓(58%)"
+        },
+        {
+          "date": "2025-04-30 10:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 19.48,
+          "shares": 500,
+          "profit": 99.99999999999964,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-05-14 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 20.51,
+          "shares": 700,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-05-22 10:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 18.97,
+          "shares": 500,
+          "reason": "补仓(62%)"
+        },
+        {
+          "date": "2025-05-23 11:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 18.84,
+          "shares": 700,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-06-05 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 18.86,
+          "shares": 700,
+          "reason": "加仓(70%)"
+        },
+        {
+          "date": "2025-06-10 13:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 18.61,
+          "shares": 800,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-06-13 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 18.18,
+          "shares": 500,
+          "reason": "补仓(61%)"
+        },
+        {
+          "date": "2025-06-24 10:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 21.02,
+          "shares": 2200,
+          "profit": 4318.999999999995,
+          "reason": "止盈(10.3%)"
+        },
+        {
+          "date": "2025-06-26 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 21.23,
+          "shares": 1100,
+          "profit": 2390.4999999999986,
+          "reason": "止盈(11.4%)"
+        },
+        {
+          "date": "2025-06-27 10:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 23.33,
+          "shares": 1100,
+          "profit": 4700.499999999996,
+          "reason": "强烈看跌(31%)"
+        },
+        {
+          "date": "2025-06-30 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 23.18,
+          "shares": 800,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-07-02 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 22.83,
+          "shares": 800,
+          "profit": -280.00000000000114,
+          "reason": "强烈看跌(30%)"
+        },
+        {
+          "date": "2025-07-07 11:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 21.9,
+          "shares": 900,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-07-10 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 21.63,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-07-18 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 22.47,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-07-21 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 22.98,
+          "shares": 1000,
+          "profit": 994.2857142857165,
+          "reason": "看跌(36%)"
+        },
+        {
+          "date": "2025-07-23 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 22.42,
+          "shares": 600,
+          "reason": "加仓(70%)"
+        },
+        {
+          "date": "2025-07-28 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 25.19,
+          "shares": 800,
+          "profit": 2440.8067226890753,
+          "reason": "止盈(13.8%)"
+        },
+        {
+          "date": "2025-07-29 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 24.97,
+          "shares": 400,
+          "profit": 1132.4033613445365,
+          "reason": "止盈(12.8%)"
+        },
+        {
+          "date": "2025-07-30 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 24.91,
+          "shares": 500,
+          "profit": 1385.5042016806713,
+          "reason": "止盈(12.5%)"
+        },
+        {
+          "date": "2025-08-05 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 25.59,
+          "shares": 700,
+          "reason": "建仓(64%)"
+        },
+        {
+          "date": "2025-08-08 13:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 26.82,
+          "shares": 500,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-08-14 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 31.61,
+          "shares": 1200,
+          "profit": 6609.0,
+          "reason": "强烈看跌(25%)"
+        },
+        {
+          "date": "2025-08-15 11:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 29.96,
+          "shares": 600,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-08-20 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 33.31,
+          "shares": 300,
+          "profit": 1005.0000000000005,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-08-22 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 35.86,
+          "shares": 300,
+          "profit": 1769.9999999999995,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-08-25 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 39.75,
+          "shares": 500,
+          "reason": "强烈买入(68%)"
+        },
+        {
+          "date": "2025-08-29 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 40.69,
+          "shares": 200,
+          "profit": 187.99999999999955,
+          "reason": "看跌(35%)"
+        },
+        {
+          "date": "2025-09-01 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 39.98,
+          "shares": 300,
+          "profit": 68.99999999999906,
+          "reason": "强烈看跌(24%)"
+        },
+        {
+          "date": "2025-09-04 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 33.89,
+          "shares": 500,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-09-05 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 35.52,
+          "shares": 400,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-09-08 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 36.9,
+          "shares": 900,
+          "profit": 2056.9999999999986,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2025-09-10 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 36.15,
+          "shares": 500,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-09-18 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 43.95,
+          "shares": 500,
+          "profit": 3900.0000000000023,
+          "reason": "强烈看跌(31%)"
+        },
+        {
+          "date": "2025-09-19 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 45.28,
+          "shares": 400,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-09-22 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 50.17,
+          "shares": 200,
+          "reason": "加仓(73%)"
+        },
+        {
+          "date": "2025-09-23 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 55.19,
+          "shares": 200,
+          "reason": "加仓(70%)"
+        },
+        {
+          "date": "2025-09-24 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 56.9,
+          "shares": 400,
+          "profit": 3168.000000000001,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-09-25 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 53.11,
+          "shares": 400,
+          "profit": 1652.000000000001,
+          "reason": "强烈看跌(30%)"
+        },
+        {
+          "date": "2025-09-26 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 48.18,
+          "shares": 400,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-09-30 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 49.83,
+          "shares": 400,
+          "profit": 659.9999999999994,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2025-10-17 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 49.94,
+          "shares": 400,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-10-24 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 55.72,
+          "shares": 400,
+          "profit": 2312.0000000000005,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2025-10-29 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 53.69,
+          "shares": 300,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-10-31 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 57.6,
+          "shares": 300,
+          "profit": 1173.0000000000011,
+          "reason": "强烈看跌(31%)"
+        },
+        {
+          "date": "2025-11-03 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 48.84,
+          "shares": 400,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-11-05 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 47.01,
+          "shares": 300,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-11-07 13:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 48.74,
+          "shares": 300,
+          "profit": 205.28571428571425,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-11-14 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 49.36,
+          "shares": 400,
+          "profit": 521.7142857142846,
+          "reason": "强烈看跌(32%)"
+        },
+        {
+          "date": "2025-11-17 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 51.0,
+          "shares": 300,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-11-21 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 55.12,
+          "shares": 100,
+          "profit": 411.9999999999998,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-11-24 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 48.32,
+          "shares": 200,
+          "profit": -536.0,
+          "reason": "看跌(36%)"
+        },
+        {
+          "date": "2025-11-25 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 47.03,
+          "shares": 400,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-11-27 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 48.48,
+          "shares": 200,
+          "profit": 289.99999999999915,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-12-01 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 51.11,
+          "shares": 200,
+          "profit": 815.9999999999997,
+          "reason": "强烈看跌(31%)"
+        },
+        {
+          "date": "2025-12-03 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 48.56,
+          "shares": 400,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-12-08 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 44.07,
+          "shares": 200,
+          "reason": "补仓(59%)"
+        },
+        {
+          "date": "2025-12-09 10:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 44.93,
+          "shares": 300,
+          "profit": -639.9999999999999,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-12-10 10:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 44.9,
+          "shares": 300,
+          "profit": -649.0000000000002,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-12-17 10:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 38.17,
+          "shares": 500,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-12-22 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 39.43,
+          "shares": 200,
+          "profit": 251.9999999999996,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-12-24 11:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 38.71,
+          "shares": 300,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-12-30 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 40.26,
+          "shares": 300,
+          "profit": 546.0000000000001,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-01-05 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 39.7,
+          "shares": 300,
+          "reason": "加仓(70%)"
+        },
+        {
+          "date": "2026-01-08 13:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 39.39,
+          "shares": 300,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-01-19 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 40.3,
+          "shares": 400,
+          "profit": 449.3333333333311,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2026-01-23 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 40.18,
+          "shares": 200,
+          "profit": 200.66666666666606,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-01-27 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 39.21,
+          "shares": 300,
+          "profit": 9.999999999999432,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-01-30 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 37.13,
+          "shares": 500,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2026-02-05 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 36.05,
+          "shares": 400,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2026-02-12 13:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 36.14,
+          "shares": 400,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2026-02-24 14:30:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 36.0,
+          "shares": 400,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2026-02-26 10:30:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 36.58,
+          "shares": 800,
+          "profit": 162.35294117647072,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2026-03-02 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 35.63,
+          "shares": 900,
+          "profit": -672.3529411764666,
+          "reason": "强烈看跌(30%)"
+        },
+        {
+          "date": "2026-03-04 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 33.15,
+          "shares": 600,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2026-03-05 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 33.4,
+          "shares": 400,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-03-06 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 33.38,
+          "shares": 500,
+          "profit": 65.00000000000128,
+          "reason": "看跌(35%)"
+        },
+        {
+          "date": "2026-03-11 14:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 32.93,
+          "shares": 200,
+          "profit": -64.00000000000006,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2026-03-13 15:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 31.78,
+          "shares": 300,
+          "profit": -440.99999999999966,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2026-03-24 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 28.33,
+          "shares": 700,
+          "reason": "建仓(58%)"
+        },
+        {
+          "date": "2026-03-26 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "SELL",
+          "price": 29.36,
+          "shares": 700,
+          "profit": 721.0000000000008,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2026-03-30 10:00:00",
+          "symbol": "002402.SZ",
+          "type": "BUY",
+          "price": 29.38,
+          "shares": 600,
+          "reason": "建仓(55%)"
+        }
+      ],
+      "summary": {
+        "initial_capital": 100000,
+        "final_value": 143713.0,
+        "profit": 43713.0,
+        "profit_rate": 43.71,
+        "trade_count": 83,
+        "win_rate": 82.5,
+        "holding_shares": 600,
+        "avg_cost": 29.38,
+        "positions": [
+          {
+            "symbol": "002402.SZ",
+            "shares": 600,
+            "avg_cost": 29.38,
+            "value": 17946.0
+          }
+        ]
+      }
+    },
+    {
+      "symbol": "601567.SH",
+      "profit_rate": 30.08,
+      "win_rate": 80.4,
+      "trade_count": 94,
+      "trades": [
+        {
+          "date": "2025-04-23 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 26.1,
+          "shares": 700,
+          "reason": "建仓(60%)"
+        },
+        {
+          "date": "2025-04-30 14:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 25.67,
+          "shares": 500,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-05-06 14:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 25.16,
+          "shares": 500,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-05-14 13:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 25.56,
+          "shares": 500,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2025-05-21 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 24.26,
+          "shares": 400,
+          "reason": "补仓(56%)"
+        },
+        {
+          "date": "2025-05-22 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 24.08,
+          "shares": 400,
+          "reason": "补仓(56%)"
+        },
+        {
+          "date": "2025-05-26 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.95,
+          "shares": 400,
+          "reason": "补仓(60%)"
+        },
+        {
+          "date": "2025-05-27 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.9,
+          "shares": 400,
+          "reason": "补仓(60%)"
+        },
+        {
+          "date": "2025-05-29 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 22.85,
+          "shares": 1900,
+          "profit": -3655.4999999999955,
+          "reason": "看跌(36%)"
+        },
+        {
+          "date": "2025-05-30 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 22.16,
+          "shares": 1900,
+          "profit": -4966.499999999998,
+          "reason": "止损(-10.6%)"
+        },
+        {
+          "date": "2025-06-04 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 21.88,
+          "shares": 900,
+          "reason": "建仓(59%)"
+        },
+        {
+          "date": "2025-06-09 14:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 23.08,
+          "shares": 400,
+          "profit": 479.9999999999997,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-06-18 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 21.94,
+          "shares": 500,
+          "profit": 30.000000000001137,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-06-19 14:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 21.29,
+          "shares": 900,
+          "reason": "建仓(59%)"
+        },
+        {
+          "date": "2025-06-24 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 21.75,
+          "shares": 400,
+          "profit": 184.00000000000034,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-06-25 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 22.12,
+          "shares": 500,
+          "profit": 415.0000000000009,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-06-26 14:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 21.7,
+          "shares": 900,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-06-30 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 22.42,
+          "shares": 400,
+          "profit": 288.00000000000097,
+          "reason": "看跌(35%)"
+        },
+        {
+          "date": "2025-07-01 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 22.05,
+          "shares": 500,
+          "profit": 175.0000000000007,
+          "reason": "看跌(36%)"
+        },
+        {
+          "date": "2025-07-03 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.28,
+          "shares": 800,
+          "reason": "建仓(55%)"
+        },
+        {
+          "date": "2025-07-07 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 21.93,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-07-08 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.11,
+          "shares": 600,
+          "reason": "加仓(70%)"
+        },
+        {
+          "date": "2025-07-10 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 23.37,
+          "shares": 1000,
+          "profit": 1246.0000000000023,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-07-11 15:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.73,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-07-16 15:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.32,
+          "shares": 600,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-07-18 11:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 21.51,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-07-24 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 21.85,
+          "shares": 600,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-07-29 14:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 21.65,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-07-31 11:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 22.58,
+          "shares": 2000,
+          "profit": 1079.9999999999982,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-08-05 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.62,
+          "shares": 600,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-08-12 13:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 24.4,
+          "shares": 1300,
+          "profit": 2893.9999999999995,
+          "reason": "止盈(10.0%)"
+        },
+        {
+          "date": "2025-08-18 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 24.48,
+          "shares": 600,
+          "profit": 1383.6923076923085,
+          "reason": "止盈(10.4%)"
+        },
+        {
+          "date": "2025-08-19 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 25.18,
+          "shares": 300,
+          "profit": 901.846153846154,
+          "reason": "止盈(13.6%)"
+        },
+        {
+          "date": "2025-08-20 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 24.93,
+          "shares": 400,
+          "profit": 1102.4615384615388,
+          "reason": "止盈(12.4%)"
+        },
+        {
+          "date": "2025-08-21 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 24.85,
+          "shares": 800,
+          "reason": "建仓(55%)"
+        },
+        {
+          "date": "2025-08-22 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.41,
+          "shares": 400,
+          "reason": "补仓(58%)"
+        },
+        {
+          "date": "2025-08-27 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 23.36,
+          "shares": 600,
+          "profit": -606.0000000000009,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-08-28 13:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.36,
+          "shares": 400,
+          "reason": "补仓(63%)"
+        },
+        {
+          "date": "2025-08-29 14:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 23.13,
+          "shares": 500,
+          "profit": -217.99999999999997,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-09-01 14:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 23.1,
+          "shares": 500,
+          "profit": -232.99999999999875,
+          "reason": "强烈看跌(27%)"
+        },
+        {
+          "date": "2025-09-03 14:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.57,
+          "shares": 800,
+          "reason": "建仓(60%)"
+        },
+        {
+          "date": "2025-09-05 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.95,
+          "shares": 600,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-09-08 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.29,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-09-10 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.77,
+          "shares": 600,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-09-11 11:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.67,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-09-16 11:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.45,
+          "shares": 600,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-09-17 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 23.26,
+          "shares": 3800,
+          "profit": 1854.0000000000105,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2025-09-18 15:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.67,
+          "shares": 800,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-09-26 11:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 24.98,
+          "shares": 400,
+          "profit": 923.9999999999995,
+          "reason": "止盈(10.2%)"
+        },
+        {
+          "date": "2025-10-09 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 25.05,
+          "shares": 200,
+          "profit": 475.9999999999998,
+          "reason": "止盈(10.5%)"
+        },
+        {
+          "date": "2025-10-10 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.44,
+          "shares": 200,
+          "profit": 753.9999999999999,
+          "reason": "止盈(16.6%)"
+        },
+        {
+          "date": "2025-10-22 15:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.13,
+          "shares": 800,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-10-28 14:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 24.5,
+          "shares": 400,
+          "profit": 548.0000000000005,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-10-29 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 25.33,
+          "shares": 400,
+          "profit": 879.9999999999998,
+          "reason": "强烈看跌(32%)"
+        },
+        {
+          "date": "2025-11-03 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.84,
+          "shares": 800,
+          "reason": "建仓(58%)"
+        },
+        {
+          "date": "2025-11-05 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.89,
+          "shares": 600,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-11-06 11:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.98,
+          "shares": 700,
+          "profit": 2583.000000000001,
+          "reason": "止盈(15.8%)"
+        },
+        {
+          "date": "2025-11-07 14:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.86,
+          "shares": 300,
+          "profit": 1071.0,
+          "reason": "止盈(15.3%)"
+        },
+        {
+          "date": "2025-11-10 15:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.16,
+          "shares": 200,
+          "profit": 574.0000000000002,
+          "reason": "止盈(12.3%)"
+        },
+        {
+          "date": "2025-11-11 15:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 28.78,
+          "shares": 200,
+          "profit": 1098.0000000000005,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-11-21 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.45,
+          "shares": 800,
+          "reason": "建仓(58%)"
+        },
+        {
+          "date": "2025-11-27 14:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 22.76,
+          "shares": 400,
+          "profit": -275.9999999999991,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-12-01 11:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 22.83,
+          "shares": 400,
+          "profit": -248.0000000000004,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-12-04 14:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.42,
+          "shares": 800,
+          "reason": "建仓(60%)"
+        },
+        {
+          "date": "2025-12-05 14:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.76,
+          "shares": 600,
+          "reason": "加仓(74%)"
+        },
+        {
+          "date": "2025-12-11 11:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.87,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-12-12 15:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 24.17,
+          "shares": 1000,
+          "profit": 1513.0000000000016,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-12-18 15:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.32,
+          "shares": 600,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-12-31 11:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 22.72,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-01-05 11:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.3,
+          "shares": 600,
+          "reason": "加仓(72%)"
+        },
+        {
+          "date": "2026-01-08 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 24.33,
+          "shares": 600,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2026-01-16 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 25.6,
+          "shares": 1700,
+          "profit": 4090.5,
+          "reason": "止盈(10.4%)"
+        },
+        {
+          "date": "2026-01-19 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.4,
+          "shares": 800,
+          "profit": 2564.941176470586,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-01-20 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.54,
+          "shares": 400,
+          "profit": 1338.4705882352932,
+          "reason": "止盈(14.4%)"
+        },
+        {
+          "date": "2026-01-21 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.19,
+          "shares": 200,
+          "profit": 599.2352941176471,
+          "reason": "止盈(12.9%)"
+        },
+        {
+          "date": "2026-01-23 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.42,
+          "shares": 300,
+          "profit": 967.8529411764707,
+          "reason": "止盈(13.9%)"
+        },
+        {
+          "date": "2026-01-27 10:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 24.21,
+          "shares": 800,
+          "reason": "建仓(61%)"
+        },
+        {
+          "date": "2026-01-29 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 25.04,
+          "shares": 800,
+          "profit": 663.9999999999986,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2026-01-30 10:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.47,
+          "shares": 800,
+          "reason": "建仓(60%)"
+        },
+        {
+          "date": "2026-02-03 11:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 23.67,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-02-04 15:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 24.61,
+          "shares": 700,
+          "profit": 738.0000000000006,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2026-02-12 15:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 24.85,
+          "shares": 300,
+          "profit": 388.28571428571513,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-02-25 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.02,
+          "shares": 200,
+          "profit": 492.85714285714306,
+          "reason": "止盈(10.5%)"
+        },
+        {
+          "date": "2026-02-26 11:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 26.21,
+          "shares": 200,
+          "profit": 530.8571428571433,
+          "reason": "止盈(11.3%)"
+        },
+        {
+          "date": "2026-03-04 13:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 25.85,
+          "shares": 700,
+          "reason": "建仓(55%)"
+        },
+        {
+          "date": "2026-03-06 14:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 29.41,
+          "shares": 500,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2026-03-09 14:30:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 32.35,
+          "shares": 400,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-03-11 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 33.15,
+          "shares": 800,
+          "profit": 3650.0,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-03-12 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 31.62,
+          "shares": 400,
+          "profit": 1213.000000000001,
+          "reason": "止盈(10.6%)"
+        },
+        {
+          "date": "2026-03-13 14:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 30.52,
+          "shares": 200,
+          "profit": 386.5000000000002,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2026-03-17 10:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 30.8,
+          "shares": 200,
+          "profit": 442.50000000000045,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2026-03-18 11:00:00",
+          "symbol": "601567.SH",
+          "type": "BUY",
+          "price": 28.66,
+          "shares": 600,
+          "reason": "建仓(60%)"
+        },
+        {
+          "date": "2026-03-20 11:00:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 28.03,
+          "shares": 300,
+          "profit": -188.99999999999972,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-03-26 10:30:00",
+          "symbol": "601567.SH",
+          "type": "SELL",
+          "price": 28.51,
+          "shares": 300,
+          "profit": -44.999999999999574,
+          "reason": "看跌(40%)"
+        }
+      ],
+      "summary": {
+        "initial_capital": 100000,
+        "final_value": 130085.0,
+        "profit": 30085.0,
+        "profit_rate": 30.08,
+        "trade_count": 94,
+        "win_rate": 80.4,
+        "holding_shares": 0,
+        "avg_cost": 0,
+        "positions": []
+      }
+    },
+    {
+      "symbol": "002335.SZ",
+      "profit_rate": 29.36,
+      "win_rate": 82.6,
+      "trade_count": 75,
+      "trades": [
+        {
+          "date": "2025-04-24 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 37.04,
+          "shares": 500,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-04-28 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 40.87,
+          "shares": 200,
+          "profit": 765.9999999999997,
+          "reason": "止盈(10.3%)"
+        },
+        {
+          "date": "2025-04-29 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 40.94,
+          "shares": 300,
+          "profit": 1169.9999999999995,
+          "reason": "止盈(10.5%)"
+        },
+        {
+          "date": "2025-05-07 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 43.97,
+          "shares": 400,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-05-13 10:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 45.91,
+          "shares": 400,
+          "profit": 775.9999999999991,
+          "reason": "强烈看跌(34%)"
+        },
+        {
+          "date": "2025-05-23 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 38.47,
+          "shares": 500,
+          "reason": "建仓(60%)"
+        },
+        {
+          "date": "2025-05-29 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 39.69,
+          "shares": 200,
+          "profit": 243.99999999999977,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2025-06-03 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 37.88,
+          "shares": 300,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-06-05 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 39.03,
+          "shares": 300,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2025-06-06 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 43.55,
+          "shares": 400,
+          "profit": 2035.9999999999986,
+          "reason": "止盈(13.2%)"
+        },
+        {
+          "date": "2025-06-09 10:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 43.07,
+          "shares": 300,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-06-16 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 43.45,
+          "shares": 400,
+          "profit": 1304.5000000000016,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-06-19 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 41.25,
+          "shares": 200,
+          "profit": 212.25000000000023,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-06-23 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 38.62,
+          "shares": 300,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-06-25 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 42.12,
+          "shares": 500,
+          "profit": 1436.2499999999975,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2025-07-03 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 40.79,
+          "shares": 400,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-07-08 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 39.74,
+          "shares": 300,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-07-09 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 39.76,
+          "shares": 300,
+          "profit": -174.00000000000162,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-07-14 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 40.25,
+          "shares": 200,
+          "profit": -18.000000000000682,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-07-15 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 44.3,
+          "shares": 200,
+          "profit": 791.9999999999987,
+          "reason": "强烈看跌(32%)"
+        },
+        {
+          "date": "2025-07-21 11:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 42.07,
+          "shares": 400,
+          "reason": "建仓(55%)"
+        },
+        {
+          "date": "2025-07-25 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 41.65,
+          "shares": 300,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2025-07-28 10:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 42.76,
+          "shares": 700,
+          "profit": 608.9999999999982,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2025-07-29 10:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 41.05,
+          "shares": 400,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-07-31 10:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 42.59,
+          "shares": 400,
+          "profit": 616.0000000000025,
+          "reason": "强烈看跌(31%)"
+        },
+        {
+          "date": "2025-08-05 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 41.65,
+          "shares": 400,
+          "reason": "强烈买入(66%)"
+        },
+        {
+          "date": "2025-08-13 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 47.41,
+          "shares": 200,
+          "profit": 1151.9999999999995,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-08-15 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 48.71,
+          "shares": 200,
+          "profit": 1412.0000000000005,
+          "reason": "止盈(17.0%)"
+        },
+        {
+          "date": "2025-08-19 10:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 51.51,
+          "shares": 300,
+          "reason": "建仓(61%)"
+        },
+        {
+          "date": "2025-08-21 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 48.59,
+          "shares": 200,
+          "reason": "补仓(57%)"
+        },
+        {
+          "date": "2025-08-25 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 53.74,
+          "shares": 500,
+          "profit": 1699.0000000000016,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2025-08-26 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 51.55,
+          "shares": 300,
+          "reason": "建仓(55%)"
+        },
+        {
+          "date": "2025-08-28 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 58.4,
+          "shares": 100,
+          "profit": 685.0000000000001,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2025-08-29 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 58.17,
+          "shares": 100,
+          "profit": 662.0000000000005,
+          "reason": "止盈(12.8%)"
+        },
+        {
+          "date": "2025-09-01 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 57.25,
+          "shares": 100,
+          "profit": 570.0000000000002,
+          "reason": "强烈看跌(28%)"
+        },
+        {
+          "date": "2025-09-04 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 49.47,
+          "shares": 400,
+          "reason": "建仓(59%)"
+        },
+        {
+          "date": "2025-09-09 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 56.26,
+          "shares": 200,
+          "profit": 1357.9999999999998,
+          "reason": "止盈(13.7%)"
+        },
+        {
+          "date": "2025-09-10 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 55.88,
+          "shares": 100,
+          "profit": 641.0000000000003,
+          "reason": "止盈(13.0%)"
+        },
+        {
+          "date": "2025-09-11 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 62.76,
+          "shares": 200,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-09-15 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 69.55,
+          "shares": 100,
+          "profit": 1122.0,
+          "reason": "止盈(19.2%)"
+        },
+        {
+          "date": "2025-09-16 14:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 69.89,
+          "shares": 100,
+          "profit": 1156.0000000000002,
+          "reason": "止盈(19.8%)"
+        },
+        {
+          "date": "2025-09-25 14:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 77.98,
+          "shares": 100,
+          "profit": 1965.0000000000005,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2025-10-13 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 65.64,
+          "shares": 300,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-10-15 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 66.21,
+          "shares": 100,
+          "profit": 56.99999999999932,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-10-16 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 65.52,
+          "shares": 200,
+          "profit": -24.00000000000091,
+          "reason": "强烈看跌(32%)"
+        },
+        {
+          "date": "2025-10-23 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 60.63,
+          "shares": 300,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-10-27 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 59.4,
+          "shares": 100,
+          "profit": -123.0000000000004,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-10-28 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 56.41,
+          "shares": 100,
+          "reason": "补仓(57%)"
+        },
+        {
+          "date": "2025-10-29 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 57.76,
+          "shares": 100,
+          "profit": -146.33333333333383,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-10-30 14:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 55.5,
+          "shares": 100,
+          "profit": -372.3333333333336,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-10-31 14:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 54.81,
+          "shares": 100,
+          "profit": -441.33333333333337,
+          "reason": "强烈看跌(27%)"
+        },
+        {
+          "date": "2025-11-03 14:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 54.56,
+          "shares": 300,
+          "reason": "建仓(60%)"
+        },
+        {
+          "date": "2025-11-05 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 53.38,
+          "shares": 200,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-11-06 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 57.73,
+          "shares": 200,
+          "profit": 728.3999999999992,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2025-11-13 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 55.71,
+          "shares": 100,
+          "profit": 162.2,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-11-20 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 52.96,
+          "shares": 100,
+          "profit": -112.80000000000001,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-11-24 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 50.36,
+          "shares": 100,
+          "reason": "补仓(56%)"
+        },
+        {
+          "date": "2025-11-25 10:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 53.35,
+          "shares": 200,
+          "profit": 225.20000000000095,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2025-11-28 14:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 52.88,
+          "shares": 300,
+          "reason": "建仓(58%)"
+        },
+        {
+          "date": "2025-12-02 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 53.29,
+          "shares": 300,
+          "profit": 122.99999999999898,
+          "reason": "强烈看跌(32%)"
+        },
+        {
+          "date": "2025-12-04 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 53.8,
+          "shares": 300,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-12-17 14:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 55.76,
+          "shares": 100,
+          "profit": 196.00000000000009,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2025-12-23 13:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 55.0,
+          "shares": 100,
+          "profit": 120.00000000000028,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2026-01-05 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 56.3,
+          "shares": 200,
+          "reason": "加仓(73%)"
+        },
+        {
+          "date": "2026-01-08 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 61.78,
+          "shares": 100,
+          "profit": 631.3333333333333,
+          "reason": "止盈(11.4%)"
+        },
+        {
+          "date": "2026-01-09 14:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 65.7,
+          "shares": 100,
+          "profit": 1023.3333333333335,
+          "reason": "止盈(18.4%)"
+        },
+        {
+          "date": "2026-02-02 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 62.88,
+          "shares": 100,
+          "profit": 741.3333333333334,
+          "reason": "强烈看跌(27%)"
+        },
+        {
+          "date": "2026-02-05 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 56.5,
+          "shares": 300,
+          "reason": "强烈买入(68%)"
+        },
+        {
+          "date": "2026-02-09 10:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 59.56,
+          "shares": 100,
+          "profit": 306.0000000000002,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2026-02-12 11:30:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 63.8,
+          "shares": 100,
+          "profit": 729.9999999999998,
+          "reason": "止盈(12.9%)"
+        },
+        {
+          "date": "2026-03-02 14:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 62.17,
+          "shares": 100,
+          "profit": 567.0000000000002,
+          "reason": "强烈看跌(28%)"
+        },
+        {
+          "date": "2026-03-05 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "BUY",
+          "price": 57.56,
+          "shares": 300,
+          "reason": "建仓(64%)"
+        },
+        {
+          "date": "2026-03-10 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 63.75,
+          "shares": 100,
+          "profit": 618.9999999999998,
+          "reason": "止盈(10.8%)"
+        },
+        {
+          "date": "2026-03-11 11:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 70.78,
+          "shares": 100,
+          "profit": 1322.0,
+          "reason": "止盈(23.0%)"
+        },
+        {
+          "date": "2026-03-19 10:00:00",
+          "symbol": "002335.SZ",
+          "type": "SELL",
+          "price": 65.91,
+          "shares": 100,
+          "profit": 834.9999999999994,
+          "reason": "强烈看跌(35%)"
+        }
+      ],
+      "summary": {
+        "initial_capital": 100000,
+        "final_value": 129359.0,
+        "profit": 29359.0,
+        "profit_rate": 29.36,
+        "trade_count": 75,
+        "win_rate": 82.6,
+        "holding_shares": 0,
+        "avg_cost": 0,
+        "positions": []
+      }
+    },
+    {
+      "symbol": "002128.SZ",
+      "profit_rate": 28.1,
+      "win_rate": 89.5,
+      "trade_count": 70,
+      "trades": [
+        {
+          "date": "2025-04-16 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 17.91,
+          "shares": 1100,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-04-23 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 18.63,
+          "shares": 500,
+          "profit": 359.99999999999943,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2025-04-24 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 18.81,
+          "shares": 300,
+          "profit": 269.99999999999955,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2025-06-05 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 19.39,
+          "shares": 700,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-06-12 13:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 19.66,
+          "shares": 700,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-06-13 13:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 19.31,
+          "shares": 700,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-06-18 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 19.1,
+          "shares": 1200,
+          "profit": -192.49999999999972,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-06-23 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 19.6,
+          "shares": 600,
+          "profit": 203.75000000000014,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-07-02 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 20.31,
+          "shares": 600,
+          "profit": 629.7499999999985,
+          "reason": "强烈看跌(35%)"
+        },
+        {
+          "date": "2025-07-07 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 19.85,
+          "shares": 1000,
+          "reason": "建仓(63%)"
+        },
+        {
+          "date": "2025-07-10 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 18.99,
+          "shares": 700,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-07-11 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 19.34,
+          "shares": 800,
+          "profit": -124.70588235294144,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-07-17 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 19.23,
+          "shares": 700,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2025-07-23 11:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 21.32,
+          "shares": 800,
+          "profit": 1552.3529411764712,
+          "reason": "止盈(10.0%)"
+        },
+        {
+          "date": "2025-07-30 13:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 20.93,
+          "shares": 400,
+          "profit": 620.1764705882354,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-08-01 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 20.13,
+          "shares": 400,
+          "profit": 300.17647058823513,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2025-08-04 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 20.02,
+          "shares": 900,
+          "reason": "建仓(58%)"
+        },
+        {
+          "date": "2025-08-05 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 20.06,
+          "shares": 700,
+          "reason": "加仓(69%)"
+        },
+        {
+          "date": "2025-08-06 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 20.59,
+          "shares": 800,
+          "profit": 441.99999999999875,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2025-08-11 13:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 20.29,
+          "shares": 700,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-08-21 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 19.74,
+          "shares": 700,
+          "profit": -290.7333333333355,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-09-01 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 21.13,
+          "shares": 400,
+          "profit": 389.86666666666565,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-09-02 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 21.33,
+          "shares": 400,
+          "profit": 469.86666666666537,
+          "reason": "看跌(36%)"
+        },
+        {
+          "date": "2025-09-04 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 20.92,
+          "shares": 900,
+          "reason": "强烈买入(65%)"
+        },
+        {
+          "date": "2025-09-05 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 21.26,
+          "shares": 700,
+          "reason": "加仓(73%)"
+        },
+        {
+          "date": "2025-09-09 15:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 22.42,
+          "shares": 800,
+          "profit": 1081.0000000000002,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-09-11 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 22.12,
+          "shares": 600,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-09-15 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 23.11,
+          "shares": 700,
+          "profit": 1113.499999999999,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-09-29 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 22.34,
+          "shares": 600,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-10-09 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 23.82,
+          "shares": 600,
+          "profit": 1153.1538461538453,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-10-15 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 24.3,
+          "shares": 300,
+          "profit": 720.5769230769228,
+          "reason": "止盈(11.0%)"
+        },
+        {
+          "date": "2025-10-17 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 24.39,
+          "shares": 400,
+          "profit": 996.7692307692303,
+          "reason": "止盈(11.4%)"
+        },
+        {
+          "date": "2025-10-21 11:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 24.3,
+          "shares": 800,
+          "reason": "建仓(57%)"
+        },
+        {
+          "date": "2025-10-22 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 24.57,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-10-24 15:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 24.48,
+          "shares": 600,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2025-10-28 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 24.25,
+          "shares": 600,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2025-11-03 15:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 25.95,
+          "shares": 1300,
+          "profit": 2024.9999999999986,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-11-05 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 25.28,
+          "shares": 500,
+          "reason": "加仓(71%)"
+        },
+        {
+          "date": "2025-11-07 11:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 27.13,
+          "shares": 900,
+          "profit": 2241.9999999999986,
+          "reason": "止盈(10.1%)"
+        },
+        {
+          "date": "2025-11-10 11:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 27.84,
+          "shares": 400,
+          "profit": 1280.4444444444443,
+          "reason": "止盈(13.0%)"
+        },
+        {
+          "date": "2025-11-12 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 27.43,
+          "shares": 200,
+          "profit": 558.2222222222221,
+          "reason": "止盈(11.3%)"
+        },
+        {
+          "date": "2025-11-13 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 27.55,
+          "shares": 300,
+          "profit": 873.3333333333335,
+          "reason": "止盈(11.8%)"
+        },
+        {
+          "date": "2025-11-24 11:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 25.87,
+          "shares": 700,
+          "reason": "建仓(58%)"
+        },
+        {
+          "date": "2025-11-26 11:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 26.55,
+          "shares": 300,
+          "profit": 203.99999999999991,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2025-11-28 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 25.87,
+          "shares": 500,
+          "reason": "加仓(69%)"
+        },
+        {
+          "date": "2025-12-01 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 26.41,
+          "shares": 900,
+          "profit": 485.9999999999992,
+          "reason": "强烈看跌(32%)"
+        },
+        {
+          "date": "2025-12-03 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 26.29,
+          "shares": 700,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2025-12-05 11:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 27.88,
+          "shares": 500,
+          "reason": "加仓(65%)"
+        },
+        {
+          "date": "2025-12-15 13:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 27.65,
+          "shares": 600,
+          "profit": 418.4999999999988,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2025-12-24 15:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 27.38,
+          "shares": 500,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2025-12-26 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 27.94,
+          "shares": 500,
+          "profit": 396.590909090909,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2026-01-05 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 28.86,
+          "shares": 500,
+          "reason": "加仓(67%)"
+        },
+        {
+          "date": "2026-01-07 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 29.3,
+          "shares": 500,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-01-15 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 31.05,
+          "shares": 800,
+          "profit": 2155.954545454546,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2026-01-28 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 30.84,
+          "shares": 800,
+          "profit": 1987.954545454545,
+          "reason": "强烈看跌(33%)"
+        },
+        {
+          "date": "2026-02-02 15:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 26.7,
+          "shares": 700,
+          "reason": "建仓(61%)"
+        },
+        {
+          "date": "2026-02-05 13:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 28.09,
+          "shares": 500,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-02-11 14:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 29.68,
+          "shares": 600,
+          "profit": 1440.500000000001,
+          "reason": "看跌(40%)"
+        },
+        {
+          "date": "2026-02-13 13:30:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 28.27,
+          "shares": 500,
+          "reason": "加仓(68%)"
+        },
+        {
+          "date": "2026-02-25 11:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 29.78,
+          "shares": 500,
+          "profit": 1025.227272727273,
+          "reason": "看跌(38%)"
+        },
+        {
+          "date": "2026-02-27 13:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 30.56,
+          "shares": 300,
+          "profit": 849.1363636363641,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-03-02 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 32.45,
+          "shares": 300,
+          "profit": 1416.1363636363653,
+          "reason": "止盈(17.0%)"
+        },
+        {
+          "date": "2026-03-03 14:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 32.59,
+          "shares": 600,
+          "reason": "建仓(59%)"
+        },
+        {
+          "date": "2026-03-12 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 34.29,
+          "shares": 300,
+          "profit": 509.99999999999875,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2026-03-19 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 30.17,
+          "shares": 300,
+          "profit": -726.0000000000005,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-03-23 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 29.47,
+          "shares": 600,
+          "reason": "建仓(56%)"
+        },
+        {
+          "date": "2026-03-24 11:00:00",
+          "symbol": "002128.SZ",
+          "type": "BUY",
+          "price": 29.32,
+          "shares": 500,
+          "reason": "加仓(66%)"
+        },
+        {
+          "date": "2026-03-26 10:00:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 30.21,
+          "shares": 500,
+          "profit": 404.0909090909093,
+          "reason": "看跌(37%)"
+        },
+        {
+          "date": "2026-03-30 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 31.18,
+          "shares": 300,
+          "profit": 533.4545454545463,
+          "reason": "看跌(39%)"
+        },
+        {
+          "date": "2026-03-31 10:30:00",
+          "symbol": "002128.SZ",
+          "type": "SELL",
+          "price": 30.48,
+          "shares": 300,
+          "profit": 323.4545454545465,
+          "reason": "强烈看跌(33%)"
+        }
+      ],
+      "summary": {
+        "initial_capital": 100000,
+        "final_value": 128099.0,
+        "profit": 28099.0,
+        "profit_rate": 28.1,
+        "trade_count": 70,
+        "win_rate": 89.5,
+        "holding_shares": 0,
+        "avg_cost": 0,
+        "positions": []
+      }
+    }
+  ],
+  "summary": {
+    "initial_capital": 100000,
+    "final_value": 148062.0,
+    "profit": 48062.0,
+    "profit_rate": 48.06,
+    "trade_count": 392,
+    "win_rate": 84.94,
+    "positions": []
+  },
+  "config": {
+    "initial_capital": 100000,
+    "position_pct": 0.2,
+    "stop_loss_pct": 0.1,
+    "take_profit_pct": 0.1,
+    "buy_threshold": 0.55,
+    "sell_threshold": 0.4,
+    "strong_buy_threshold": 0.65,
+    "strong_sell_threshold": 0.35,
+    "min_hold_periods": 16,
+    "min_trade_amount": 5000,
+    "trade_cooldown": 8
+  },
+  "time": "2026-04-02T11:45:47.887933"
+}
