@@ -63,7 +63,9 @@ def get_stock_data_by_period(symbol, period):
         df = df.sort_values('date')
 
         if period == '30m':
-            result_df = df
+            # 30 分钟线：只显示最近 3 个月的数据
+            three_months_ago = pd.Timestamp.now() - pd.DateOffset(months=3)
+            result_df = df[df['date'] >= three_months_ago].copy()
 
         elif period == 'daily':
             # 日线：按日期聚合
@@ -1348,7 +1350,7 @@ def db_export_csv(table):
 
 
 @app.route('/lgbm_backtest/<symbol>', methods=['GET'])
-def lgbm_backtest_single(symbol):
+def lgbm_backtest_single(symbol, start_date=None, end_date=None):
     """单只股票 LGBM 模型回测 - 支持加仓减仓做T"""
     try:
         import pickle
@@ -1358,6 +1360,12 @@ def lgbm_backtest_single(symbol):
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
         from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
         from data.data_handler import DataHandler
+
+        # 获取日期参数（优先使用函数参数，其次从 request 获取）
+        if start_date is None:
+            start_date = request.args.get('start_date', None)
+        if end_date is None:
+            end_date = request.args.get('end_date', None)
 
         # 加载模型
         model_dir = os.path.join(os.path.dirname(__file__), '../python/models')
@@ -1395,6 +1403,17 @@ def lgbm_backtest_single(symbol):
 
         df = df.sort_values('date').reset_index(drop=True)
 
+        # 日期过滤
+        if start_date:
+            start_dt = pd.to_datetime(start_date)
+            df = df[df['date'] >= start_dt]
+        if end_date:
+            end_dt = pd.to_datetime(end_date)
+            df = df[df['date'] <= end_dt]
+
+        if len(df) < 150:
+            return jsonify({"error": f"选定时间范围数据不足(需至少150条)"}), 400
+
         # 回测参数 - 更合理的设置
         initial_capital = 100000.0
         cash = initial_capital
@@ -1429,7 +1448,7 @@ def lgbm_backtest_single(symbol):
             current_price = round(df['close'].iloc[i], 2)
 
             # 计算特征和预测
-            df_slice = df.iloc[:i+1]
+            df_slice = df.iloc[:i+1].copy()
             try:
                 features = EnhancedFeatureEngineer.calculate_features(df_slice)
                 if features.iloc[-1].isna().any():
@@ -1437,7 +1456,7 @@ def lgbm_backtest_single(symbol):
                 else:
                     prob = model.predict_proba([features.iloc[-1].values])[0]
                     up_prob = prob[1] if len(prob) > 1 else prob[0]
-            except:
+            except Exception:
                 up_prob = 0.5
 
             predictions.append({
@@ -1683,10 +1702,28 @@ def lgbm_backtest_single(symbol):
             if drawdown > max_drawdown:
                 max_drawdown = drawdown
 
+        # 构建真实价格曲线（benchmark）- 买入持有策略对比
+        benchmark = []
+        start_idx = 150 if len(df) > 150 else 0
+        initial_price = df['close'].iloc[start_idx]
+        if initial_price <= 0:
+            return jsonify({"error": "股票价格无效，无法计算基准收益"}), 400
+        initial_stock_value = 100000  # 初始资金 10 万，假设全部买入股票
+        shares_held = initial_stock_value / initial_price
+        for idx, row in df.iloc[start_idx:].iterrows():
+            # 买入持有策略：初始资金能买多少股，乘以当前价格
+            current_value = shares_held * row['close']
+            benchmark.append({
+                "date": str(row['date']),
+                "price": round(row['close'], 2),
+                "portfolioValue": round(current_value, 2)
+            })
+
         return jsonify({
             "status": "success",
             "symbol": symbol,
             "portfolioValues": portfolio_values,
+            "benchmark": benchmark,
             "trades": trades,
             "buyPoints": buy_points,
             "sellPoints": sell_points,
@@ -1698,6 +1735,8 @@ def lgbm_backtest_single(symbol):
                 "finalPortfolio": round(final_portfolio, 2),
                 "totalProfit": round(total_profit, 2),
                 "profitRate": round(total_profit / initial_capital * 100, 2),
+                "benchmarkReturn": round((benchmark[-1]['portfolioValue'] - initial_capital) / initial_capital * 100, 2) if benchmark else 0,
+                "excessReturn": round((total_profit - (benchmark[-1]['portfolioValue'] - initial_capital)) / initial_capital * 100, 2) if benchmark else 0,
                 "tradeCount": len(trades),
                 "buyCount": len(buy_points),
                 "sellCount": len(sell_points),
@@ -1737,18 +1776,22 @@ def lgbm_backtest_batch():
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
         from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
 
-        # 获取股票列表
+        # 获取股票列表和日期参数
         symbols_param = request.args.get('symbols', '')
         if symbols_param:
             symbols = symbols_param.split(',')
         else:
             symbols = [s['symbol'] for s in HS300_STOCKS[:10]]
 
+        # 获取日期参数
+        start_date = request.args.get('start_date', None)
+        end_date = request.args.get('end_date', None)
+
         results = []
         for symbol in symbols:
             try:
-                # 调用单只股票回测
-                result = lgbm_backtest_single(symbol)
+                # 调用单只股票回测（传递日期参数）
+                result = lgbm_backtest_single(symbol, start_date=start_date, end_date=end_date)
                 if result.status_code == 200:
                     data = result.get_json()
                     if data.get('status') == 'success':
@@ -1813,12 +1856,17 @@ def db_get_stock_list():
         conn = sqlite3.connect(handler.db_path)
         cursor = conn.cursor()
 
-        # 获取每只股票的数据量
+        # 从 kline_30m 表获取所有股票，并关联 stock_info 获取名称
+        # 对于港股等不在 stock_info 中的股票，从持仓表中获取名称
         cursor.execute('''
-            SELECT s.symbol, s.name, COUNT(k.id) as cnt, MAX(k.date) as last_date
-            FROM stock_info s
-            LEFT JOIN kline_30m k ON s.symbol = k.symbol
-            GROUP BY s.symbol
+            SELECT DISTINCT k.symbol,
+                   COALESCE(s.name, p.stock_name, SUBSTR(k.symbol, 1, INSTR(k.symbol, '.') - 1)) as name,
+                   COUNT(k.id) as cnt,
+                   MAX(k.date) as last_date
+            FROM kline_30m k
+            LEFT JOIN stock_info s ON k.symbol = s.symbol
+            LEFT JOIN positions p ON k.symbol = p.symbol
+            GROUP BY k.symbol
             ORDER BY cnt DESC
         ''')
 
@@ -1842,5 +1890,162 @@ def db_get_stock_list():
         return jsonify({"error": str(e)}), 500
 
 
+# ==================== 交易记录管理 ====================
+
+@app.route('/api/positions', methods=['GET'])
+def get_positions():
+    """获取当前持仓列表"""
+    try:
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(__file__), '../python/data/stock_data.db')
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT symbol, stock_name, shares, cost_price, current_price FROM positions')
+
+        positions = []
+        for row in cursor.fetchall():
+            positions.append({
+                "symbol": row[0],
+                "stock_name": row[1],
+                "shares": row[2],
+                "cost_price": row[3],
+                "current_price": row[4]
+            })
+
+        conn.close()
+        return jsonify({"status": "success", "positions": positions})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/trade', methods=['POST'])
+def record_trade():
+    """记录交易（买入/卖出）"""
+    try:
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(__file__), '../python/data/stock_data.db')
+
+        data = request.json
+        symbol = data.get('symbol')
+        stock_name = data.get('stock_name', '')
+        action = data.get('action')  # 'BUY' or 'SELL'
+        shares = int(data.get('shares', 0))
+        price = float(data.get('price', 0))
+        reason = data.get('reason', '')
+
+        if not symbol or not action or shares <= 0 or price <= 0:
+            return jsonify({"status": "error", "error": "参数不完整"}), 400
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # 获取股票名称（如果未提供）
+        if not stock_name:
+            cursor.execute('SELECT name FROM stock_info WHERE symbol = ?', (symbol,))
+            row = cursor.fetchone()
+            if row:
+                stock_name = row[0]
+
+        # 检查是否已有持仓
+        cursor.execute('SELECT shares, cost_price FROM positions WHERE symbol = ?', (symbol,))
+        existing = cursor.fetchone()
+
+        if action == 'BUY':
+            if existing:
+                # 已有持仓，计算新的成本价
+                old_shares, old_cost = existing
+                new_total_cost = old_shares * old_cost + shares * price
+                new_shares = old_shares + shares
+                new_cost = new_total_cost / new_shares if new_shares > 0 else price
+
+                cursor.execute('''
+                    UPDATE positions
+                    SET shares = ?, cost_price = ?, current_price = ?, updated_at = datetime('now')
+                    WHERE symbol = ?
+                ''', (new_shares, new_cost, price, symbol))
+            else:
+                # 新建持仓
+                cursor.execute('''
+                    INSERT INTO positions (symbol, stock_name, shares, cost_price, current_price)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (symbol, stock_name, shares, price, price))
+
+        elif action == 'SELL':
+            if not existing:
+                conn.close()
+                return jsonify({"status": "error", "error": "没有该股票持仓"}), 400
+
+            old_shares, old_cost = existing
+            if shares > old_shares:
+                conn.close()
+                return jsonify({"status": "error", "error": "卖出数量超过持仓"}), 400
+
+            new_shares = old_shares - shares
+            if new_shares == 0:
+                # 清仓
+                cursor.execute('DELETE FROM positions WHERE symbol = ?', (symbol,))
+            else:
+                # 部分卖出
+                cursor.execute('''
+                    UPDATE positions
+                    SET shares = ?, current_price = ?, updated_at = datetime('now')
+                    WHERE symbol = ?
+                ''', (new_shares, price, symbol))
+
+        # 记录交易历史
+        amount = shares * price
+        cursor.execute('''
+            INSERT INTO trades (symbol, stock_name, action, shares, price, amount, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (symbol, stock_name, action, shares, price, amount, reason))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "message": f"交易记录成功：{action} {stock_name} {shares}股 @ ¥{price}"
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/trades', methods=['GET'])
+def get_trades():
+    """获取交易历史记录"""
+    try:
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(__file__), '../python/data/stock_data.db')
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT symbol, stock_name, action, shares, price, amount, reason, trade_time
+            FROM trades
+            ORDER BY trade_time DESC
+            LIMIT 100
+        ''')
+
+        trades = []
+        for row in cursor.fetchall():
+            trades.append({
+                "symbol": row[0],
+                "stock_name": row[1],
+                "action": row[2],
+                "shares": row[3],
+                "price": row[4],
+                "amount": row[5],
+                "reason": row[6],
+                "timestamp": row[7]
+            })
+
+        conn.close()
+        return jsonify({"status": "success", "trades": trades})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=False)
