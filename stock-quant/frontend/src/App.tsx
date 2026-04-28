@@ -334,6 +334,25 @@ const App: React.FC = () => {
     }],
   } : null;
 
+  // 超额收益图表
+  const excessReturnChart = backtestResults ? {
+    labels: backtestResults.portfolioValues.filter((_: any, i: number) => i % 4 === 0).map((v: any) => v.date.slice(5, 10)),
+    datasets: [
+      {
+        label: '超额收益',
+        data: backtestResults.portfolioValues.filter((_: any, i: number) => i % 4 === 0).map((v: any) => {
+          const portfolioReturn = ((v.portfolioValue - 100000) / 100000) * 100;
+          return portfolioReturn - (backtestResults.summary.benchmarkReturn || 0);
+        }),
+        borderColor: '#13c2c2',
+        backgroundColor: 'rgba(19, 194, 194, 0.1)',
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true,
+      },
+    ],
+  } : null;
+
   // 交易表格列
   const tradeColumns = [
     { title: '时间', dataIndex: 'date', width: 100, render: (d: string) => d.slice(5, 16) },
@@ -601,6 +620,8 @@ const App: React.FC = () => {
                           </Card>
                         </Col>
                       </Row>
+
+                      <Row gutter={16} style={{ marginBottom: 16 }}>
                         <Col span={6}>
                           <Card title="买入点" size="small" style={{ background: '#e6f7ff' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
