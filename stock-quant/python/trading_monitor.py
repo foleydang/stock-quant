@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
 
-BASE_DIR = '/Users/foleydang/github/stock-quant/stock-quant/python'
+BASE_DIR = '/root/github/stock-quant/stock-quant/python'
 DB_PATH = f'{BASE_DIR}/data/stock_data.db'
 MODEL_PATH = f'{BASE_DIR}/models/lgb_hs300/model.pkl'
 LOGS_DIR = f'{BASE_DIR}/logs'
@@ -599,6 +599,10 @@ class TradingMonitor:
 </html>
 """
 
+        NL = "\n"
+        holdings_text = NL.join([f"{s['stock_name']}: {s['shares']:,}股 @ ¥{s['cost_price']:.3f} → ¥{s['current_price']:.3f} | 盈亏¥{s['profit']:,.0f}({s['profit_pct']:.1f}%) | 预测上涨{s['up_prob']:.0%}" for s in suggestions])
+        watchlist_text = NL.join([f"{w['name']}: ¥{w['price']:.2f}" for w in watchlist_prices])
+        
         text = f"""
 持仓日报 - {datetime.now().strftime('%Y-%m-%d %H:%M')}
 {'='*60}
@@ -609,10 +613,10 @@ class TradingMonitor:
 {'='*60}
 
 【持仓明细】
-{''.join([f"{s['stock_name']}: {s['shares']:,}股 @ ¥{s['cost_price']:.3f} → ¥{s['current_price']:.3f} | 盈亏¥{s['profit']:,.0f}({s['profit_pct']:.1f}%) | 预测上涨{s['up_prob']:.0%}\n" for s in suggestions])}
+{holdings_text}
 
 【关注股票】
-{''.join([f"{w['name']}: ¥{w['price']:.2f}\n" for w in watchlist_prices])}
+{watchlist_text}
 
 【做T操作建议】
 """

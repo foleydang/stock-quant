@@ -24,7 +24,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 
-BASE_DIR = '/Users/foleydang/github/stock-quant/stock-quant/python'
+BASE_DIR = '/root/github/stock-quant/stock-quant/python'
 DB_PATH = f'{BASE_DIR}/data/stock_data.db'
 MODEL_PATH = f'{BASE_DIR}/models/lgb_hs300/model.pkl'
 LOGS_DIR = f'{BASE_DIR}/logs'

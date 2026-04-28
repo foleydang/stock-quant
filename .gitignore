@@ -1,8 +1,3 @@
-# Database files - too large for GitHub
-stock-quant/python/data/stock_data.db
-stock-quant/python/data/*.db
-*.db
-
 # Node modules
 node_modules/
 
@@ -13,17 +8,23 @@ build/
 # Python cache
 __pycache__/
 *.pyc
-.pyo
+*.pyo
 
-# Logs
-*.log
-logs/
+# Logs (保留目录结构，排除日志内容)
+stock-quant/logs/*.log
 
 # IDE
 .idea/
 .vscode/
 .DS_Store
 
-# Environment
-.env
-.env.local
+# Environment (包含敏感信息)
+stock-quant/python/.env
+
+# 临时 CSV 缓存文件（太多，不提交）
+stock-quant/python/data/*_30m.csv
+stock-quant/python/data/*_daily.csv
+
+# 临时文件
+*.tmp
+*.bak

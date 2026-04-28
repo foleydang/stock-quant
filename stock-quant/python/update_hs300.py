@@ -11,7 +11,7 @@ import time
 import random
 from datetime import datetime, timedelta
 
-BASE_DIR = '/Users/foleydang/github/stock-quant/stock-quant/python'
+BASE_DIR = '/root/github/stock-quant/stock-quant/python'
 sys.path.insert(0, BASE_DIR)
 
 DB_PATH = f'{BASE_DIR}/data/stock_data.db'
