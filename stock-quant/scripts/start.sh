@@ -40,7 +40,7 @@ show_help() {
 start_server() {
     echo "启动 API 服务器..."
     cd "$PROJECT_ROOT/api"
-    /opt/homebrew/bin/python3 server.py
+    /usr/bin/python3.8 server.py
 }
 
 # 运行交易监控
@@ -49,7 +49,7 @@ run_monitor() {
     cd "$PYTHON_DIR"
     LOG_FILE="$LOG_DIR/monitor.log"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - 开始监控" >> "$LOG_FILE"
-    /opt/homebrew/bin/python3 trading_monitor.py >> "$LOG_FILE" 2>&1
+    /usr/bin/python3.8 trading_monitor.py >> "$LOG_FILE" 2>&1
     echo "$(date '+%Y-%m-%d %H:%M:%S') - 监控完成" >> "$LOG_FILE"
 }
 
@@ -59,7 +59,7 @@ run_full() {
     cd "$PYTHON_DIR"
     LOG_FILE="$LOG_DIR/monitor.log"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - 开始完整监控" >> "$LOG_FILE"
-    /opt/homebrew/bin/python3 full_monitor.py --monitor >> "$LOG_FILE" 2>&1
+    /usr/bin/python3.8 full_monitor.py --monitor >> "$LOG_FILE" 2>&1
     echo "$(date '+%Y-%m-%d %H:%M:%S') - 完整监控完成" >> "$LOG_FILE"
 }
 
@@ -69,7 +69,7 @@ run_update() {
     cd "$PYTHON_DIR"
     LOG_FILE="$LOG_DIR/hs300_update.log"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - 开始增量更新" >> "$LOG_FILE"
-    /opt/homebrew/bin/python3 update_hs300.py >> "$LOG_FILE" 2>&1
+    /usr/bin/python3.8 update_hs300.py >> "$LOG_FILE" 2>&1
     echo "$(date '+%Y-%m-%d %H:%M:%S') - 更新完成" >> "$LOG_FILE"
 }
 
@@ -77,21 +77,21 @@ run_update() {
 run_strategy() {
     echo "运行策略..."
     cd "$PYTHON_DIR"
-    /opt/homebrew/bin/python3 run_full_strategy.py
+    /usr/bin/python3.8 run_full_strategy.py
 }
 
 # 运行回测
 run_backtest() {
     echo "运行 LGBM 回测..."
     cd "$PYTHON_DIR"
-    /opt/homebrew/bin/python3 lgbm_backtest.py
+    /usr/bin/python3.8 lgbm_backtest.py
 }
 
 # 生成报告
 run_report() {
     echo "生成报告..."
     cd "$PYTHON_DIR"
-    /opt/homebrew/bin/python3 generate_report.py
+    /usr/bin/python3.8 generate_report.py
 }
 
 # 运行配置脚本
