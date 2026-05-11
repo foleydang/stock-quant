@@ -296,6 +296,7 @@ class DataHandler:
                         prices[symbol] = {
                             'name': fields[1],
                             'price': float(fields[3]),
+                'time': fields[30],
                             'prev_close': float(fields[4]),
                             'open': float(fields[5]),
                             'volume': float(fields[6]),
