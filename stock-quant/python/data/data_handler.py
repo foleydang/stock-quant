@@ -86,7 +86,7 @@ class DataHandler:
                 return None
             df['date'] = pd.to_datetime(df['date'])
             return df
-        except:
+        except Exception as e:
             return None
 
     # ==================== 腾讯财经 API（实时行情） ====================
@@ -317,7 +317,7 @@ class DataHandler:
             stocks = [{'symbol': r[0], 'name': r[1]} for r in cursor.fetchall()]
             conn.close()
             return stocks
-        except:
+        except Exception as e:
             return []
 
     def get_data_stats(self):
@@ -335,7 +335,7 @@ class DataHandler:
             conn.close()
             return {'stock_count': stock_count, 'kline_count': kline_count,
                     'min_date': min_date, 'max_date': max_date}
-        except:
+        except Exception as e:
             return None
 
     def is_data_fresh(self, df, max_age_hours=None):
