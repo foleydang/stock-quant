@@ -28,3 +28,9 @@ stock-quant/python/data/*_daily.csv
 # 临时文件
 *.tmp
 *.bak
+
+# Vite 缓存
+.vite/
+
+# 更多临时CSV
+*.csv.tmp
