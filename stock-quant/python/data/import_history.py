@@ -1,3 +1,4 @@
+import os
 """导入足够的历史数据用于特征计算"""
 
 import tushare as ts
@@ -8,7 +9,7 @@ import time
 
 DB_PATH = 'data/stock_data.db'
 
-ts.set_token('7a9014b18909e8cbce5109d7175f7b21ce37354eaff2371db0da2c58')
+ts.set_token(os.getenv('TUSHARE_TOKEN', ''))
 pro = ts.pro_api()
 
 def import_history(symbol, days=365):

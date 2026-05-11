@@ -163,7 +163,7 @@ class ScheduledMonitor:
                 for row in cursor.fetchall():
                     names[row[0]] = row[1]
                 conn.close()
-            except:
+            except Exception as e:
                 pass
         return names
 
@@ -218,7 +218,7 @@ class ScheduledMonitor:
                 )
                 if not df.empty:
                     pos.current_price = float(df['close'].iloc[0])
-            except:
+            except Exception as e:
                 pass
         conn.close()
 
@@ -340,7 +340,7 @@ class ScheduledMonitor:
                 return None
             up_prob = self.model.predict_proba([features.iloc[-1].values])[0][1]
             return up_prob
-        except:
+        except Exception as e:
             return None
 
     def _print_status(self):
