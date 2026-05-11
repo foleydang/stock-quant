@@ -134,7 +134,6 @@ class FullMonitor:
         cursor = conn.cursor()
         cursor.execute('SELECT symbol, name FROM stock_info')
         names = {row[0]: row[1] for row in cursor.fetchall()}
-        conn.close()
         return names
 
     # ==================== 数据更新 ====================
@@ -169,11 +168,14 @@ class FullMonitor:
 
             try:
                 # 使用DataHandler获取数据
-                df = self.data_handler.fetch_stock_data(symbol, force_refresh=True)
+                df = self.data_handler.fetch_stock_data(symbol, days=365, force_refresh=True)  # 需要365天历史才能计算特征
 
-                if df is None or len(df) < 50:
+                if df is None or len(df) < 200:  # 特征计算需要至少200条数据  # 日线数据条数较少，降低阈值
                     print("数据不足")
                     continue
+
+
+                # data_handler.fetch_stock_data 已做新鲜度检查，直接写入
 
                 # 写入DB
                 self._write_kline_to_db(conn, symbol, df)
@@ -184,7 +186,6 @@ class FullMonitor:
                 print(f"失败: {e}")
 
         conn.commit()
-        conn.close()
 
         print(f"\n✓ 数据更新完成: {success_count}/{total} 只股票")
         return success_count
@@ -232,7 +233,6 @@ class FullMonitor:
             )
             positions[pos.symbol] = pos
 
-        conn.close()
         return positions
 
     def get_current_cash(self) -> float:
@@ -241,7 +241,6 @@ class FullMonitor:
         cursor = conn.cursor()
         cursor.execute('SELECT cash FROM account ORDER BY id DESC LIMIT 1')
         row = cursor.fetchone()
-        conn.close()
         return row[0] if row else self.initial_capital
 
     def save_position(self, pos: Position):
@@ -258,7 +257,6 @@ class FullMonitor:
             datetime.now().isoformat()
         ))
         conn.commit()
-        conn.close()
 
     def delete_position(self, symbol: str):
         """删除持仓"""
@@ -266,7 +264,6 @@ class FullMonitor:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM positions WHERE symbol = ?', (symbol,))
         conn.commit()
-        conn.close()
 
     def save_trade(self, symbol: str, stock_name: str, action: str, shares: int,
                    price: float, profit: float = 0, reason: str = "", up_prob: float = 0,
@@ -283,7 +280,6 @@ class FullMonitor:
             datetime.now().isoformat(), simulated
         ))
         conn.commit()
-        conn.close()
 
     def save_account(self, cash: float, positions: Dict[str, Position]):
         """保存账户状态"""
@@ -296,7 +292,6 @@ class FullMonitor:
             VALUES (?, ?, ?, ?, ?)
         ''', (cash, total_value, total_profit, len(positions), datetime.now().isoformat()))
         conn.commit()
-        conn.close()
 
     # ==================== 回测模拟 ====================
 
@@ -327,7 +322,6 @@ class FullMonitor:
         cursor.execute('DELETE FROM trades WHERE simulated = 1')
         cursor.execute('DELETE FROM account')
         conn.commit()
-        conn.close()
 
         # 初始化账户
         cash = self.initial_capital
@@ -342,7 +336,6 @@ class FullMonitor:
             ORDER BY COUNT(*) DESC LIMIT 30
         ''')
         symbols = [row[0] for row in cursor.fetchall()]
-        conn.close()
 
         self.stock_names = self._load_stock_names()
 
@@ -448,7 +441,6 @@ class FullMonitor:
             # 保存账户状态
             self.save_account(cash, positions)
 
-        conn.close()
 
         # 最终结果
         final_value = cash + sum(p.market_value for p in positions.values())
@@ -502,6 +494,21 @@ class FullMonitor:
             return None
 
     # ==================== 实时监控 ====================
+
+
+    def _check_data_freshness(self, conn) -> bool:
+        """检查数据库数据是否新鲜（使用 data_handler 的方法）"""
+        import pandas as pd
+        cursor = conn.cursor()
+        cursor.execute('SELECT date, close FROM kline_30m ORDER BY date DESC LIMIT 1')
+        row = cursor.fetchone()
+        if row:
+            df = pd.DataFrame([{'date': row[0], 'close': row[1]}])
+            df['date'] = pd.to_datetime(df['date'])
+            is_fresh = self.data_handler.is_data_fresh(df)
+            print(f"  数据最新时间: {row[0]}, 新鲜={is_fresh}")
+            return is_fresh
+        return False
 
     def monitor(self) -> List[Dict]:
         """
@@ -636,7 +643,6 @@ class FullMonitor:
             if not df.empty:
                 watchlist_prices[stock['symbol']] = float(df['close'].iloc[0])
 
-        conn.close()
 
         # 打印关注股票
         if watchlist_prices:
@@ -647,7 +653,13 @@ class FullMonitor:
                     print(f"  👀 {stock['name']}: ¥{price:.2f}")
 
         # 发送邮件（即使无信号也发送持仓汇总）
-        if self.email_notifier:
+        # 检查数据新鲜度，过期不发邮件
+        data_is_fresh = self._check_data_freshness(conn)
+
+        conn.close()
+        if not data_is_fresh:
+            print("\n⚠ 数据已过期，跳过邮件发送")
+        elif self.email_notifier:
             self._send_email(signals, positions, cash, watchlist_prices)
 
         # 保存结果
