@@ -9,28 +9,31 @@ build/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 
-# Logs (保留目录结构，排除日志内容)
+# Vite 缓存
+.vite/
+
+# Logs
 stock-quant/logs/*.log
+stock-quant/python/logs/*.log
+stock-quant/python/logs/*.json
+
+# 数据文件（CSV）
+stock-quant/python/data/*.csv
+
+# 大数据库文件
+stock-quant/python/data/*.db
 
 # IDE
 .idea/
 .vscode/
 .DS_Store
 
-# Environment (包含敏感信息)
+# Environment
 stock-quant/python/.env
-
-# 临时 CSV 缓存文件（太多，不提交）
-stock-quant/python/data/*_30m.csv
-stock-quant/python/data/*_daily.csv
 
 # 临时文件
 *.tmp
 *.bak
-
-# Vite 缓存
-.vite/
-
-# 更多临时CSV
-*.csv.tmp
+*.swp
