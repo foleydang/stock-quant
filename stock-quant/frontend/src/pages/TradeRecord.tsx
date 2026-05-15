@@ -126,7 +126,17 @@ const TradeRecord: React.FC = () => {
   const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
-      const res = await axios.post('/api/trade', values);
+      // 解析 symbol：AutoComplete 的值可能是 "600048.SH - 保利发展" 格式
+      let symbol = values.symbol || '';
+      if (symbol.includes(' - ')) {
+        symbol = symbol.split(' - ')[0].trim();
+      }
+      const submitData = {
+        ...values,
+        symbol,
+        amount: (values.shares || 0) * (values.price || 0),
+      };
+      const res = await axios.post('/api/trade', submitData);
       if (res.data.status === 'success') {
         message.success(res.data.message);
         form.resetFields();
@@ -322,7 +332,7 @@ const TradeRecord: React.FC = () => {
                   label="股票名称"
                   rules={[{ required: true, message: '请输入股票名称' }]}
                 >
-                  <Input placeholder="选择股票代码后自动填充" readOnly style={{ backgroundColor: '#2a2f38' }} />
+                  <Input placeholder="选择股票代码后自动填充" readOnly style={{ backgroundColor: '#2a2f38', color: '#e0e0e0' }} />
                 </Form.Item>
 
                 <Form.Item

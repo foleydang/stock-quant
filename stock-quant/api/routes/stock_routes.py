@@ -1,6 +1,6 @@
-"""股票数据相关路由"""
-
+"""股票数据路由"""
 from flask import Blueprint, jsonify, request
+import sqlite3
 import sys
 import os
 
@@ -9,101 +9,112 @@ from config_loader import get_db_path
 
 stock_bp = Blueprint('stock', __name__)
 
+
 @stock_bp.route('/stock/<symbol>', methods=['GET'])
 def get_stock_data(symbol):
-    """获取股票日线数据"""
+    """获取股票数据"""
     try:
-        import pandas as pd
-        import sqlite3
-        
         conn = sqlite3.connect(get_db_path())
-        df = pd.read_sql_query(
-            'SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 100',
-            conn, params=(symbol,)
-        )
-        # conn.close() moved to end
+        cursor = conn.cursor()
         
-        if df.empty:
+        cursor.execute("SELECT name FROM stock_info WHERE symbol=?", (symbol,))
+        row = cursor.fetchone()
+        name = row[0] if row and row[0] else symbol
+        
+        cursor.execute("SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 50", (symbol,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        if not rows:
             return jsonify({'status': 'error', 'message': '无数据'}), 404
         
         data = []
-        for _, row in df.iterrows():
+        for r in rows:
             data.append({
-                'date': row['date'],
-                'open': float(row['open']),
-                'high': float(row['high']),
-                'low': float(row['low']),
-                'close': float(row['close']),
-                'volume': int(row['volume'])
+                'date': r[0],
+                'open': float(r[1]),
+                'high': float(r[2]),
+                'low': float(r[3]),
+                'close': float(r[4]),
+                'volume': int(r[5])
             })
         
-        return jsonify({'status': 'success', 'data': data[::-1]})
+        prices = [d['close'] for d in data]
+        latest_price = prices[0]
+        
+        return jsonify({
+            'status': 'success',
+            'symbol': symbol,
+            'name': name,
+            'latestPrice': latest_price,
+            'totalReturn': round((latest_price - prices[-1]) / prices[-1] * 100, 2),
+            'maxPrice': max(prices),
+            'minPrice': min(prices),
+            'avgPrice': round(sum(prices) / len(prices), 2),
+            'dataCount': len(data),
+            'data': data
+        })
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
+
 @stock_bp.route('/stock/<symbol>/<period>', methods=['GET'])
 def get_stock_data_by_period(symbol, period):
-    """获取不同周期的股票数据"""
+    """获取指定周期的股票数据"""
     try:
         import sqlite3
+        
+        period_map = {
+            '30m': ('kline_30m', 50),
+            'daily': ('kline_daily', 100),
+            'weekly': ('kline_weekly', 50),
+            'monthly': ('kline_monthly', 24),
+        }
+        
+        table, limit = period_map.get(period, ('kline_30m', 50))
         
         conn = sqlite3.connect(get_db_path())
         cursor = conn.cursor()
         
-        if period == "30m":
-            # 30分钟线数据（最近50条）
-            cursor.execute(
-                "SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 50",
-                (symbol,)
-            )
-        elif period == "daily":
-            # 日线：按日期聚合，生成OHLC
-            cursor.execute(
-                "SELECT substr(date, 1, 10) as day, MIN(open) as open, MAX(high) as high, MIN(low) as low, MAX(close) as close, SUM(volume) as volume FROM kline_30m WHERE symbol=? GROUP BY substr(date, 1, 10) ORDER BY day DESC LIMIT 365",
-                (symbol,)
-            )
-        elif period == "weekly":
-            # 周线：按周聚合
-            cursor.execute(
-                "SELECT substr(date, 1, 10) as day, MIN(open) as open, MAX(high) as high, MIN(low) as low, MAX(close) as close, SUM(volume) as volume FROM kline_30m WHERE symbol=? GROUP BY strftime('%Y-%W', date) ORDER BY day DESC LIMIT 52",
-                (symbol,)
-            )
-        elif period == "monthly":
-            # 月线：按月聚合
-            cursor.execute(
-                "SELECT substr(date, 1, 7) as month, MIN(open) as open, MAX(high) as high, MIN(low) as low, MAX(close) as close, SUM(volume) as volume FROM kline_30m WHERE symbol=? GROUP BY substr(date, 1, 7) ORDER BY month DESC LIMIT 24",
-                (symbol,)
-            )
-        else:
-            conn.close()
-            return jsonify({"status": "error", "message": "不支持的周期"}), 400
+        cursor.execute("SELECT name FROM stock_info WHERE symbol=?", (symbol,))
+        row = cursor.fetchone()
+        name = row[0] if row and row[0] else symbol
         
+        cursor.execute(f"SELECT date, open, high, low, close, volume FROM {table} WHERE symbol=? ORDER BY date DESC LIMIT {limit}", (symbol,))
         rows = cursor.fetchall()
-        
-        if period == "30m":
-            data = [{
-                "date": r[0],
-                "open": float(r[1]),
-                "high": float(r[2]),
-                "low": float(r[3]),
-                "close": float(r[4]),
-                "volume": int(r[5])
-            } for r in rows]
-        else:
-            # daily/weekly/monthly 返回真正的OHLCV
-            data = [{
-                "date": r[0],
-                "open": float(r[1]) if r[1] else 0,
-                "high": float(r[2]) if r[2] else 0,
-                "low": float(r[3]) if r[3] else 0,
-                "close": float(r[4]) if r[4] else 0,
-                "volume": int(r[5]) if r[5] else 0
-            } for r in rows]
-        
         conn.close()
-        return jsonify({"status": "success", "data": data[::-1], "period": period})
+        
+        if not rows:
+            return jsonify({'status': 'error', 'message': '无数据'}), 404
+        
+        data = []
+        for r in rows:
+            data.append({
+                'date': r[0],
+                'open': float(r[1]),
+                'high': float(r[2]),
+                'low': float(r[3]),
+                'close': float(r[4]),
+                'volume': int(r[5])
+            })
+        
+        prices = [d['close'] for d in data]
+        latest_price = prices[0]
+        
+        return jsonify({
+            'status': 'success',
+            'symbol': symbol,
+            'name': name,
+            'latestPrice': latest_price,
+            'totalReturn': round((latest_price - prices[-1]) / prices[-1] * 100, 2),
+            'maxPrice': max(prices),
+            'minPrice': min(prices),
+            'avgPrice': round(sum(prices) / len(prices), 2),
+            'dataCount': len(data),
+            'data': data
+        })
     except Exception as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 
 @stock_bp.route('/stocks', methods=['GET'])
@@ -114,17 +125,19 @@ def get_stocks():
         
         conn = sqlite3.connect(get_db_path())
         cursor = conn.cursor()
-        cursor.execute('SELECT DISTINCT symbol FROM kline_30m ORDER BY symbol')
+        cursor.execute("SELECT symbol, name FROM stock_info ORDER BY symbol")
         rows = cursor.fetchall()
+        conn.close()
         
-        stocks = [{'symbol': r[0]} for r in rows]
+        stocks = [{'symbol': r[0], 'name': r[1]} for r in rows]
         return jsonify({'status': 'success', 'stocks': stocks})
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
+
 @stock_bp.route('/positions', methods=['GET'])
 def get_positions():
-    """获取持仓列表"""
+    """获取持仓"""
     try:
         import sqlite3
         
@@ -132,20 +145,21 @@ def get_positions():
         cursor = conn.cursor()
         cursor.execute('SELECT symbol, stock_name, shares, cost_price, current_price FROM positions')
         rows = cursor.fetchall()
+        conn.close()
         
         positions = [{
             'symbol': r[0],
             'name': r[1],
-            'shares': r[2],
+            'shares': int(r[2]),
             'cost': float(r[3]),
-            'current': float(r[4]),
-            'profit': float(r[4]) - float(r[3]),
-            'profit_pct': (float(r[4]) - float(r[3])) / float(r[3]) * 100
+            'current': float(r[4])
         } for r in rows]
         
         return jsonify({'status': 'success', 'positions': positions})
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 500
+
+
 @stock_bp.route("/positions", methods=["POST"])
 def add_position():
     """添加持仓"""
@@ -165,6 +179,7 @@ def add_position():
         return jsonify({"status": "success", "message": "添加成功"})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
+
 
 @stock_bp.route("/positions/<symbol>", methods=["PUT"])
 def update_position(symbol):
@@ -186,6 +201,7 @@ def update_position(symbol):
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
+
 @stock_bp.route("/positions/<symbol>", methods=["DELETE"])
 def delete_position(symbol):
     """删除持仓"""
@@ -202,119 +218,95 @@ def delete_position(symbol):
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
+
 @stock_bp.route("/kline/<symbol>", methods=["GET"])
 def get_kline_data(symbol):
     """获取分钟线数据"""
     try:
         import sqlite3
-        period = request.args.get("period", "30min")
-        limit = int(request.args.get("limit", 50))
-        
         conn = sqlite3.connect(get_db_path())
         cursor = conn.cursor()
         
-        if period == "30min":
-            cursor.execute(
-                "SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT ?",
-                (symbol, limit)
-            )
-        else:
-            cursor.execute(
-                "SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT ?",
-                (symbol, limit)
-            )
+        cursor.execute("SELECT name FROM stock_info WHERE symbol=?", (symbol,))
+        row = cursor.fetchone()
+        name = row[0] if row and row[0] else symbol
         
+        cursor.execute("SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 50", (symbol,))
         rows = cursor.fetchall()
+        conn.close()
         
-        data = [{
-            "date": r[0],
-            "open": float(r[1]),
-            "high": float(r[2]),
-            "low": float(r[3]),
-            "close": float(r[4]),
-            "volume": int(r[5])
-        } for r in rows]
+        if not rows:
+            return jsonify({"status": "error", "message": "无数据"}), 404
         
-        return jsonify({"status": "success", "data": data[::-1], "period": period})
+        data = []
+        for r in rows:
+            data.append({
+                "date": r[0],
+                "open": float(r[1]),
+                "high": float(r[2]),
+                "low": float(r[3]),
+                "close": float(r[4]),
+                "volume": int(r[5])
+            })
+        
+        return jsonify({
+            "status": "success",
+            "symbol": symbol,
+            "name": name,
+            "data": data
+        })
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
+
 @stock_bp.route("/stocks/with_kline", methods=["GET"])
 def get_stocks_with_kline():
-    """获取有分钟线数据的股票列表"""
+    """获取有K线数据的股票"""
     try:
         import sqlite3
-        
         conn = sqlite3.connect(get_db_path())
         cursor = conn.cursor()
         
-        # 获取有足够分钟线数据的股票（>50条）
         cursor.execute("""
-            SELECT symbol, COUNT(*) as cnt, MAX(date) as latest
-            FROM kline_30m 
-            GROUP BY symbol 
-            HAVING cnt > 50
-            ORDER BY latest DESC
+            SELECT s.symbol, s.name, COUNT(k.date) as cnt, MAX(k.close) as latest_price
+            FROM stock_info s
+            JOIN kline_30m k ON s.symbol = k.symbol
+            GROUP BY s.symbol
+            HAVING cnt > 10
+            ORDER BY cnt DESC
+            LIMIT 20
         """)
         rows = cursor.fetchall()
-        
-        stocks = []
-        for r in rows:
-            symbol = r[0]
-            cnt = r[1]
-            latest = r[2]
-            
-            # 解析市场
-            if symbol.endswith(".SZ"):
-                market = "深圳"
-            elif symbol.endswith(".SH"):
-                market = "上海"
-            elif symbol.endswith(".HK"):
-                market = "港股"
-            else:
-                market = "其他"
-            
-            # 获取股票名称（优先positions，其次stock_info）
-            name = symbol
-            try:
-                cursor.execute("SELECT stock_name FROM positions WHERE symbol=?", (symbol,))
-                row_name = cursor.fetchone()
-                if row_name and row_name[0]:
-                    name = row_name[0]
-                else:
-                    # 从stock_info获取
-                    cursor.execute("SELECT name FROM stock_info WHERE symbol=?", (symbol,))
-                    row_info = cursor.fetchone()
-                    if row_info and row_info[0]:
-                        name = row_info[0]
-            except Exception as e:
-                pass
-            
-            stocks.append({
-                "symbol": symbol,
-                "name": name,
-                "count": cnt,
-                "latest_date": latest,
-                "market": market,
-                "has_intraday": True
-            })
-        
         conn.close()
-        return jsonify({"status": "success", "stocks": stocks, "count": len(stocks)})
+        
+        stocks = [{
+            "symbol": r[0],
+            "name": r[1],
+            "dataCount": int(r[2]),
+            "latestPrice": float(r[3])
+        } for r in rows]
+        
+        return jsonify({
+            "status": "success",
+            "stocks": stocks
+        })
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
+
 
 @stock_bp.route("/trades", methods=["GET"])
 def get_trades():
     """获取交易记录"""
     try:
         import sqlite3
+        
         conn = sqlite3.connect(get_db_path())
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM trades ORDER BY id DESC LIMIT 100")
         rows = cursor.fetchall()
         conn.close()
         
+        # 获取列名
         trades = []
         for r in rows:
             trades.append({
@@ -323,34 +315,78 @@ def get_trades():
                 "name": r[2],
                 "action": r[3],
                 "shares": r[4],
-                "price": float(r[5]),
-                "amount": float(r[6]) if r[6] else 0,
-                "profit": float(r[7]) if r[7] else 0,
-                "reason": r[8] or '',
-                "up_prob": float(r[9]) if r[9] else 0,
-                "timestamp": r[12] or r[10]  # timestamp or trade_time
+                "price": r[5],
+                "amount": r[6],
+                "reason": r[7] if len(r) > 7 else "",
+                "timestamp": r[12] if len(r) > 12 else r[10] if len(r) > 10 else ""
             })
         
         return jsonify({"status": "success", "trades": trades})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
+
 @stock_bp.route("/trade", methods=["POST"])
 def add_trade():
-    """添加交易记录"""
+    """添加交易记录 + 同步更新持仓"""
     try:
         import sqlite3
         data = request.json
-        
+        symbol = data.get("symbol", "")
+        stock_name = data.get("stock_name", "")
+        action = data.get("action", "BUY")
+        shares = int(data.get("shares", 0) or 0)
+        price = float(data.get("price", 0) or 0)
+        amount = float(data.get("amount", 0) or price * shares)
+        reason = data.get("reason", "")
+
         conn = sqlite3.connect(get_db_path())
         cursor = conn.cursor()
+
+        # 1. 插入交易记录
         cursor.execute(
-            "INSERT INTO trades (symbol, stock_name, action, shares, price, amount, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime(\"now\"))",
-            (data.get("symbol"), data.get("stock_name", ""), data.get("action"), data.get("shares", 0), data.get("price", 0), data.get("amount", 0))
+            "INSERT INTO trades (symbol, stock_name, action, shares, price, amount, reason, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+            (symbol, stock_name, action, shares, price, amount, reason)
         )
+
+        # 2. 同步更新持仓
+        cursor.execute("SELECT shares, cost_price FROM positions WHERE symbol=?", (symbol,))
+        pos = cursor.fetchone()
+
+        if action == "BUY":
+            if pos:
+                # 已有持仓：加权平均成本价
+                old_shares = int(pos[0])
+                old_cost = float(pos[1])
+                new_shares = old_shares + shares
+                new_cost = (old_cost * old_shares + price * shares) / new_shares
+                cursor.execute(
+                    "UPDATE positions SET shares=?, cost_price=?, current_price=?, stock_name=? WHERE symbol=?",
+                    (new_shares, new_cost, price, stock_name, symbol)
+                )
+            else:
+                # 新建持仓
+                cursor.execute(
+                    "INSERT INTO positions (symbol, stock_name, shares, cost_price, current_price) VALUES (?, ?, ?, ?, ?)",
+                    (symbol, stock_name, shares, price, price)
+                )
+        elif action == "SELL":
+            if pos:
+                old_shares = int(pos[0])
+                new_shares = old_shares - shares
+                if new_shares <= 0:
+                    # 清仓：删除持仓
+                    cursor.execute("DELETE FROM positions WHERE symbol=?", (symbol,))
+                else:
+                    # 减仓：成本价不变，更新现价
+                    cursor.execute(
+                        "UPDATE positions SET shares=?, current_price=? WHERE symbol=?",
+                        (new_shares, price, symbol)
+                    )
+
         conn.commit()
         conn.close()
-        
-        return jsonify({"status": "success", "message": "添加成功"})
+
+        return jsonify({"status": "success", "message": "交易记录成功，持仓已更新"})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500

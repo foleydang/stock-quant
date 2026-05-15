@@ -75,7 +75,7 @@ const App: React.FC = () => {
   const [batchResults, setBatchResults] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(() => {
     // 默认日期区间：最近 1 个月（截止到今天）
-    const end = dayjs('2026-04-07');
+    const end = dayjs();
     const start = end.subtract(1, 'month');
     return [start, end];
   });
