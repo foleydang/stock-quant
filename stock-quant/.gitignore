@@ -1,1 +1,12 @@
 node_modules/
+dist/
+*.db
+*.env
+logs/
+*.log
+__pycache__/
+*.pyc
+python/data/*.csv
+python/data/backup/
+*.pkl
+.vite/

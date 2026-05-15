@@ -6,15 +6,15 @@ import axios from 'axios';
 
 interface Position {
   symbol: string;
-  stock_name: string;
+  name: string;
   shares: number;
-  cost_price: number;
-  current_price: number;
+  cost: number;
+  current: number;
 }
 
 interface Trade {
   symbol: string;
-  stock_name: string;
+  name: string;
   action: string;
   shares: number;
   price: number;
@@ -155,7 +155,7 @@ const TradeRecord: React.FC = () => {
       title: '股票',
       key: 'stock',
       width: 150,
-      render: (_: any, record: Trade) => `${record.stock_name} (${record.symbol})`,
+      render: (_: any, record: Trade) => `${record.name} (${record.symbol})`,
     },
     {
       title: '操作',
@@ -173,7 +173,7 @@ const TradeRecord: React.FC = () => {
       dataIndex: 'price',
       key: 'price',
       width: 80,
-      render: (p: number) => `¥${p.toFixed(2)}`,
+      render: (p: number) => `¥${p?.toFixed(2) || 0.00}`,
     },
     {
       title: '数量',
@@ -203,7 +203,7 @@ const TradeRecord: React.FC = () => {
       title: '股票',
       key: 'stock',
       width: 180,
-      render: (_: any, record: Position) => `${record.stock_name} (${record.symbol})`,
+      render: (_: any, record: Position) => `${record.name} (${record.symbol})`,
     },
     {
       title: '持股数量',
@@ -214,28 +214,28 @@ const TradeRecord: React.FC = () => {
     },
     {
       title: '成本价',
-      dataIndex: 'cost_price',
-      key: 'cost_price',
+      dataIndex: 'cost',
+      key: 'cost',
       width: 90,
-      render: (p: number) => `¥${p.toFixed(3)}`,
+      render: (p: number) => `¥${p?.toFixed(3) || 0.000}`,
     },
     {
       title: '现价',
-      dataIndex: 'current_price',
-      key: 'current_price',
+      dataIndex: 'current',
+      key: 'current',
       width: 90,
-      render: (p: number) => `¥${p.toFixed(2)}`,
+      render: (p: number) => `¥${p?.toFixed(2) || 0.00}`,
     },
     {
       title: '盈亏',
       key: 'profit',
       width: 120,
       render: (_: any, record: Position) => {
-        const profit = (record.current_price - record.cost_price) * record.shares;
-        const profitPct = ((record.current_price - record.cost_price) / record.cost_price * 100);
+        const profit = (record.current - record.cost) * record.shares;
+        const profitPct = ((record.current - record.cost) / record.cost * 100);
         return (
           <span style={{ color: profit >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>
-            ¥{profit.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({profitPct.toFixed(1)}%)
+            ¥{profit.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({profitPct?.toFixed(1) || 0}%)
           </span>
         );
       },
@@ -243,17 +243,17 @@ const TradeRecord: React.FC = () => {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: 24 }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#1e2229', padding: 24 }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         {/* 标题 */}
         <Card style={{ marginBottom: 16 }}>
           <Row gutter={16} align="middle">
             <Col span={12}>
-              <h1 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
-                <SwapOutlined style={{ marginRight: 12, color: '#1890ff' }} />
+              <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', color: '#e0e0e0' }}>
+                <SwapOutlined style={{ marginRight: 12, color: '#e2b04a' }} />
                 交易记录
               </h1>
-              <p style={{ margin: '8px 0 0', color: '#666' }}>
+              <p style={{ margin: '8px 0 0', color: '#8899aa' }}>
                 记录您的买入/卖出操作，同步持仓数据
               </p>
             </Col>
@@ -274,7 +274,7 @@ const TradeRecord: React.FC = () => {
               size="middle"
             />
           ) : (
-            <p style={{ textAlign: 'center', color: '#999', padding: 20 }}>暂无持仓</p>
+            <p style={{ textAlign: 'center', color: '#8899aa', padding: 20 }}>暂无持仓</p>
           )}
         </Card>
 
@@ -310,7 +310,7 @@ const TradeRecord: React.FC = () => {
                       <AutoComplete.Option key={opt.value} value={opt.value}>
                         <span style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <strong>{opt.symbol}</strong>
-                          <span style={{ color: '#666' }}>{opt.name}</span>
+                          <span style={{ color: '#8899aa' }}>{opt.name}</span>
                         </span>
                       </AutoComplete.Option>
                     ))}
@@ -322,7 +322,7 @@ const TradeRecord: React.FC = () => {
                   label="股票名称"
                   rules={[{ required: true, message: '请输入股票名称' }]}
                 >
-                  <Input placeholder="选择股票代码后自动填充" readOnly style={{ backgroundColor: '#f5f5f5' }} />
+                  <Input placeholder="选择股票代码后自动填充" readOnly style={{ backgroundColor: '#2a2f38' }} />
                 </Form.Item>
 
                 <Form.Item

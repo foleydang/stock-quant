@@ -23,11 +23,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
 
-# 路径配置
-BASE_DIR = '/Users/foleydang/github/stock-quant/stock-quant/python'
-DB_PATH = f'{BASE_DIR}/data/stock_data.db'
-MODEL_PATH = f'{BASE_DIR}/models/lgb_hs300/model.pkl'
-LOGS_DIR = f'{BASE_DIR}/logs'
+# 路径配置（动态获取）
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'data/stock_data.db')
+MODEL_PATH = os.path.join(BASE_DIR, 'models/lgb_hs300/model.pkl')
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 
 sys.path.insert(0, BASE_DIR)
 

@@ -1,0 +1,149 @@
+/* 移动端响应式适配 */
+
+/* 基础布局 */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* 移动端适配 (< 768px) */
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+  }
+  
+  /* 导航栏 */
+  .nav {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .nav a {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+  
+  /* 卡片 */
+  .ant-card {
+    margin-bottom: 12px;
+  }
+  
+  .ant-card-head-title {
+    font-size: 16px;
+  }
+  
+  /* 统计数字 */
+  .ant-statistic-title {
+    font-size: 12px;
+  }
+  
+  .ant-statistic-content-value {
+    font-size: 18px;
+  }
+  
+  /* 表格横向滚动 */
+  .ant-table-wrapper {
+    overflow-x: auto;
+  }
+  
+  .ant-table {
+    min-width: 600px;
+  }
+  
+  /* 图表 */
+  .chart-container {
+    height: 250px;
+  }
+  
+  /* 按钮 */
+  .ant-btn {
+    font-size: 14px;
+    padding: 4px 12px;
+  }
+  
+  /* 表格操作列隐藏部分内容 */
+  .table-action-btn {
+    font-size: 12px;
+  }
+  
+  /* Select 下拉 */
+  .ant-select {
+    width: 100% !important;
+  }
+  
+  /* 日期选择器 */
+  .ant-picker {
+    width: 100% !important;
+  }
+  
+  /* Row/Col 变为单列 */
+  .ant-row {
+    flex-direction: column;
+  }
+  
+  .ant-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-bottom: 8px;
+  }
+}
+
+/* 小屏幕 (< 480px) */
+@media (max-width: 480px) {
+  .header h1 {
+    font-size: 18px;
+  }
+  
+  .ant-statistic-content-value {
+    font-size: 14px;
+  }
+  
+  .chart-container {
+    height: 200px;
+  }
+  
+  /* 隐藏次要表格列 */
+  .hide-on-mobile {
+    display: none !important;
+  }
+  
+  /* 标签 */
+  .ant-tag {
+    font-size: 10px;
+  }
+}
+
+/* 大屏幕 (> 1200px) */
+@media (min-width: 1200px) {
+  .container {
+    padding: 24px;
+  }
+}
+
+/* 横向滚动表格容器 */
+.table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 卡片紧凑模式 */
+.compact-card .ant-card-body {
+  padding: 12px;
+}
+
+/* 简洁统计 */
+.simple-statistic {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .simple-statistic {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

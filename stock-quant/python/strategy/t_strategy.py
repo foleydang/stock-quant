@@ -366,8 +366,8 @@ if __name__ == "__main__":
     import sqlite3
     import os
 
-    BASE_DIR = '/Users/foleydang/github/stock-quant/stock-quant/python'
-    DB_PATH = f'{BASE_DIR}/data/stock_data.db'
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    DB_PATH = os.path.join(BASE_DIR, 'data/stock_data.db')
 
     # 获取测试数据
     conn = sqlite3.connect(DB_PATH)
