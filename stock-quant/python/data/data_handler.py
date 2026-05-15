@@ -129,17 +129,22 @@ class DataHandler:
             open_price = float(fields[5])
             volume = float(fields[6])
             
-            # 高低价需要从买卖盘提取，或用当前价近似
-            high_price = current_price  # 可从其他字段提取
-            low_price = current_price
+            # 高低价从腾讯API字段提取（统一位置）
+            # fields[33] = 最高价, fields[34] = 最低价（港股/A股/ETF都一样）
+            try:
+                high_price = float(fields[33]) if len(fields) > 33 and fields[33] else current_price
+                low_price = float(fields[34]) if len(fields) > 34 and fields[34] else current_price
+            except:
+                high_price = current_price
+                low_price = current_price
             
             # 构建单条数据（今日）
             now = datetime.now()
             df = pd.DataFrame([{
                 'date': now,
                 'open': open_price,
-                'high': max(open_price, current_price),
-                'low': min(open_price, current_price),
+                'high': high_price,
+                'low': low_price,
                 'close': current_price,
                 'volume': volume
             }])
@@ -194,7 +199,7 @@ class DataHandler:
     def _fetch_a_stock(self, symbol, cache_path):
         """获取A股数据 - Tushare日线 + 腾讯实时"""
         # 方法1: Tushare 日线
-        df = self._fetch_from_tushare(symbol, days=days)  # 使用传入的天数
+        df = self._fetch_from_tushare(symbol)  # 默认365天
         if df is not None and not df.empty:
             df.to_csv(cache_path, index=False)
             return df
@@ -232,6 +237,40 @@ class DataHandler:
                 return df
         except Exception as e:
             sys.stderr.write(f"Tushare 失败 {symbol}: {e}\n")
+        return None
+
+
+    def fetch_real_30min_kline(self, symbol, count=20):
+        """Fetch real 30min K-line from Sina Finance API"""
+        if not (symbol.endswith(".SZ") or symbol.endswith(".SH")):
+            return None
+        code = symbol[:6]
+        prefix = "sz" if symbol.endswith(".SZ") else "sh"
+        sina_code = prefix + code
+        try:
+            url = "https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketDataService.getKLineData"
+            params = {"symbol": sina_code, "scale": "30", "datalen": count}
+            r = requests.get(url, params=params, timeout=15)
+            if r.status_code == 200:
+                import json
+                data = json.loads(r.text)
+                if isinstance(data, list) and len(data) > 0:
+                    df = pd.DataFrame(data)
+                    df = df.rename(columns={"day": "date"})
+                    df["date"] = pd.to_datetime(df["date"])
+                    for col in ["open", "high", "low", "close", "volume"]:
+                        df[col] = df[col].astype(float)
+                    df = df[["date", "open", "high", "low", "close", "volume"]]
+                    df = df.sort_values("date").reset_index(drop=True)
+                    self.last_fetch_status[symbol] = {
+                        "success": True, "source": "sina_30min",
+                        "count": len(df),
+                        "last_date": df["date"].iloc[-1].strftime("%Y-%m-%d %H:%M"),
+                        "fetch_time": datetime.now().isoformat()
+                    }
+                    return df
+        except Exception as e:
+            sys.stderr.write(f"Sina 30min failed {symbol}: {e}\n")
         return None
 
     def _use_cache(self, cache_path):
@@ -294,13 +333,15 @@ class DataHandler:
                             symbol = f"{code}.SH"
                         
                         prices[symbol] = {
-                            'name': fields[1],
-                            'price': float(fields[3]),
-                'time': fields[30],
-                            'prev_close': float(fields[4]),
-                            'open': float(fields[5]),
-                            'volume': float(fields[6]),
-                            'change_pct': (float(fields[3]) - float(fields[4])) / float(fields[4]) * 100
+                            "name": fields[1],
+                            "price": float(fields[3]),
+                            "prev_close": float(fields[4]),
+                            "open": float(fields[5]),
+                            "high": float(fields[33]) if len(fields) > 33 and fields[33] else float(fields[3]),
+                            "low": float(fields[34]) if len(fields) > 34 and fields[34] else float(fields[3]),
+                            "volume": float(fields[6]),
+                            "time": fields[30],
+                            "change_pct": (float(fields[3]) - float(fields[4])) / float(fields[4]) * 100
                         }
             
             return prices

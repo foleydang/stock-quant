@@ -9,9 +9,11 @@ import sqlite3
 from datetime import datetime
 from typing import List, Dict
 
-BASE_DIR = '/Users/foleydang/github/stock-quant/stock-quant/python'
-DB_PATH = f'{BASE_DIR}/data/stock_data.db'
-LOGS_DIR = f'{BASE_DIR}/logs'
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config_loader import get_base_dir, get_db_path
+BASE_DIR = get_base_dir()
+DB_PATH = get_db_path()
+LOGS_DIR = os.path.join(get_base_dir(), 'logs')
 
 def generate_report():
     """生成策略报告"""

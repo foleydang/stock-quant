@@ -23,11 +23,14 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
 
-BASE_DIR = '/root/github/stock-quant/stock-quant/python'
-DB_PATH = f'{BASE_DIR}/data/stock_data.db'
-MODEL_PATH = f'{BASE_DIR}/models/lgb_hs300/model.pkl'
-LOGS_DIR = f'{BASE_DIR}/logs'
+# 使用统一配置
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config_loader import get_base_dir, get_db_path, get_available_cash, get_watchlist, get_strategy_params, get_email_config
 
+BASE_DIR = get_base_dir()
+DB_PATH = get_db_path()
+MODEL_PATH = os.path.join(BASE_DIR, 'models/lgb_hs300/model.pkl')
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 sys.path.insert(0, BASE_DIR)
 
 from data.data_handler import DataHandler
@@ -90,12 +93,13 @@ class TradingMonitor:
         self.data_handler = DataHandler(force_refresh=True)
 
         # 账户参数
-        self.available_cash = 150000  # 可用现金15万
+        self.available_cash = get_available_cash()  # 从配置读取
 
         # 策略参数（熊市策略）
-        self.add_position_threshold = -0.20  # 浮亏20%考虑补仓
-        self.add_position_up_prob = 0.55     # 补仓要求上涨概率55%
-        self.max_add_ratio = 0.3             # 单次补仓不超过原持仓30%
+        params = get_strategy_params()
+        self.add_position_threshold = params.get('add_position_threshold', -0.20)
+        self.add_position_up_prob = params.get("add_position_prob", 0.55)
+        self.max_add_ratio = params.get("max_add_ratio", 0.30)
 
         # 模型
         self.model = None
@@ -108,10 +112,7 @@ class TradingMonitor:
         self.email_notifier = create_email_notifier_from_env() if EMAIL_AVAILABLE else None
 
         # 关注股票
-        self.watchlist = [
-            {'symbol': '9988.HK', 'name': '阿里巴巴-W'},
-            {'symbol': '0700.HK', 'name': '腾讯控股'},
-        ]
+        self.watchlist = get_watchlist()  # 从配置读取
 
     def _load_model(self):
         """加载模型"""
@@ -128,48 +129,29 @@ class TradingMonitor:
         return sqlite3.connect(self.db_path)
 
     def update_prices(self):
-        """更新持仓股票价格"""
-        print("\n" + "=" * 70)
-        print(f"更新股票价格 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("=" * 70)
-
+        """Update prices from minute-bar data"""
         conn = self._get_conn()
         cursor = conn.cursor()
-        cursor.execute('SELECT symbol, stock_name FROM positions')
+        cursor.execute("SELECT symbol, stock_name FROM positions")
         positions = cursor.fetchall()
-
-        # 加上关注股票
-        all_symbols = list(positions) + [(w['symbol'], w['name']) for w in self.watchlist]
+        all_symbols = list(positions) + [(w["symbol"], w["name"]) for w in self.watchlist]
 
         for symbol, name in all_symbols:
             print(f"  {name}({symbol})...", end=" ")
-            df = self.data_handler.fetch_stock_data(symbol, force_refresh=True)
-
-            if df is not None and len(df) > 0:
-                # 获取数据库最新日期
-                cursor.execute('SELECT MAX(date) FROM kline_30m WHERE symbol = ?', (symbol,))
-                latest_date = cursor.fetchone()[0]
-
-                # 增量插入新数据
-                new_count = 0
-                for _, row in df.iterrows():
-                    date_str = row['date'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(row['date'], 'strftime') else str(row['date'])
-                    if latest_date is None or date_str > latest_date:
-                        cursor.execute('''
-                            INSERT OR IGNORE INTO kline_30m (symbol, date, open, high, low, close, volume)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (symbol, date_str, float(row['open']), float(row['high']),
-                              float(row['low']), float(row['close']), float(row['volume'])))
-                        new_count += 1
-
-                # 更新持仓现价
-                latest_price = float(df['close'].iloc[-1])
-                cursor.execute('UPDATE positions SET current_price = ?, updated_at = datetime("now") WHERE symbol = ?',
-                              (latest_price, symbol))
-                print(f"✓ ¥{latest_price:.2f}" + (f" (+{new_count})" if new_count > 0 else ""))
+            cursor.execute("SELECT close FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 1", (symbol,))
+            row = cursor.fetchone()
+            if row:
+                price = float(row[0])
+                cursor.execute("UPDATE positions SET current_price=? WHERE symbol=?", (price, symbol))
+                print(f"done {price:.2f}")
             else:
-                print("失败，使用历史数据")
-
+                prices = self.data_handler.get_realtime_prices([symbol])
+                if prices and symbol in prices:
+                    price = prices[symbol]["price"]
+                    cursor.execute("UPDATE positions SET current_price=? WHERE symbol=?", (price, symbol))
+                    print(f"rt {price:.2f}")
+                else:
+                    print("fail")
         conn.commit()
         conn.close()
 
@@ -206,10 +188,15 @@ class TradingMonitor:
 
         try:
             features = EnhancedFeatureEngineer.calculate_features(df)
-            if features.iloc[-1].isna().any():
-                return None
-            return self.model.predict_proba([features.iloc[-1].values])[0][1]
-        except:
+            last_features = features.iloc[-1]
+            
+            # 处理 NaN：用0填充（模型可以处理）
+            if last_features.isna().any():
+                last_features = last_features.fillna(0)
+            
+            return self.model.predict_proba([last_features.values])[0][1]
+        except Exception as e:
+            sys.stderr.write(f"预测失败 {symbol}: {e}\n")
             return None
 
     def analyze_positions(self) -> List[Dict]:

@@ -24,10 +24,12 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 
-BASE_DIR = '/root/github/stock-quant/stock-quant/python'
-DB_PATH = f'{BASE_DIR}/data/stock_data.db'
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config_loader import get_base_dir, get_db_path
+BASE_DIR = get_base_dir()
+DB_PATH = get_db_path()
 MODEL_PATH = f'{BASE_DIR}/models/lgb_hs300/model.pkl'
-LOGS_DIR = f'{BASE_DIR}/logs'
+LOGS_DIR = os.path.join(get_base_dir(), 'logs')
 
 sys.path.insert(0, BASE_DIR)
 
@@ -62,6 +64,7 @@ class Position:
     available: int = 1
     stop_loss: float = 0.0
     take_profit: float = 0.0
+    up_prob: float = 0.0
 
     @property
     def market_value(self) -> float:
@@ -702,6 +705,7 @@ class FullMonitor:
                     <td style="text-align:right;color:{color}">{pos.profit_pct:+.1f}%</td>
                     <td style="text-align:right">¥{pos.cost_price*(1-self.stop_loss_pct):.2f}</td>
                     <td style="text-align:right">¥{pos.cost_price*(1+self.take_profit_pct):.2f}</td>
+                    <td style="text-align:right">{pos.up_prob:.1%}</td>
                 </tr>
             """)
 
@@ -858,6 +862,24 @@ class FullMonitor:
             json.dump(result, f, ensure_ascii=False, indent=2)
         print(f"✓ 结果已保存: {result_file}")
 
+
+
+    def _predict_up_for_position(self, symbol: str) -> float:
+        """为指定股票计算涨跌预测概率"""
+        import pandas as pd
+        try:
+            conn = self._get_conn()
+            df = pd.read_sql_query(
+                "SELECT * FROM kline_30m WHERE symbol=? ORDER BY date",
+                conn, params=(symbol,))
+            if len(df) >= 200:
+                features = self.feature_engineer.calculate_features(df)
+                up_prob = self.model.predict_proba([features.iloc[-1].values])[0][1]
+                conn.close()
+                return up_prob
+        except Exception as e:
+            pass
+        return 0.0
 
 def main():
     import argparse

@@ -90,13 +90,13 @@ class LGBMBacktesterOptimized:
         self.feature_names = self.model_data.get('feature_names', []) if self.model_data else []
 
         # 参数
-        self.position_pct = 0.15
+        self.position_pct = 0.30  # 提高仓位比例，适应高价股
         self.max_positions = 5
-        self.min_hold_periods = 16
-        self.max_hold_periods = 64
-        self.stop_loss_pct = 0.04
-        self.take_profit_pct = 0.06
-        self.buy_threshold = 0.52
+        self.min_hold_periods = 12  # 缩短最小持仓周期
+        self.max_hold_periods = 48  # 缩短最大持仓周期
+        self.stop_loss_pct = 0.03  # 降低止损阈值
+        self.take_profit_pct = 0.05  # 降低止盈阈值
+        self.buy_threshold = 0.48  # 降低买入阈值，提高交易频率
 
         # 特征缓存
         self.features_cache: Dict[str, pd.DataFrame] = {}
@@ -139,13 +139,38 @@ class LGBMBacktesterOptimized:
             return 0.5, f"预测错误:{e}"
 
     def load_data(self, symbol: str) -> pd.DataFrame:
-        """加载数据"""
+        """加载数据 - 优先从数据库读取"""
+        import sqlite3
+        from config_loader import get_db_path
+        
+        db_path = get_db_path()
+        if os.path.exists(db_path):
+            try:
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    'SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date ASC',
+                    (symbol,)
+                )
+                rows = cursor.fetchall()
+                conn.close()
+                
+                if rows:
+                    df = pd.DataFrame(rows, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+                    df['date'] = pd.to_datetime(df['date'])
+                    df = df.sort_values('date').reset_index(drop=True)
+                    return df
+            except Exception as e:
+                logger.warning(f"数据库读取失败: {e}")
+        
+        # Fallback: CSV缓存
         cache_path = os.path.join(os.path.dirname(__file__), f'data/{symbol}_30m.csv')
         if os.path.exists(cache_path):
             df = pd.read_csv(cache_path)
             df['date'] = pd.to_datetime(df['date'])
             df = df.sort_values('date').reset_index(drop=True)
             return df
+        
         return None
 
     def preload_features(self, all_data: Dict[str, pd.DataFrame]):
@@ -166,8 +191,8 @@ class LGBMBacktesterOptimized:
             return None
         return time_map.get(time)
 
-    def run_backtest(self, stocks: List[Dict]):
-        """执行回测"""
+    def run_backtest(self, stocks: List[Dict], start_date: Optional[str] = None, end_date: Optional[str] = None):
+        """执行回测 - 支持日期范围"""
         logger.info("=" * 70)
         logger.info("LGBM 模型回测系统 (优化版)")
         logger.info("=" * 70)
@@ -186,8 +211,23 @@ class LGBMBacktesterOptimized:
             logger.info(f"\n加载 {stock['name']} ({symbol})...")
             df = self.load_data(symbol)
             if df is not None and len(df) >= 60:
-                all_data[symbol] = df
-                logger.info(f"  ✓ 数据量: {len(df)} 条")
+                # 日期范围过滤（兼容不同时间格式）
+                if start_date:
+                    start_dt = pd.to_datetime(start_date)
+                    # 只匹配日期部分，忽略时间
+                    df = df[df['date'].dt.date >= start_dt.date()]
+                if end_date:
+                    end_dt = pd.to_datetime(end_date)
+                    df = df[df['date'].dt.date <= end_dt.date()]
+                
+                # 降低最小数据要求
+                if len(df) >= 20:
+                    # 重置索引，确保特征计算正确
+                    df = df.reset_index(drop=True)
+                    all_data[symbol] = df
+                    logger.info(f"  ✓ 数据量: {len(df)} 条")
+                else:
+                    logger.warning(f"  ⚠️ 日期范围后数据不足({len(df)}条)")
             else:
                 logger.warning(f"  ⚠️ 数据不足")
 
@@ -289,7 +329,7 @@ class LGBMBacktesterOptimized:
                 continue
 
             current_idx = self._get_stock_local_idx(symbol, current_time)
-            if current_idx is None or current_idx < 150:
+            if current_idx is None or current_idx < 120:  # 需要足够的特征计算窗口
                 continue
 
             up_prob, reason = self._get_model_prediction(symbol, current_idx)
@@ -305,13 +345,13 @@ class LGBMBacktesterOptimized:
             return
 
         max_invest = min(self.cash * 0.9, self.initial_capital * self.position_pct)
-        shares = int(max_invest / entry_price / 100) * 100
-        if shares < 100:
+        shares = int(max_invest / entry_price / 100) * 100  # 100股整数倍
+        if shares < 100:  # 最少100股（交易所规则）
             return
 
         actual_amount = shares * entry_price
         if actual_amount > self.cash:
-            shares = int(self.cash / entry_price / 100) * 100
+            shares = int(self.cash / entry_price / 100) * 100  # 100股整数倍
             if shares < 100:
                 return
             actual_amount = shares * entry_price
@@ -453,7 +493,7 @@ WATCHLIST = [
 
 
 def main():
-    backtester = LGBMBacktesterOptimized(initial_capital=100000)
+    backtester = LGBMBacktesterOptimized(initial_capital=500000)  # 50万初始资金
     backtester.run_backtest(WATCHLIST)
 
 

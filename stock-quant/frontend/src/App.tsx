@@ -4,6 +4,7 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  Filler,
   PointElement,
   LineElement,
   BarElement,
@@ -12,15 +13,16 @@ import {
   Legend,
 } from 'chart.js';
 import { Button, Select, Table, Spin, message, Card, Statistic, Row, Col, Tag, Tabs, Progress, Descriptions, DatePicker } from 'antd';
-import { RiseOutlined, FallOutlined, StockOutlined, FundOutlined, SwapOutlined } from '@ant-design/icons';
+import { RiseOutlined, FallOutlined, StockOutlined, FundOutlined, SwapOutlined, AimOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import TradeRecord from './pages/TradeRecord';
+import ForecastAccuracy from './pages/ForecastAccuracy';
 
 const { RangePicker } = DatePicker;
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
 // 沪深300典型蓝筹股
 const stockList = [
@@ -98,16 +100,16 @@ const App: React.FC = () => {
         const prices = history.map((d: any) => d.close);
         const latestPrice = prices[prices.length - 1];
         const firstPrice = prices[0];
-        const totalReturn = ((latestPrice - firstPrice) / firstPrice * 100).toFixed(2);
+        const totalReturn = ((latestPrice - firstPrice) / firstPrice * 100)?.toFixed(2) || "0.00";
         const maxPrice = Math.max(...prices);
         const minPrice = Math.min(...prices);
-        const avgPrice = (prices.reduce((a: number, b: number) => a + b, 0) / prices.length).toFixed(2);
+        const avgPrice = (prices.reduce((a: number, b: number) => a + b, 0) / prices.length)?.toFixed(2) || "0.00";
 
         setStockInfo({
-          latestPrice: latestPrice.toFixed(2),
+          latestPrice: latestPrice?.toFixed(2) || "0.00",
           totalReturn: totalReturn,
-          maxPrice: maxPrice.toFixed(2),
-          minPrice: minPrice.toFixed(2),
+          maxPrice: maxPrice?.toFixed(2) || "0.00",
+          minPrice: minPrice?.toFixed(2) || "0.00",
           avgPrice: avgPrice,
           dataCount: history.length,
           period: per,
@@ -197,7 +199,7 @@ const App: React.FC = () => {
 
   // 股价走势图表
   const priceChartData = {
-    labels: stockData.map((d, i) => i % 8 === 0 ? d.date.slice(5, 10) : ''),
+    labels: stockData.map((d, i) => i % 8 === 0 ? d?.date?.slice(5, 10) || "" : ''),
     datasets: [
       {
         label: '收盘价',
@@ -240,7 +242,7 @@ const App: React.FC = () => {
 
   // 成交量图表
   const volumeChartData = {
-    labels: stockData.map((d, i) => i % 16 === 0 ? d.date.slice(5, 10) : ''),
+    labels: stockData.map((d, i) => i % 16 === 0 ? d?.date?.slice(5, 10) || "" : ''),
     datasets: [
       {
         label: '成交量',
@@ -254,12 +256,12 @@ const App: React.FC = () => {
   };
 
   // 回测价格图表
-  const backtestPriceChart = backtestResults ? {
-    labels: backtestResults.portfolioValues.filter((_: any, i: number) => i % 2 === 0).map((v: any) => v.date.slice(5, 10)),
+  const backtestPriceChart = backtestResults && backtestResults?.portfolioValues ? {
+    labels: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 2 === 0).map((v: any) => v?.date?.slice(5, 10) || ""),
     datasets: [
       {
         label: '股价',
-        data: backtestResults.portfolioValues.filter((_: any, i: number) => i % 2 === 0).map((v: any) => v.price),
+        data: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 2 === 0).map((v: any) => v.price),
         borderColor: '#1890ff',
         borderWidth: 2,
         tension: 0.3,
@@ -268,8 +270,8 @@ const App: React.FC = () => {
       },
       {
         label: '买入点',
-        data: backtestResults.portfolioValues.filter((_: any, i: number) => i % 2 === 0).map((v: any) => {
-          const bp = backtestResults.buyPoints.find((b: any) => b.date === v.date);
+        data: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 2 === 0).map((v: any) => {
+          const bp = backtestResults?.buyPoints?.find((b: any) => b.date === v.date);
           return bp ? bp.price : null;
         }),
         borderColor: '#1890ff',
@@ -280,8 +282,8 @@ const App: React.FC = () => {
       },
       {
         label: '卖出点',
-        data: backtestResults.portfolioValues.filter((_: any, i: number) => i % 2 === 0).map((v: any) => {
-          const sp = backtestResults.sellPoints.find((s: any) => s.date === v.date);
+        data: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 2 === 0).map((v: any) => {
+          const sp = backtestResults?.sellPoints?.find((s: any) => s.date === v.date);
           return sp ? sp.price : null;
         }),
         borderColor: '#fa8c16',
@@ -294,12 +296,12 @@ const App: React.FC = () => {
   } : null;
 
   // 市值曲线
-  const portfolioChart = backtestResults ? {
-    labels: backtestResults.portfolioValues.filter((_: any, i: number) => i % 4 === 0).map((v: any) => v.date.slice(5, 10)),
+  const portfolioChart = backtestResults && backtestResults?.portfolioValues ? {
+    labels: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 4 === 0).map((v: any) => v?.date?.slice(5, 10) || ""),
     datasets: [
       {
         label: '策略市值',
-        data: backtestResults.portfolioValues.filter((_: any, i: number) => i % 4 === 0).map((v: any) => v.portfolioValue),
+        data: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 4 === 0).map((v: any) => v.portfolioValue),
         borderColor: '#722ed1',
         backgroundColor: 'rgba(114, 46, 209, 0.1)',
         borderWidth: 2,
@@ -308,7 +310,7 @@ const App: React.FC = () => {
       },
       {
         label: '基准(初始资金)',
-        data: backtestResults.portfolioValues.filter((_: any, i: number) => i % 4 === 0).map(() => 100000),
+        data: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 4 === 0).map(() => 100000),
         borderColor: '#d9d9d9',
         borderWidth: 1,
         borderDash: [5, 5],
@@ -324,23 +326,23 @@ const App: React.FC = () => {
     datasets: [{
       label: '预测分布',
       data: [
-        backtestResults.predictions.filter((p: any) => p.up_prob < 40).length,
-        backtestResults.predictions.filter((p: any) => p.up_prob >= 40 && p.up_prob < 50).length,
-        backtestResults.predictions.filter((p: any) => p.up_prob >= 50 && p.up_prob < 55).length,
-        backtestResults.predictions.filter((p: any) => p.up_prob >= 55 && p.up_prob < 65).length,
-        backtestResults.predictions.filter((p: any) => p.up_prob >= 65).length,
+        (backtestResults?.predictions || []).filter((p: any) => p.up_prob < 40).length,
+        (backtestResults?.predictions || []).filter((p: any) => p.up_prob >= 40 && p.up_prob < 50).length,
+        (backtestResults?.predictions || []).filter((p: any) => p.up_prob >= 50 && p.up_prob < 55).length,
+        (backtestResults?.predictions || []).filter((p: any) => p.up_prob >= 55 && p.up_prob < 65).length,
+        (backtestResults?.predictions || []).filter((p: any) => p.up_prob >= 65).length,
       ],
       backgroundColor: ['#ff4d4f', '#faad14', '#d9d9d9', '#52c41a', '#1890ff'],
     }],
   } : null;
 
   // 超额收益图表
-  const excessReturnChart = backtestResults ? {
-    labels: backtestResults.portfolioValues.filter((_: any, i: number) => i % 4 === 0).map((v: any) => v.date.slice(5, 10)),
+  const excessReturnChart = backtestResults && backtestResults?.portfolioValues ? {
+    labels: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 4 === 0).map((v: any) => v?.date?.slice(5, 10) || ""),
     datasets: [
       {
         label: '超额收益',
-        data: backtestResults.portfolioValues.filter((_: any, i: number) => i % 4 === 0).map((v: any) => {
+        data: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 4 === 0).map((v: any) => {
           const portfolioReturn = ((v.portfolioValue - 100000) / 100000) * 100;
           return portfolioReturn - (backtestResults.summary.benchmarkReturn || 0);
         }),
@@ -355,14 +357,14 @@ const App: React.FC = () => {
 
   // 交易表格列
   const tradeColumns = [
-    { title: '时间', dataIndex: 'date', width: 100, render: (d: string) => d.slice(5, 16) },
-    { title: '操作', dataIndex: 'type', width: 60, render: (t: string) => <Tag color={t === 'BUY' ? 'green' : 'red'}>{t === 'BUY' ? '买入' : '卖出'}</Tag> },
-    { title: '价格', dataIndex: 'price', width: 70, render: (p: number) => `¥${p.toFixed(2)}` },
+    { title: '时间', dataIndex: 'date', width: 100, render: (d: string) => d?.slice(5, 16) || "" },
+    { title: '操作', dataIndex: 'type', width: 60, render: (t: string) => <Tag color={t === 'buy' ? 'green' : 'red'}>{t === 'buy' ? '买入' : '卖出'}</Tag> },
+    { title: '价格', dataIndex: 'price', width: 70, render: (p: number) => `¥${p?.toFixed(2) || "0.00"}` },
     { title: '数量', dataIndex: 'shares', width: 60, render: (s: number) => `${s}股` },
-    { title: '金额', dataIndex: 'amount', width: 80, render: (a: number) => `¥${(a/1000).toFixed(1)}k` },
-    { title: '盈亏', dataIndex: 'profit', width: 80, render: (p: number) => p ? <span style={{ color: p > 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>{p > 0 ? '+' : ''}¥{p.toFixed(0)}</span> : '--' },
+    { title: '金额', dataIndex: 'amount', width: 80, render: (a: number) => a ? `¥${(a/1000)?.toFixed(1)}k` : '--' },
+    { title: '盈亏', dataIndex: 'profit', width: 80, render: (p: number) => p ? <span style={{ color: p > 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>{p > 0 ? '+' : ''}¥{p?.toFixed(0) || "0"}</span> : '--' },
     { title: '预测', dataIndex: 'up_prob', width: 60, render: (p: number) => <Tag color={p > 55 ? 'green' : p < 45 ? 'red' : 'default'}>{p}%</Tag> },
-    { title: '原因', dataIndex: 'reason', ellipsis: true, render: (r: string) => r?.slice(0, 15) },
+    { title: '原因', dataIndex: 'reason', ellipsis: true, render: (r: string) => r?.slice(0, 15) || "" },
   ];
 
   // 选股结果表格列
@@ -389,7 +391,7 @@ const App: React.FC = () => {
         mode: 'nearest' as const,
         callbacks: {
           label: (context: any) => {
-            return `${context.dataset.label}: ¥${context.parsed.y.toFixed(2)}`;
+            return `${context.dataset.label}: ¥${context?.parsed?.y?.toFixed(2) || "0.00"}`;
           },
           title: (items: any) => {
             const date = items[0]?.label;
@@ -419,23 +421,32 @@ const App: React.FC = () => {
         <Route path="/trade" element={
           <TradeRecord />
         } />
+        <Route path="/forecast" element={
+          <ForecastAccuracy />
+        } />
         <Route path="/" element={
-          <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
-            {/* 顶部标题栏 */}
-            <div style={{ background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)', padding: '20px 24px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ minHeight: '100vh', backgroundColor: '#1e2229' }}>
+            {/* 顶部标题栏 - 深色金融风格 */}
+            <div style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', padding: '16px 32px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div>
-                <h1 style={{ margin: 0, fontSize: 28 }}>
-                  <StockOutlined style={{ marginRight: 12 }} />
+                <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: 2 }}>
+                  <StockOutlined style={{ marginRight: 12, color: '#e2b04a' }} />
                   LGBM 量化交易系统
                 </h1>
-                <p style={{ margin: '8px 0 0', opacity: 0.9 }}>
+                <p style={{ margin: '4px 0 0', opacity: 0.6, fontSize: 13, letterSpacing: 1 }}>
                   基于机器学习的智能选股与策略回测平台
                 </p>
               </div>
-              <Link to="/trade" style={{ color: 'white', textDecoration: 'none', padding: '10px 20px', background: 'rgba(255,255,255,0.2)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <SwapOutlined />
-                交易记录
-              </Link>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <Link to="/trade" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
+                  <SwapOutlined />
+                  交易记录
+                </Link>
+                <Link to="/forecast" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
+                  <AimOutlined />
+                  预测验证
+                </Link>
+              </div>
             </div>
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: 24 }}>
@@ -465,22 +476,22 @@ const App: React.FC = () => {
               {stockInfo && (
                 <Row gutter={16}>
                   <Col span={4}>
-                    <Statistic title="最新价" value={stockInfo.latestPrice} prefix="¥" valueStyle={{ fontSize: 18 }} />
+                    <Statistic title="最新价" value={stockInfo.latestPrice} prefix="¥" valueStyle={{ fontSize: 18, color: '#e0e0e0' }} />
                   </Col>
                   <Col span={4}>
                     <Statistic title="区间涨跌" value={stockInfo.totalReturn} suffix="%" valueStyle={{ color: parseFloat(stockInfo.totalReturn) >= 0 ? '#52c41a' : '#ff4d4f', fontSize: 18 }} prefix={parseFloat(stockInfo.totalReturn) >= 0 ? <RiseOutlined /> : <FallOutlined />} />
                   </Col>
                   <Col span={4}>
-                    <Statistic title="区间最高" value={stockInfo.maxPrice} prefix="¥" valueStyle={{ fontSize: 16 }} />
+                    <Statistic title="区间最高" value={stockInfo.maxPrice} prefix="¥" valueStyle={{ fontSize: 16, color: '#e0e0e0' }} />
                   </Col>
                   <Col span={4}>
-                    <Statistic title="区间最低" value={stockInfo.minPrice} prefix="¥" valueStyle={{ fontSize: 16 }} />
+                    <Statistic title="区间最低" value={stockInfo.minPrice} prefix="¥" valueStyle={{ fontSize: 16, color: '#e0e0e0' }} />
                   </Col>
                   <Col span={4}>
-                    <Statistic title="区间均价" value={stockInfo.avgPrice} prefix="¥" valueStyle={{ fontSize: 16 }} />
+                    <Statistic title="区间均价" value={stockInfo.avgPrice} prefix="¥" valueStyle={{ fontSize: 16, color: '#e0e0e0' }} />
                   </Col>
                   <Col span={4}>
-                    <Statistic title="数据量" value={stockInfo.dataCount} suffix="条" valueStyle={{ fontSize: 16 }} />
+                    <Statistic title="数据量" value={stockInfo.dataCount} suffix="条" valueStyle={{ fontSize: 16, color: '#e0e0e0' }} />
                   </Col>
                 </Row>
               )}
@@ -625,9 +636,9 @@ const App: React.FC = () => {
                         <Col span={6}>
                           <Card title="买入点" size="small" style={{ background: '#e6f7ff' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
-                              {backtestResults.buyPoints.slice(-10).map((bp: any, i: number) => (
+                              {(backtestResults?.buyPoints || []).slice(-10).map((bp: any, i: number) => (
                                 <div key={i} style={{ padding: 4, borderBottom: '1px solid #e8e8e8', fontSize: 12 }}>
-                                  <Tag color="blue">{bp.date.slice(5, 10)}</Tag> ¥{bp.price} | {bp.shares}股 | {bp.up_prob}%
+                                  <Tag color="blue">{bp?.date?.slice(5, 10) || ""}</Tag> ¥{bp.price} | {bp.shares}股 | {bp.up_prob}%
                                 </div>
                               ))}
                             </div>
@@ -636,9 +647,9 @@ const App: React.FC = () => {
                         <Col span={6}>
                           <Card title="卖出点" size="small" style={{ background: '#fff7e6' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
-                              {backtestResults.sellPoints.slice(-10).map((sp: any, i: number) => (
+                              {(backtestResults?.sellPoints || []).slice(-10).map((sp: any, i: number) => (
                                 <div key={i} style={{ padding: 4, borderBottom: '1px solid #e8e8e8', fontSize: 12 }}>
-                                  <Tag color="orange">{sp.date.slice(5, 10)}</Tag> ¥{sp.price} | <span style={{ color: sp.profit_pct >= 0 ? '#52c41a' : '#ff4d4f' }}>{sp.profit_pct}%</span>
+                                  <Tag color="orange">{sp?.date?.slice(5, 10) || ""}</Tag> ¥{sp.price} | <span style={{ color: sp.profit_pct >= 0 ? '#52c41a' : '#ff4d4f' }}>{sp.profit_pct}%</span>
                                 </div>
                               ))}
                             </div>
@@ -650,7 +661,7 @@ const App: React.FC = () => {
                       <Card title="交易记录">
                         <Table columns={tradeColumns} dataSource={backtestResults.trades} rowKey="date" pagination={{ pageSize: 15 }} size="small" scroll={{ x: 700 }}
                           summary={(pageData) => {
-                            const sells = pageData.filter((t: any) => t.type === 'SELL' && t.profit);
+                            const sells = pageData.filter((t: any) => t.type === 'sell' && t.profit);
                             const totalProfit = sells.reduce((sum: number, t: any) => sum + (t.profit || 0), 0);
                             return (
                               <Table.Summary.Row>
