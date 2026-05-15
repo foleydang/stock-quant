@@ -1,34 +1,47 @@
 {
-  "model_name": "lgb_hs300",
-  "version": "1.0",
-  "train_date": "2026-04-29",
+  "model_name": "lgb_hs300_v2",
+  "version": "2.0",
+  "train_date": "2026-05-15",
   "train_data": {
-    "symbols": "沪深300成分股",
-    "period": "30分钟K线",
-    "date_range": "2025-03 ~ 2026-04",
-    "samples": "~50000"
+    "symbols": "\u6caa\u6df1300\u6210\u5206\u80a1",
+    "period": "30\u5206\u949fK\u7ebf",
+    "threshold": "1.5%",
+    "horizon": "3\u6839K\u7ebf(90\u5206\u949f)"
   },
-  "features": [
-    "收益率(1/5/10/20)",
-    "均线(5/10/20/60/120)",
-    "波动率(10/20)",
-    "RSI(14)",
-    "MACD",
-    "布林带",
-    "KDJ",
-    "成交量比率",
-    "时间特征"
+  "improvements": [
+    "\u79fb\u9664\u65f6\u95f4\u7279\u5f81(day_of_week\u7b49)\u907f\u514d\u7edf\u8ba1\u504f\u5dee",
+    "\u6da8\u8dcc\u9608\u503c\u4ece0.8%\u63d0\u9ad8\u52301.5%\u51cf\u5c11\u566a\u58f0",
+    "num_leaves\u4ece63\u964d\u523031",
+    "max_depth\u4ece8\u964d\u52306",
+    "\u6b63\u5219\u5316alpha/lambda\u4ece0.1\u63d0\u9ad8\u52300.3",
+    "\u52a0\u5165\u65e9\u505c(50\u8f6e)\u9632\u6b62\u8fc7\u62df\u5408"
   ],
   "performance": {
-    "accuracy": 0.6602,
-    "precision": "未知",
-    "recall": "未知",
-    "f1": "未知"
+    "accuracy": 0.5636,
+    "cv_scores": [
+      0.5398913951545531,
+      0.5364452798663325,
+      0.591374269005848,
+      0.5767543859649122,
+      0.5735171261487051
+    ]
   },
   "hyperparameters": {
+    "objective": "binary",
+    "metric": "binary_logloss",
+    "boosting_type": "gbdt",
     "num_leaves": 31,
-    "max_depth": -1,
-    "learning_rate": 0.05,
-    "n_estimators": 100
+    "learning_rate": 0.02,
+    "n_estimators": 423,
+    "max_depth": 6,
+    "min_child_samples": 50,
+    "feature_fraction": 0.7,
+    "bagging_fraction": 0.7,
+    "bagging_freq": 5,
+    "reg_alpha": 0.3,
+    "reg_lambda": 0.3,
+    "verbose": -1,
+    "random_state": 42,
+    "n_jobs": -1
   }
 }

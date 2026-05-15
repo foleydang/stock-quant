@@ -16,17 +16,22 @@ forecast_bp = Blueprint('forecast', __name__)
 # 全局加载模型（避免每次请求重新加载）
 _model = None
 _feature_engineer = None
+_filtered_feature_names = None
+
+# 需要过滤的时间特征
+TIME_FEATURES = ['day_of_week', 'day_of_month', 'hour', 'minute', 'is_morning',
+                  'is_afternoon', 'is_first_hour', 'is_last_hour']
 
 
 def _load_model():
     """加载LGBM模型（单例）"""
-    global _model, _feature_engineer
+    global _model, _feature_engineer, _filtered_feature_names
     if _model is not None:
-        return _model, _feature_engineer
+        return _model, _feature_engineer, _filtered_feature_names
 
     model_path = '/root/github/stock-quant/stock-quant/python/models/lgb_hs300/model.pkl'
     if not os.path.exists(model_path):
-        return None, None
+        return None, None, None
 
     try:
         with open(model_path, 'rb') as f:
@@ -34,9 +39,12 @@ def _load_model():
         _model = model_data.get('model')
         if _model is None:
             print(f'⚠ 模型文件中无model字段: {list(model_data.keys())}')
+            return None, None, None
+        # 获取模型训练时使用的特征名
+        _filtered_feature_names = model_data.get('feature_names', None)
     except Exception as e:
         print(f'⚠ 模型加载异常: {e}')
-        return None, None
+        return None, None, None
 
     try:
         from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
@@ -45,7 +53,7 @@ def _load_model():
         print(f'⚠ FeatureEngineer导入失败: {e}')
         _feature_engineer = None
 
-    return _model, _feature_engineer
+    return _model, _feature_engineer, _filtered_feature_names
 
 
 @forecast_bp.route('/forecast/accuracy/<symbol>', methods=['GET'])
@@ -65,7 +73,7 @@ def forecast_accuracy(symbol):
     months = int(request.args.get('months', 1))
     step = int(request.args.get('step', 1))
 
-    model, feature_engineer = _load_model()
+    model, feature_engineer, filtered_feature_names = _load_model()
     if model is None or feature_engineer is None:
         return jsonify({'status': 'error', 'message': '模型未加载'}), 500
 
@@ -92,7 +100,18 @@ def forecast_accuracy(symbol):
 
         # 计算特征
         features = feature_engineer.calculate_features(df)
-        feature_names = list(features.columns)
+
+        # 过滤时间特征（v2模型不使用时间特征）
+        if filtered_feature_names:
+            # 用模型训练时的特征列表过滤
+            missing_cols = [c for c in filtered_feature_names if c not in features.columns]
+            for c in missing_cols:
+                features[c] = 0  # 补齐缺失列
+            features = features[filtered_feature_names]
+        else:
+            # 旧模型兼容：移除已知时间特征
+            keep_cols = [c for c in features.columns if c not in TIME_FEATURES]
+            features = features[keep_cols]
 
         # 确定验证区间：最近 months 个月
         df['date'] = pd.to_datetime(df['date'])
@@ -111,7 +130,11 @@ def forecast_accuracy(symbol):
         actual_prices = []   # 真实价格
         actual_dates = []    # 真实日期
 
-        for i in range(start_idx, len(df), step):
+        # 评估参数（与训练一致）
+        horizon = 3      # 预测3根K线后
+        threshold = 0.015  # 涨跌阈值1.5%
+
+        for i in range(start_idx, len(df) - horizon, step):
             try:
                 feat_row = features.iloc[i]
                 if feat_row.isna().any():
@@ -119,13 +142,16 @@ def forecast_accuracy(symbol):
 
                 up_prob = model.predict_proba([feat_row.values])[0][1]
 
-                # 真实涨跌：下一根K线的close vs 当前close
-                if i + 1 < len(df):
-                    next_close = float(df.iloc[i + 1]['close'])
-                    current_close = float(df.iloc[i]['close'])
-                    actual_up = 1 if next_close > current_close else 0
+                # 真实涨跌：3根K线后 close vs 当前 close，阈值1.5%
+                future_close = float(df.iloc[i + horizon]['close'])
+                current_close = float(df.iloc[i]['close'])
+                ret = (future_close - current_close) / current_close
+                if ret > threshold:
+                    actual_up = 1   # 明确上涨
+                elif ret < -threshold:
+                    actual_up = 0   # 明确下跌
                 else:
-                    continue
+                    continue  # 震荡区间跳过，不参与评估
 
                 predictions.append(float(up_prob))
                 actual_directions.append(int(actual_up))
