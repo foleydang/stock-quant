@@ -337,7 +337,10 @@ def add_trade():
         action = data.get("action", "BUY")
         shares = int(data.get("shares", 0) or 0)
         price = float(data.get("price", 0) or 0)
-        amount = float(data.get("amount", 0) or price * shares)
+        amount = float(data.get("amount", 0) or 0)
+        # 如果前端没传amount，自动计算
+        if amount == 0 and price > 0 and shares > 0:
+            amount = price * shares
         reason = data.get("reason", "")
 
         conn = sqlite3.connect(get_db_path())
