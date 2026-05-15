@@ -108,6 +108,9 @@ body {
   background: #3a3f4a !important;
   color: #e2b04a !important;
 }
+.ant-select-item-option-content {
+  color: #e0e0e0 !important;
+}
 .ant-input {
   background: #2a2f38 !important;
   border-color: #505868 !important;
@@ -134,6 +137,19 @@ body {
   background: #3a3f4a !important;
   border-color: #505868 !important;
   color: #8899aa !important;
+}
+.ant-input-textarea {
+  background: #2a2f38 !important;
+  border-color: #505868 !important;
+  color: #e0e0e0 !important;
+}
+.ant-input-textarea textarea {
+  color: #e0e0e0 !important;
+  background: #2a2f38 !important;
+}
+textarea.ant-input {
+  color: #e0e0e0 !important;
+  background: #2a2f38 !important;
 }
 
 /* AutoComplete */
