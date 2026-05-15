@@ -102,7 +102,7 @@ class TradingMonitor:
         self.max_add_ratio = params.get("max_add_ratio", 0.30)
 
         # 模型
-        self.model = None
+        self.model_data = None
         self._load_model()
 
         # 做T策略
@@ -115,13 +115,21 @@ class TradingMonitor:
         self.watchlist = get_watchlist()  # 从配置读取
 
     def _load_model(self):
-        """加载模型"""
+        """加载模型（支持v3集成和v2单模型）"""
         if os.path.exists(self.model_path):
             try:
                 with open(self.model_path, 'rb') as f:
                     model_data = pickle.load(f)
-                self.model = model_data.get('model')
-                print(f"✓ 模型加载成功")
+                self.model_data = model_data
+                if 'models' in model_data:
+                    # v3 集成
+                    print(f"✓ 加载v3集成模型 ({len(model_data['models'])}个子模型)")
+                elif 'model' in model_data:
+                    # v2 单模型
+                    self.model = model_data.get('model')
+                    print(f"✓ 加载v2单模型")
+                else:
+                    print(f"⚠ 未识别的模型格式")
             except Exception as e:
                 print(f"⚠ 模型加载失败: {e}")
 
@@ -175,26 +183,55 @@ class TradingMonitor:
         return positions
 
     def _predict_up_prob(self, symbol: str) -> Optional[float]:
-        """预测上涨概率"""
-        if not self.model or not FEATURE_ENGINEER_AVAILABLE:
+        """预测上涨概率（支持v3集成和v2单模型）"""
+        if self.model_data is None or not FEATURE_ENGINEER_AVAILABLE:
             return None
 
         conn = self._get_conn()
         df = pd.read_sql_query('SELECT * FROM kline_30m WHERE symbol=? ORDER BY date', conn, params=(symbol,))
         conn.close()
 
-        if len(df) < 100:
+        if len(df) < 150:
             return None
 
         try:
+            # 基础特征
             features = EnhancedFeatureEngineer.calculate_features(df)
-            last_features = features.iloc[-1]
-            
-            # 处理 NaN：用0填充（模型可以处理）
-            if last_features.isna().any():
-                last_features = last_features.fillna(0)
-            
-            return self.model.predict_proba([last_features.values])[0][1]
+
+            # v3 高级特征
+            try:
+                from strategy.train_lgb_v3 import AdvancedFeatureEngineer, TIME_FEATURES
+                adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
+                features = pd.concat([features, adv_features], axis=1)
+            except Exception:
+                pass
+
+            # 过滤时间特征 + 使用模型特征名
+            feature_names = self.model_data.get('feature_names')
+            if feature_names:
+                missing = [c for c in feature_names if c not in features.columns]
+                for c in missing:
+                    features[c] = 0
+                features = features[feature_names]
+            else:
+                TIME_FEATS = ['day_of_week', 'day_of_month', 'hour', 'minute', 'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
+                features = features[[c for c in features.columns if c not in TIME_FEATS]]
+
+            last_features = features.iloc[-1].fillna(0)
+
+            # 预测
+            if 'models' in self.model_data:
+                # v3 集成：平均概率
+                probs = []
+                for m in self.model_data['models']:
+                    try:
+                        probs.append(m.predict_proba([last_features.values])[0][1])
+                    except Exception:
+                        probs.append(0.5)
+                return float(np.mean(probs))
+            else:
+                # v2/v1 单模型
+                return self.model.predict_proba([last_features.values])[0][1]
         except Exception as e:
             sys.stderr.write(f"预测失败 {symbol}: {e}\n")
             return None
