@@ -44,7 +44,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), '../data/stock_data.db')
 MODEL_DIR = os.path.join(os.path.dirname(__file__), '../models/lgb_hs300')
 HORIZON = 3               # 预测3根K线后(90分钟)
 BASE_THRESHOLD = 0.018     # 阈值1.8% (只标记强趋势)
-N_BAGGING = 3              # 3个子模型集成(2G内存限制)
+N_BAGGING = 3              # 3个子模型(验证最优,回测16.88%)
 TIME_FEATURES = ['day_of_week', 'day_of_month', 'hour', 'minute',
                   'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
 # 零重要性特征 - 首轮训练确认无用，直接剔除
@@ -521,8 +521,15 @@ def main():
         print(f"❌ 数据不足: {len(X)} 条")
         return
 
-    # 3. Optuna超参搜索 (50次, 约10-20分钟)
-    best_params = optimize_hyperparams(X, y, n_trials=50)
+    # 3. Optuna超参搜索
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--quick', action='store_true', help='快速模式(10次搜索)')
+    parser.add_argument('--trials', type=int, default=200, help='Optuna搜索次数(默认200)')
+    args = parser.parse_args()
+    n_trials = 10 if args.quick else args.trials
+    print(f"Optuna搜索: {n_trials}次 {'(快速)' if args.quick else '(全量)'}")
+    best_params = optimize_hyperparams(X, y, n_trials=n_trials)
 
     # 4. Bagging集成训练
     model_data = train_ensemble(X, y, best_params, feature_names, n_models=N_BAGGING)
