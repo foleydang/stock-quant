@@ -43,7 +43,7 @@ from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
 DB_PATH = os.path.join(os.path.dirname(__file__), '../data/stock_data.db')
 MODEL_DIR = os.path.join(os.path.dirname(__file__), '../models/lgb_hs300')
 HORIZON = 3               # 预测3根K线后(90分钟)
-BASE_THRESHOLD = 0.018     # 阈值1.8% (只标记强趋势)
+BASE_THRESHOLD = 0.010     # 阈值1.0% (从1.8%降低,保留更多有效样本)
 N_BAGGING = 3              # 3个子模型(验证最优,回测16.88%)
 TIME_FEATURES = ['day_of_week', 'day_of_month', 'hour', 'minute',
                   'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
