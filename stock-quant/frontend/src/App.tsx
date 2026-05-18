@@ -469,12 +469,17 @@ const App: React.FC = () => {
           defaultActiveKey="backtest"
           items={[
             {
+              key: 'forecast7',
+              label: <span><AimOutlined /> 7天预测</span>,
+              children: <Forecast7Tab symbol={symbol} />,
+            },
+            {
               key: 'backtest',
-              label: <span><FundOutlined /> 个股策略回测</span>,
+              label: <span><FundOutlined /> 策略回测</span>,
               children: (
                 <div>
                   {/* 回测控制 */}
-                  <Card style={{ marginBottom: 16 }}>
+                  <Card style={{ marginBottom: 16, background: '#242830', border: '1px solid #3a3f4a' }}>
                     <Row gutter={16}>
                       <Col span={5}>
                         <Row gutter={[0, 12]}>
@@ -501,7 +506,7 @@ const App: React.FC = () => {
                         </Row>
                       </Col>
                       <Col span={19}>
-                        <Descriptions column={4} size="small">
+                        <Descriptions column={4} size="small" labelStyle={{ color: 'rgba(255,255,255,0.5)', background: '#242830' }} contentStyle={{ color: 'rgba(255,255,255,0.85)', background: '#242830' }}>
                           <Descriptions.Item label="建仓">首次25-30%</Descriptions.Item>
                           <Descriptions.Item label="加仓">模型看涨时20%</Descriptions.Item>
                           <Descriptions.Item label="止盈">盈利10%/强看跌5%</Descriptions.Item>
@@ -518,7 +523,7 @@ const App: React.FC = () => {
                   {backtestResults && (
                     <>
                       {/* 回测核心指标 */}
-                      <Card style={{ marginBottom: 16 }}>
+                      <Card style={{ marginBottom: 16, background: '#242830', border: '1px solid #3a3f4a' }}>
                         <Row gutter={16}>
                           <Col span={3}>
                             <Statistic title="总收益率" value={backtestResults.summary.profitRate} precision={2} suffix="%" valueStyle={{ color: backtestResults.summary.profitRate >= 0 ? '#52c41a' : '#ff4d4f', fontSize: 24 }} prefix={backtestResults.summary.profitRate >= 0 ? <RiseOutlined /> : <FallOutlined />} />
@@ -546,9 +551,9 @@ const App: React.FC = () => {
 
                       {/* 持仓状态 */}
                       {backtestResults.summary.holdingShares > 0 && (
-                        <Card style={{ marginBottom: 16, background: '#e6f7ff' }}>
+                        <Card style={{ marginBottom: 16, background: '#1a3328', border: '1px solid #3fb950' }}>
                           <Row gutter={16} align="middle">
-                            <Col span={4}><b>当前持仓:</b></Col>
+                            <Col span={4}><b style={{ color: 'rgba(255,255,255,0.85)' }}>当前持仓:</b></Col>
                             <Col span={4}><Tag color="blue" style={{ fontSize: 14 }}>{backtestResults.summary.holdingShares}股</Tag></Col>
                             <Col span={4}>成本价: ¥{backtestResults.summary.avgCost}</Col>
                             <Col span={4}>市值: ¥{backtestResults.summary.finalStockValue.toFixed(0)}</Col>
@@ -561,12 +566,12 @@ const App: React.FC = () => {
                       {/* 图表区域 */}
                       <Row gutter={16} style={{ marginBottom: 16 }}>
                         <Col span={12}>
-                          <Card title="股价与交易点" size="small">
+                          <Card title="股价与交易点" size="small" styles={{ body: { padding: 12 } }} style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
                             <div style={{ height: 280 }}>{backtestPriceChart && <Line data={backtestPriceChart} options={chartOptions} />}</div>
                           </Card>
                         </Col>
                         <Col span={12}>
-                          <Card title="市值曲线" size="small">
+                          <Card title="市值曲线" size="small" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
                             <div style={{ height: 280 }}>{portfolioChart && <Line data={portfolioChart} options={chartOptions} />}</div>
                           </Card>
                         </Col>
@@ -574,12 +579,12 @@ const App: React.FC = () => {
 
                       <Row gutter={16} style={{ marginBottom: 16 }}>
                         <Col span={12}>
-                          <Card title="超额收益（相对基准）" size="small">
+                          <Card title="超额收益（相对基准）" size="small" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
                             <div style={{ height: 200 }}>{excessReturnChart && <Line data={excessReturnChart} options={chartOptions} />}</div>
                           </Card>
                         </Col>
                         <Col span={12}>
-                          <Card title="预测概率分布" size="small">
+                          <Card title="预测概率分布" size="small" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
                             <div style={{ height: 200 }}>{predictionChart && <Bar data={predictionChart} options={volumeOptions} />}</div>
                           </Card>
                         </Col>
@@ -587,10 +592,10 @@ const App: React.FC = () => {
 
                       <Row gutter={16} style={{ marginBottom: 16 }}>
                         <Col span={6}>
-                          <Card title="买入点" size="small" style={{ background: '#e6f7ff' }}>
+                          <Card title="买入点" size="small" style={{ background: '#1a3328', border: '1px solid #3fb950' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
                               {(backtestResults?.buyPoints || []).slice(-10).map((bp: any, i: number) => (
-                                <div key={i} style={{ padding: 4, borderBottom: '1px solid #e8e8e8', fontSize: 12 }}>
+                                <div key={i} style={{ padding: 4, borderBottom: '1px solid #3a3f4a', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
                                   <Tag color="blue">{bp?.date?.slice(5, 10) || ""}</Tag> ¥{bp.price} | {bp.shares}股 | {bp.up_prob}%
                                 </div>
                               ))}
@@ -598,10 +603,10 @@ const App: React.FC = () => {
                           </Card>
                         </Col>
                         <Col span={6}>
-                          <Card title="卖出点" size="small" style={{ background: '#fff7e6' }}>
+                          <Card title="卖出点" size="small" style={{ background: '#2a2818', border: '1px solid #faad14' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
                               {(backtestResults?.sellPoints || []).slice(-10).map((sp: any, i: number) => (
-                                <div key={i} style={{ padding: 4, borderBottom: '1px solid #e8e8e8', fontSize: 12 }}>
+                                <div key={i} style={{ padding: 4, borderBottom: '1px solid #3a3f4a', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
                                   <Tag color="orange">{sp?.date?.slice(5, 10) || ""}</Tag> ¥{sp.price} | <span style={{ color: sp.profit_pct >= 0 ? '#52c41a' : '#ff4d4f' }}>{sp.profit_pct}%</span>
                                 </div>
                               ))}
@@ -611,7 +616,7 @@ const App: React.FC = () => {
                       </Row>
 
                       {/* 交易记录 */}
-                      <Card title="交易记录">
+                      <Card title="交易记录" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
                         <Table columns={tradeColumns} dataSource={backtestResults.trades} rowKey="date" pagination={{ pageSize: 15 }} size="small" scroll={{ x: 700 }}
                           summary={(pageData) => {
                             const sells = pageData.filter((t: any) => t.type === 'sell' && t.profit);
@@ -630,11 +635,6 @@ const App: React.FC = () => {
                   )}
                 </div>
               ),
-            },
-            {
-              key: 'forecast7',
-              label: <span><AimOutlined /> 7天预测</span>,
-              children: <Forecast7Tab symbol={symbol} />,
             },
           ]}
         />
