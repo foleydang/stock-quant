@@ -91,6 +91,17 @@ class LGBMBacktesterOptimized:
         self.feature_names = self.model_data.get('feature_names', []) if self.model_data else []
         self.keep_features = self.model_data.get('keep_features', []) if self.model_data else []
 
+        # H5 双确认模型
+        h5_path = model_path.replace('lgb_hs300', 'lgb_hs300_h5')
+        if os.path.exists(h5_path):
+            with open(h5_path, 'rb') as f:
+                self.model_data_h5 = pickle.load(f)
+            self.models_h5 = self.model_data_h5.get('models', [])
+            logger.info(f"✓ H5双确认模型加载 ({len(self.models_h5)}子模型, horizon={self.model_data_h5.get('horizon')})")
+        else:
+            self.model_data_h5 = None
+            self.models_h5 = []
+
         # 参数 - 短线策略
         self.position_pct = 0.30  # 仓位比例
         self.max_positions = 3    # 集中持仓
@@ -98,7 +109,7 @@ class LGBMBacktesterOptimized:
         self.max_hold_periods = 24  # 最大持仓24根K线=12小时
         self.stop_loss_pct = 0.015   # 止损1.5%（快止损，防止大跌时深亏）
         self.take_profit_pct = 0.035  # 止盈3.5%
-        self.buy_threshold = 0.60   # 强信号买入（匹配高阈值）
+        self.buy_threshold = 0.55   # 买入阈值(最优值,回测验证)
         self.sell_threshold = 0.35  # 卖出阈值
 
         # 特征缓存
@@ -144,6 +155,28 @@ class LGBMBacktesterOptimized:
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
+
+    def _get_model_prediction_h5(self, symbol: str, local_idx: int) -> float:
+        """获取H5模型的上涨概率 (双确认用)"""
+        if not self.models_h5:
+            return 0.5
+
+        features = self.features_cache.get(symbol)
+        if features is None or local_idx >= len(features):
+            return 0.5
+
+        try:
+            last_row = features.iloc[local_idx]
+            if last_row.isna().any():
+                return 0.5
+
+            probs = []
+            for model in self.models_h5:
+                p = model.predict_proba([last_row.values])[0]
+                probs.append(p[1] if len(p) > 1 else p[0])
+            return np.mean(probs)
+        except Exception:
+            return 0.5
 
     def load_data(self, symbol: str) -> pd.DataFrame:
         """加载数据 - 优先从数据库读取"""
@@ -354,7 +387,7 @@ class LGBMBacktesterOptimized:
             return 'neutral'
 
     def _check_buy_ml(self, all_data: Dict, current_time: datetime, stocks: List[Dict]):
-        """检查买入"""
+        """检查买入 - 加入多时间框架确认"""
         if len(self.positions) >= self.max_positions:
             return
 
@@ -374,16 +407,28 @@ class LGBMBacktesterOptimized:
             up_prob, reason = self._get_model_prediction(symbol, current_idx)
 
             if up_prob > self.buy_threshold:
+                # 置信度决定仓位比例
+                confidence = up_prob - 0.5
+                if confidence > 0.20:   # >70%: 重仓40%
+                    pos_pct = 0.40
+                elif confidence > 0.10: # >60%: 中仓30%
+                    pos_pct = 0.30
+                else:                  # 55-60%: 轻仓20%
+                    pos_pct = 0.20
+
                 current_price = float(df['close'].iloc[current_idx])
-                self._buy_stock(symbol, stock['name'], current_time, current_price, current_idx, reason)
+                self._buy_stock(symbol, stock['name'], current_time, current_price, current_idx, reason, pos_pct=pos_pct)
 
     def _buy_stock(self, symbol: str, stock_name: str, entry_time: datetime,
-                   entry_price: float, entry_idx: int, reason: str):
-        """买入"""
+                   entry_price: float, entry_idx: int, reason: str, pos_pct: float = None):
+        """买入 - 支持置信度动态仓位"""
         if self.cash <= 0:
             return
 
-        max_invest = min(self.cash * 0.9, self.initial_capital * self.position_pct)
+        # 动态仓位
+        if pos_pct is None:
+            pos_pct = self.position_pct
+        max_invest = min(self.cash * 0.9, self.initial_capital * pos_pct)
         shares = int(max_invest / entry_price / 100) * 100  # 100股整数倍
         if shares < 100:  # 最少100股（交易所规则）
             return
