@@ -83,15 +83,9 @@ class LGBMBacktesterOptimized:
         self.trades: List[Trade] = []
         self.daily_values = []
 
-        # 加载模型 (支持v4混合/v3 ensemble)
+        # 加载v3 ensemble模型
         if model_path is None:
             model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_hs300/model.pkl')
-
-        # v4混合模型 (需要用use_v4=True参数启用)
-        v4_path = model_path.replace('model.pkl', 'model_v4.pkl')
-        if os.path.exists(v4_path) and getattr(self, 'use_v4', False):
-            model_path = v4_path
-            logger.info(f"✓ 使用v4混合模型")
 
         self.model_data = self._load_model(model_path)
         self.models = self.model_data.get('models', []) if self.model_data else []
@@ -134,7 +128,7 @@ class LGBMBacktesterOptimized:
             return None
 
     def _get_model_prediction(self, symbol: str, local_idx: int) -> Tuple[float, str]:
-        """获取模型预测 - 支持v4混合+LR Stacking"""
+        """获取模型预测"""
         if not self.models:
             return 0.5, "模型未加载"
 
@@ -147,65 +141,16 @@ class LGBMBacktesterOptimized:
             if last_row.isna().any():
                 last_row = last_row.fillna(0)
 
-            # 对齐特征到模型期望的列(v4:107列, v3:118列)
-            if self.feature_names and len(last_row) != len(self.feature_names):
-                last_row = last_row.reindex(self.feature_names).fillna(0)
-
-            # 每个模型类型用不同的predict方式
             probs = []
-            model_types = self.model_data.get('model_types', ['lgbm'] * len(self.models))
-
-            for model, mtype in zip(self.models, model_types):
+            for model in self.models:
                 try:
-                    if mtype == 'lgbm':
-                        p = model.predict_proba([last_row.values])[0]
-                        probs.append(p[1] if len(p) > 1 else p[0])
-                    elif mtype == 'xgb':
-                        p = model.predict_proba(last_row.values.reshape(1, -1))[0]
-                        probs.append(p[1] if len(p) > 1 else p[0])
-                    elif mtype == 'catboost':
-                        p = model.predict_proba(last_row.values.reshape(1, -1))
-                        probs.append(float(p[0][1]) if len(p[0]) > 1 else float(p[0][0]))
-                    else:
-                        probs.append(0.5)
+                    p = model.predict_proba([last_row.values])[0]
+                    probs.append(p[1] if len(p) > 1 else p[0])
                 except Exception:
                     probs.append(0.5)
 
             avg_prob = float(np.mean(probs))
-
-            # LR Stacking元模型 (如果可用且有效)
-            # 注意: v4的LR Stacking在训练集上98%准确率但回测0%收益,
-            # 严重过拟合, 故禁用LR, 改用简单加权平均
-            lr_meta = self.model_data.get('lr_meta')
-            use_lr_stacking = self.model_data.get('use_lr_stacking', False)
-            if lr_meta is not None and use_lr_stacking:
-                std_prob = float(np.std(probs))
-                signal_strength = avg_prob - 0.5
-                strong_up = 1.0 if avg_prob > 0.6 else 0.0
-                strong_down = 1.0 if avg_prob < 0.4 else 0.0
-                stacking_input = np.array([
-                    *probs, avg_prob, std_prob,
-                    signal_strength, strong_up, strong_down,
-                ]).reshape(1, -1)
-                up_prob = float(lr_meta.predict_proba(stacking_input)[0][1])
-                method = f"LR-stacking"
-            elif self.model_data.get('ensemble_weights'):
-                # 加权平均 (从模型数据读取权重配置)
-                ew = self.model_data['ensemble_weights']
-                weights = [ew.get(mt, 1.0) for mt in model_types]
-                total_w = sum(weights)
-                weighted_avg = sum(p * w for p, w in zip(probs, weights)) / total_w
-                up_prob = weighted_avg
-                n_types = Counter(model_types)
-                type_str = '+'.join(f"{cnt}{t}" for t, cnt in n_types.items())
-                method = f"加权混合({type_str})"
-            else:
-                up_prob = avg_prob
-                n_types = Counter(model_types)
-                type_str = '+'.join(f"{cnt}{t}" for t, cnt in n_types.items())
-                method = f"混合:{type_str}"
-
-            return up_prob, f"上涨概率:{up_prob:.1%}({method})"
+            return avg_prob, f"上涨概率:{avg_prob:.1%}(3LGBM ensemble)"
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
