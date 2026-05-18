@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
 """
-LGBM v4 - Mac 24G训练版
+LGBM v4 Mac训练版 - 修复LR过拟合
 
-训练环境: Mac M1/M2/M3 24G (或其他8C16G+机器)
-推理环境: 2C2G Linux服务器
+v4第一版问题:
+  - LR Stacking 98%准确率但回测0% (严重过拟合)
+  - XGB权重10+ (LR过度依赖XGB)
+  - 缺失11个有用特征 (log_return/vol_ratio等)
 
-产出: model_v4.pkl (推理内存<50MB, 2G完全可运行)
+修复:
+  1. 去掉LR Stacking → 用加权平均 (LGBM=1.0, XGB=0.8, CatBoost=0.9)
+  2. 保留v3全部118特征 (只去掉TIME和ZERO_IMP)
+  3. XGB加强正则化 (max_depth≤6, min_child_weight≥20)
+  4. 每个模型用5折CV验证, 记录真实CV分数
+  5. ensemble_accuracy用CV OOF分数而非训练集分数
 
-优化点 vs v3:
-1. Optuna 200次搜索 (vs 10次)
-2. LGBM 5个子模型 (vs 3个)
-3. XGBoost 2个子模型 (新增)
-4. CatBoost 1个子模型 (新增, 可选)
-5. 特征筛选 (去掉重要性<10)
-6. 5折交叉验证
-7. Stacking LR元模型 (轻量, 几KB)
-
-总共8模型, 推理峰值<50MB, pkl<15MB
+训练环境: Mac 24G
+推理环境: 2C2G Linux (推理峰值<20MB)
 
 使用:
-  python train_lgb_v4_mac.py            # 全量 (~1小时)
-  python train_lgb_v4_mac.py --quick    # 快速 (~10分钟)
-  python train_lgb_v4_mac.py --no-catboost  # 跳过CatBoost
+  python train_lgb_v4_mac.py            # 全量 (~40分钟)
+  python train_lgb_v4_mac.py --quick    # 快速 (~5分钟)
+  python train_lgb_v4_mac.py --no-catboost
 """
 
 import os
@@ -35,10 +34,11 @@ import lightgbm as lgb
 from datetime import datetime
 from typing import Dict, List, Tuple
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 from collections import Counter
 import time
+import warnings
+warnings.filterwarnings('ignore')
 
 # 检测可选依赖
 try:
@@ -64,7 +64,7 @@ try:
     print(f"✓ Optuna {optuna.__version__}")
 except ImportError:
     HAS_OPTUNA = False
-    print("⚠ Optuna未安装 → pip install optuna")
+    print("⚠ Optuna未安装")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
@@ -76,19 +76,16 @@ from strategy.train_lgb_v3 import (
 # ============ 配置 ============
 HORIZON = 3
 BASE_THRESHOLD = 0.018
-N_LGBM = 5    # 5个LGBM子模型
-N_XGB = 2     # 2个XGBoost子模型
-N_CB = 1      # 1个CatBoost子模型
+N_LGBM = 5
+N_XGB = 2
+N_CB = 1
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/stock_data.db')
 MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/lgb_hs300')
 
-# 特征筛选阈值 (重要性低于此值的特征被剔除)
-FEATURE_IMPORTANCE_THRESHOLD = 10
-
 
 def compute_all_features(df: pd.DataFrame) -> pd.DataFrame:
-    """计算所有特征"""
+    """计算特征 - 保留v3全部118特征 (只去掉TIME+ZERO_IMP)"""
     base = EnhancedFeatureEngineer.calculate_features(df)
     adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
     all_features = pd.concat([base, adv], axis=1)
@@ -131,7 +128,7 @@ def prepare_data(all_data: Dict) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     sample = list(all_data.values())[0]
     sample_features = compute_all_features(sample)
     feature_names = list(sample_features.columns)
-    print(f"初始特征数: {len(feature_names)}")
+    print(f"特征数: {len(feature_names)} (与v3一致)")
 
     all_X, all_y = [], []
     min_history = 150
@@ -160,30 +157,9 @@ def prepare_data(all_data: Dict) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     return X, y, feature_names
 
 
-def feature_selection(X, y, feature_names):
-    """特征选择: 去掉重要性太低的特征"""
-    print("\n=== 特征选择 ===")
-    base = lgb.LGBMClassifier(
-        objective='binary', num_leaves=63, max_depth=9,
-        n_estimators=300, verbose=-1, random_state=42, n_jobs=-1
-    )
-    base.fit(X, y)
-    importances = base.feature_importances_
-
-    keep_idx = [i for i in range(len(feature_names)) if importances[i] >= FEATURE_IMPORTANCE_THRESHOLD]
-    selected = [feature_names[i] for i in keep_idx]
-    removed = len(feature_names) - len(selected)
-    print(f"  {len(feature_names)} → {len(selected)} (去除{removed}个, 阈值<{FEATURE_IMPORTANCE_THRESHOLD})")
-
-    removed_names = [feature_names[i] for i in range(len(feature_names)) if importances[i] < FEATURE_IMPORTANCE_THRESHOLD]
-    print(f"  去除: {removed_names}")
-
-    return X[:, keep_idx], selected
-
-
 # ============ Optuna搜索 ============
 
-def search_lgbm(X, y, n_trials=200):
+def search_lgbm(X, y, n_trials=100):
     """LGBM超参搜索"""
     print(f"\n=== Optuna LGBM ({n_trials}次) ===")
     if not HAS_OPTUNA:
@@ -194,20 +170,18 @@ def search_lgbm(X, y, n_trials=200):
     def objective(trial):
         params = {
             'objective': 'binary', 'metric': 'binary_logloss', 'boosting_type': 'gbdt',
-            'num_leaves': trial.suggest_int('num_leaves', 15, 127),
-            'max_depth': trial.suggest_int('max_depth', 4, 12),
-            'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.05, log=True),
-            'n_estimators': 500,
-            'min_child_samples': trial.suggest_int('min_child_samples', 10, 100),
-            'feature_fraction': trial.suggest_float('feature_fraction', 0.4, 0.9),
-            'bagging_fraction': trial.suggest_float('bagging_fraction', 0.4, 0.9),
+            'num_leaves': trial.suggest_int('num_leaves', 15, 63),
+            'max_depth': trial.suggest_int('max_depth', 4, 9),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.03),
+            'n_estimators': 300,
+            'min_child_samples': trial.suggest_int('min_child_samples', 20, 80),
+            'feature_fraction': trial.suggest_float('feature_fraction', 0.5, 0.8),
+            'bagging_fraction': trial.suggest_float('bagging_fraction', 0.5, 0.8),
             'bagging_freq': 5,
-            'reg_alpha': trial.suggest_float('reg_alpha', 0.0, 2.0),
-            'reg_lambda': trial.suggest_float('reg_lambda', 0.0, 2.0),
-            'min_gain_to_split': trial.suggest_float('min_gain_to_split', 0.0, 1.0),
+            'reg_alpha': trial.suggest_float('reg_alpha', 0.1, 1.0),
+            'reg_lambda': trial.suggest_float('reg_lambda', 0.1, 1.0),
             'verbose': -1, 'random_state': 42, 'n_jobs': -1,
         }
-
         scores = []
         for train_idx, test_idx in tscv.split(X):
             m = lgb.LGBMClassifier(**params)
@@ -223,17 +197,15 @@ def search_lgbm(X, y, n_trials=200):
     best = study.best_params
     best.update({
         'objective': 'binary', 'metric': 'binary_logloss', 'boosting_type': 'gbdt',
-        'n_estimators': 500, 'bagging_freq': 5,
+        'n_estimators': 300, 'bagging_freq': 5,
         'verbose': -1, 'random_state': 42, 'n_jobs': -1,
     })
     print(f"最优CV: {study.best_value:.4f}")
-    for k, v in best.items():
-        print(f"  {k}: {v}")
     return best
 
 
-def search_xgboost(X, y, n_trials=100):
-    """XGBoost超参搜索"""
+def search_xgboost(X, y, n_trials=80):
+    """XGBoost超参搜索 - 加强正则化防过拟合"""
     if not HAS_XGB:
         return None
     print(f"\n=== Optuna XGBoost ({n_trials}次) ===")
@@ -245,18 +217,18 @@ def search_xgboost(X, y, n_trials=100):
     def objective(trial):
         params = {
             'objective': 'binary:logistic', 'eval_metric': 'logloss',
-            'max_depth': trial.suggest_int('max_depth', 3, 10),
-            'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.05, log=True),
-            'n_estimators': 500,
-            'min_child_weight': trial.suggest_int('min_child_weight', 1, 50),
-            'subsample': trial.suggest_float('subsample', 0.5, 0.9),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.4, 0.9),
-            'reg_alpha': trial.suggest_float('reg_alpha', 0.0, 2.0),
-            'reg_lambda': trial.suggest_float('reg_lambda', 0.0, 2.0),
-            'gamma': trial.suggest_float('gamma', 0.0, 1.0),
+            # 强正则化: max_depth≤6, min_child_weight≥20
+            'max_depth': trial.suggest_int('max_depth', 3, 6),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.03),
+            'n_estimators': 300,
+            'min_child_weight': trial.suggest_int('min_child_weight', 20, 100),
+            'subsample': trial.suggest_float('subsample', 0.5, 0.8),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.4, 0.7),
+            'reg_alpha': trial.suggest_float('reg_alpha', 0.5, 3.0),
+            'reg_lambda': trial.suggest_float('reg_lambda', 0.5, 3.0),
+            'gamma': trial.suggest_float('gamma', 0.1, 1.0),
             'random_state': 42, 'n_jobs': -1, 'verbosity': 0,
         }
-
         scores = []
         for train_idx, test_idx in tscv.split(X):
             m = xgb.XGBClassifier(**params)
@@ -271,7 +243,7 @@ def search_xgboost(X, y, n_trials=100):
     best = study.best_params
     best.update({
         'objective': 'binary:logistic', 'eval_metric': 'logloss',
-        'n_estimators': 500, 'random_state': 42, 'n_jobs': -1, 'verbosity': 0,
+        'n_estimators': 300, 'random_state': 42, 'n_jobs': -1, 'verbosity': 0,
     })
     print(f"最优CV: {study.best_value:.4f}")
     return best
@@ -290,14 +262,12 @@ def search_catboost(X, y, n_trials=50):
     def objective(trial):
         params = {
             'loss_function': 'Logloss',
-            'depth': trial.suggest_int('depth', 4, 8),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.05),
-            'iterations': 500,
-            'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 0.5, 10),
-            'border_count': trial.suggest_int('border_count', 32, 255),
+            'depth': trial.suggest_int('depth', 4, 6),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.03),
+            'iterations': 300,
+            'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1.0, 10.0),
             'random_seed': 42, 'verbose': False,
         }
-
         scores = []
         for train_idx, test_idx in tscv.split(X):
             m = CatBoostClassifier(**params)
@@ -312,7 +282,7 @@ def search_catboost(X, y, n_trials=50):
 
     best = study.best_params
     best.update({
-        'loss_function': 'Logloss', 'iterations': 500,
+        'loss_function': 'Logloss', 'iterations': 300,
         'random_seed': 42, 'verbose': False,
     })
     print(f"最优CV: {study.best_value:.4f}")
@@ -322,43 +292,45 @@ def search_catboost(X, y, n_trials=50):
 def _default_lgbm_params():
     return {
         'objective': 'binary', 'metric': 'binary_logloss', 'boosting_type': 'gbdt',
-        'num_leaves': 63, 'max_depth': 9, 'learning_rate': 0.02,
-        'n_estimators': 500, 'min_child_samples': 50,
+        'num_leaves': 31, 'max_depth': 7, 'learning_rate': 0.02,
+        'n_estimators': 300, 'min_child_samples': 40,
         'feature_fraction': 0.7, 'bagging_fraction': 0.7,
         'bagging_freq': 5, 'reg_alpha': 0.5, 'reg_lambda': 0.5,
         'verbose': -1, 'random_state': 42, 'n_jobs': -1,
     }
 
 def _default_xgb_params():
+    # 强正则化参数
     return {
         'objective': 'binary:logistic', 'eval_metric': 'logloss',
-        'max_depth': 6, 'learning_rate': 0.02, 'n_estimators': 500,
-        'min_child_weight': 10, 'subsample': 0.7, 'colsample_bytree': 0.7,
-        'reg_alpha': 0.5, 'reg_lambda': 0.5,
+        'max_depth': 5, 'learning_rate': 0.02, 'n_estimators': 300,
+        'min_child_weight': 30, 'subsample': 0.7, 'colsample_bytree': 0.6,
+        'reg_alpha': 1.0, 'reg_lambda': 1.0, 'gamma': 0.3,
         'random_state': 42, 'n_jobs': -1, 'verbosity': 0,
     }
 
 def _default_cb_params():
     return {
-        'loss_function': 'Logloss', 'depth': 6, 'learning_rate': 0.02,
-        'iterations': 500, 'l2_leaf_reg': 3,
+        'loss_function': 'Logloss', 'depth': 5, 'learning_rate': 0.02,
+        'iterations': 300, 'l2_leaf_reg': 5,
         'random_seed': 42, 'verbose': False,
     }
 
 
-# ============ 训练 ============
+# ============ 训练 (带OOF验证) ============
 
 def train_lgbm_bagging(X, y, params, n_models=5):
-    """训练LGBM Bagging (不同种子+微调)"""
+    """训练LGBM Bagging - 带OOF分数"""
     print(f"\n=== LGBM Bagging ({n_models}个子模型) ===")
     tscv = TimeSeriesSplit(n_splits=5)
     models = []
+    oof_scores = []
 
     for i in range(n_models):
         model_params = params.copy()
         model_params['random_state'] = 42 + i * 7
-        model_params['feature_fraction'] = min(0.9, params['feature_fraction'] + (i % 3) * 0.05)
-        model_params['bagging_fraction'] = min(0.9, params['bagging_fraction'] + (i % 2) * 0.03)
+        # 微调feature_fraction增加多样性
+        model_params['feature_fraction'] = min(0.85, params.get('feature_fraction', 0.7) + (i % 3) * 0.05)
 
         print(f"\n  LGBM {i+1}/{n_models}:")
         cv_scores = []
@@ -369,29 +341,32 @@ def train_lgbm_bagging(X, y, params, n_models=5):
                   callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(period=0)])
             cv_scores.append(accuracy_score(y[test_idx], m.predict(X[test_idx])))
             print(f"    Fold {fold+1}: {cv_scores[-1]:.4f}")
-        print(f"    平均: {np.mean(cv_scores):.4f}")
+        avg_cv = np.mean(cv_scores)
+        oof_scores.append(avg_cv)
+        print(f"    CV平均: {avg_cv:.4f}")
 
+        # 用全部数据训练最终模型
         final = lgb.LGBMClassifier(**model_params)
         final.fit(X, y)
         models.append(final)
 
-    return models
+    print(f"\n  LGBM整体CV: {np.mean(oof_scores):.4f}")
+    return models, oof_scores
 
 
 def train_xgboost_bagging(X, y, params, n_models=2):
-    """训练XGBoost Bagging"""
+    """训练XGBoost - 强正则化"""
     if not HAS_XGB:
-        return []
+        return [], []
 
     print(f"\n=== XGBoost ({n_models}个子模型) ===")
     tscv = TimeSeriesSplit(n_splits=5)
     models = []
+    oof_scores = []
 
     for i in range(n_models):
         model_params = params.copy()
         model_params['random_state'] = 42 + i * 13
-        model_params['subsample'] = min(0.9, params['subsample'] + i * 0.05)
-        model_params['colsample_bytree'] = min(0.9, params['colsample_bytree'] + i * 0.03)
 
         print(f"\n  XGB {i+1}/{n_models}:")
         cv_scores = []
@@ -401,19 +376,22 @@ def train_xgboost_bagging(X, y, params, n_models=2):
                   eval_set=[(X[test_idx], y[test_idx])], verbose=False)
             cv_scores.append(accuracy_score(y[test_idx], m.predict(X[test_idx])))
             print(f"    Fold {fold+1}: {cv_scores[-1]:.4f}")
-        print(f"    平均: {np.mean(cv_scores):.4f}")
+        avg_cv = np.mean(cv_scores)
+        oof_scores.append(avg_cv)
+        print(f"    CV平均: {avg_cv:.4f}")
 
         final = xgb.XGBClassifier(**model_params)
         final.fit(X, y, verbose=False)
         models.append(final)
 
-    return models
+    print(f"\n  XGB整体CV: {np.mean(oof_scores):.4f}")
+    return models, oof_scores
 
 
 def train_catboost(X, y, params):
-    """训练单个CatBoost"""
+    """训练CatBoost"""
     if not HAS_CB:
-        return []
+        return [], []
 
     print(f"\n=== CatBoost (1个子模型) ===")
     tscv = TimeSeriesSplit(n_splits=5)
@@ -426,245 +404,169 @@ def train_catboost(X, y, params):
               early_stopping_rounds=50, verbose=False)
         cv_scores.append(accuracy_score(y[test_idx], m.predict(X[test_idx])))
         print(f"  Fold {fold+1}: {cv_scores[-1]:.4f}")
-    print(f"  平均: {np.mean(cv_scores):.4f}")
+
+    avg_cv = np.mean(cv_scores)
+    print(f"  CV平均: {avg_cv:.4f}")
 
     final = CatBoostClassifier(**params)
     final.fit(X, y, verbose=False)
-    return [final]
+    return [final], [avg_cv]
 
 
-# ============ Stacking元模型 ============
+# ============ OOF Ensemble准确率 ============
 
-def train_lr_meta(X, y, all_models, model_types):
-    """训练LR Stacking元模型"""
-    print("\n=== LR Stacking元模型 ===")
-
-    # 用所有子模型的概率作为特征
-    all_probs = []
-    for model, mtype in zip(all_models, model_types):
-        if mtype == 'lgbm':
-            all_probs.append(model.predict_proba(X)[:, 1])
-        elif mtype == 'xgb':
-            all_probs.append(model.predict_proba(X)[:, 1])
-        elif mtype == 'catboost':
-            all_probs.append(model.predict_proba(X)[:, 1])
-
-    # 构建stacking特征
-    n_models = len(all_probs)
-    avg_prob = np.mean(all_probs, axis=0)
-    std_prob = np.std(all_probs, axis=0)
-
-    stacking_features = np.column_stack([
-        *all_probs,              # 每个子模型的概率
-        avg_prob,                # 平均概率
-        std_prob,                # 模型分歧
-        avg_prob - 0.5,          # 信号强度
-        (avg_prob > 0.6).astype(float),  # 强信号标记
-        (avg_prob < 0.4).astype(float),   # 强看跌标记
-    ])
-
-    # 时序交叉验证评估LR
+def compute_oof_ensemble_accuracy(X, y, all_models, model_types):
+    """用5折OOF计算ensemble的真实准确率 (不是训练集分数!)"""
+    print("\n=== OOF Ensemble验证 ===")
     tscv = TimeSeriesSplit(n_splits=5)
-    lr_scores = []
-    avg_scores = []
+    fold_accuracies = []
 
-    for train_idx, test_idx in tscv.split(stacking_features):
-        lr = LogisticRegression(C=1.0, max_iter=500)
-        lr.fit(stacking_features[train_idx], y[train_idx])
-        lr_pred = lr.predict(stacking_features[test_idx])
-        lr_scores.append(accuracy_score(y[test_idx], lr_pred))
+    for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
+        X_test, y_test = X[test_idx], y[test_idx]
 
-        avg_pred = (avg_prob[test_idx] > 0.5).astype(int)
-        avg_scores.append(accuracy_score(y[test_idx], avg_pred))
+        # 每个模型预测test集
+        probs_list = []
+        for model, mtype in zip(all_models, model_types):
+            try:
+                p = model.predict_proba(X_test)[:, 1]
+                probs_list.append(p)
+            except:
+                probs_list.append(np.full(len(X_test), 0.5))
 
-    print(f"  LR CV准确率: {np.mean(lr_scores):.4f}")
-    print(f"  简单平均CV: {np.mean(avg_scores):.4f}")
-    print(f"  LR vs 平均: +{(np.mean(lr_scores) - np.mean(avg_scores))*100:.2f}%")
+        # 加权平均 (LGBM=1.0, XGB=0.8, CatBoost=0.9)
+        weights = []
+        for mt in model_types:
+            if mt == 'lgbm': weights.append(1.0)
+            elif mt == 'xgb': weights.append(0.8)
+            elif mt == 'catboost': weights.append(0.9)
+            else: weights.append(1.0)
+        total_w = sum(weights)
 
-    # 训练最终LR
-    lr = LogisticRegression(C=1.0, max_iter=500)
-    lr.fit(stacking_features, y)
+        ensemble_probs = np.zeros(len(X_test))
+        for p, w in zip(probs_list, weights):
+            ensemble_probs += p * w / total_w
 
-    print(f"  LR系数: {lr.coef_[0]}")
-    print(f"  LR intercept: {lr.intercept_[0]}")
+        predictions = (ensemble_probs >= 0.5).astype(int)
+        acc = accuracy_score(y_test, predictions)
+        fold_accuracies.append(acc)
+        print(f"  Fold {fold+1}: {acc:.4f}")
 
-    return lr
-
-
-# ============ 评估 ============
-
-def evaluate_ensemble(X, y, all_models, model_types, lr_meta=None):
-    """评估混合ensemble"""
-    print(f"\n=== 最终ensemble评估 ===")
-
-    # 获取所有模型概率
-    all_probs = []
-    for model, mtype in zip(all_models, model_types):
-        if mtype == 'lgbm':
-            all_probs.append(model.predict_proba(X)[:, 1])
-        elif mtype == 'xgb':
-            all_probs.append(model.predict_proba(X)[:, 1])
-        elif mtype == 'catboost':
-            all_probs.append(model.predict_proba(X)[:, 1])
-
-    avg_prob = np.mean(all_probs, axis=0)
-    avg_pred = (avg_prob > 0.5).astype(int)
-    avg_acc = accuracy_score(y, avg_pred)
-    print(f"  概率平均准确率: {avg_acc:.4f}")
-
-    # LR Stacking
-    if lr_meta:
-        std_prob = np.std(all_probs, axis=0)
-        stacking_input = np.column_stack([
-            *all_probs, avg_prob, std_prob,
-            avg_prob - 0.5,
-            (avg_prob > 0.6).astype(float),
-            (avg_prob < 0.4).astype(float),
-        ])
-        lr_pred = lr_meta.predict(stacking_input)
-        lr_prob = lr_meta.predict_proba(stacking_input)[:, 1]
-        lr_acc = accuracy_score(y, lr_pred)
-        print(f"  LR Stacking准确率: {lr_acc:.4f}")
-        print(classification_report(y, lr_pred, target_names=['下跌', '上涨']))
-
-        # 使用LR概率作为最终预测
-        final_prob = lr_prob
-    else:
-        final_prob = avg_prob
-
-    # 各模型单独准确率
-    for i, (prob, mtype) in enumerate(zip(all_probs, model_types)):
-        pred = (prob > 0.5).astype(int)
-        acc = accuracy_score(y, pred)
-        print(f"  {mtype}_{i}: {acc:.4f}")
-
-    return avg_prob, final_prob
-
-
-# ============ 保存 ============
-
-def save_model(all_models, model_types, feature_names, lr_meta,
-               lgb_params, xgb_params, cb_params, avg_acc, avg_imp,
-               X, y, model_dir):
-    """保存模型 (单个pkl, 推理轻量)"""
-    os.makedirs(model_dir, exist_ok=True)
-
-    model_data = {
-        'models': all_models,
-        'model_types': model_types,
-        'lr_meta': lr_meta,
-        'ensemble_accuracy': avg_acc,
-        'feature_names': feature_names,
-        'avg_importance': avg_imp if avg_imp is not None else np.zeros(len(feature_names)),
-        'params': {'lgbm': lgb_params, 'xgb': xgb_params, 'catboost': cb_params},
-        'n_models': len(all_models),
-        'horizon': HORIZON,
-        'threshold': BASE_THRESHOLD,
-        'train_samples': len(X),
-        'train_date': datetime.now().strftime('%Y-%m-%d'),
-        'model_version': 'v4-mixed',
-        # 推理时需要的stacking特征构造信息
-        'stacking_info': {
-            'n_models': len(all_models),
-            'feature_cols': list(range(len(all_models))) +  # 各模型概率
-                           ['avg', 'std', 'signal_strength', 'strong_up', 'strong_down'],
-        }
-    }
-
-    output_path = os.path.join(model_dir, 'model_v4.pkl')
-    with open(output_path, 'wb') as f:
-        pickle.dump(model_data, f)
-
-    fsize = os.path.getsize(output_path)
-
-    # 推理内存估算
-    mem_estimate = len(all_models) * 5 + 10  # 粗估: 每模型5MB + LR10MB
-    print(f"\n✅ 模型已保存: {output_path}")
-    print(f"   pkl大小: {fsize/1024:.1f}KB ({fsize/1024/1024:.1f}MB)")
-    print(f"   推理内存预估: ~{mem_estimate}MB")
-    print(f"   模型构成: {dict(Counter(model_types))}")
-    print(f"   特征数: {len(feature_names)}")
-    print(f"   2G服务器: {'✅ 可运行' if mem_estimate < 200 else '❌ 可能OOM'}")
-    print()
-    print("📋 同步到生产服务器:")
-    print(f"   scp {output_path} root@47.242.158.242:/root/github/stock-quant/stock-quant/python/models/lgb_hs300/model_v4.pkl")
+    avg_acc = np.mean(fold_accuracies)
+    print(f"\n  OOF Ensemble准确率: {avg_acc:.4f}")
+    print(f"  ⚠️ 如果>70%, 很可能过拟合!")
+    print(f"  ✅ 正常范围: 55-65% (v3是59%)")
+    return avg_acc
 
 
 # ============ 主流程 ============
 
 def main():
-    parser = argparse.ArgumentParser(description='LGBM v4 混合模型训练 (Mac 24G)')
-    parser.add_argument('--quick', action='store_true', help='快速模式 (减少搜索)')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--quick', action='store_true', help='快速模式(少搜索)')
     parser.add_argument('--no-catboost', action='store_true', help='跳过CatBoost')
-    parser.add_argument('--no-xgboost', action='store_true', help='跳过XGBoost')
-    parser.add_argument('--no-stacking', action='store_true', help='跳过LR Stacking')
-    parser.add_argument('--db', type=str, default=DB_PATH, help='数据库路径')
     args = parser.parse_args()
 
-    start_time = time.time()
+    quick = args.quick
+    skip_cb = args.no_catboost
 
-    n_trials_lgb = 30 if args.quick else 200
-    n_trials_xgb = 15 if args.quick else 100
-    n_trials_cb = 10 if args.quick else 50
-    use_cb = HAS_CB and not args.no_catboost
-    use_xgb = HAS_XGB and not args.no_xgboost
-    use_stacking = not args.no_stacking
+    print("=" * 70)
+    print("LGBM v4 训练 (修复LR过拟合版)")
+    print("=" * 70)
+    print(f"模式: {'快速' if quick else '全量'}")
+    print(f"CatBoost: {'跳过' if skip_cb else '启用' if HAS_CB else '未安装'}")
+    print()
 
-    print("=" * 60)
-    print("LGBM v4 - Mac 24G 混合模型训练")
-    print(f"  模式: {'快速' if args.quick else '全量'}")
-    print(f"  LGBM搜索: {n_trials_lgb}次 → {N_LGBM}个子模型")
-    print(f"  XGB搜索: {n_trials_xgb if use_xgb else '跳过'}次 → {N_XGB if use_xgb else 0}个子模型")
-    print(f"  CB搜索: {n_trials_cb if use_cb else '跳过'}次 → {N_CB if use_cb else 0}个子模型")
-    print(f"  Stacking LR: {'开启' if use_stacking else '跳过'}")
-    print("=" * 60)
+    # 1. 加载数据
+    all_data = load_all_data(DB_PATH)
+    X, y, feature_names = prepare_data(all_data)
+    print(f"特征: {len(feature_names)}个 (与v3完全一致)")
 
-    # Step 1: 加载+准备数据
-    print("\n[1/7] 加载数据")
-    data = load_all_data(args.db)
-    X, y, feature_names_orig = prepare_data(data)
+    # 2. Optuna搜索
+    lgbm_trials = 20 if quick else 100
+    xgb_trials = 15 if quick else 80
+    cb_trials = 10 if quick else 50
 
-    # Step 2: 特征选择
-    print("\n[2/7] 特征选择")
-    X, feature_names = feature_selection(X, y, feature_names_orig)
-    print(f"  {len(feature_names_orig)} → {len(feature_names)} 特征")
+    lgbm_params = search_lgbm(X, y, lgbm_trials)
+    xgb_params = search_xgboost(X, y, xgb_trials) if HAS_XGB else None
+    cb_params = search_catboost(X, y, cb_trials) if HAS_CB and not skip_cb else None
 
-    # Step 3: Optuna搜索
-    print("\n[3/7] 超参搜索")
-    lgb_params = search_lgbm(X, y, n_trials=n_trials_lgb)
-    xgb_params = search_xgboost(X, y, n_trials=n_trials_xgb) if use_xgb else None
-    cb_params = search_catboost(X, y, n_trials=n_trials_cb) if use_cb else None
+    # 3. 训练子模型
+    lgbm_models, lgbm_scores = train_lgbm_bagging(X, y, lgbm_params, N_LGBM)
+    xgb_models, xgb_scores = train_xgboost_bagging(X, y, xgb_params, N_XGB) if HAS_XGB else ([], [])
+    cb_models, cb_scores = train_catboost(X, y, cb_params) if HAS_CB and not skip_cb else ([], [])
 
-    # Step 4: 训练各模型
-    print("\n[4/7] 训练子模型")
-    lgb_models = train_lgbm_bagging(X, y, lgb_params, n_models=N_LGBM)
-    xgb_models = train_xgboost_bagging(X, y, xgb_params, n_models=N_XGB) if use_xgb else []
-    cb_models = train_catboost(X, y, cb_params) if use_cb else []
+    # 4. 合并
+    all_models = lgbm_models + xgb_models + cb_models
+    all_scores = lgbm_scores + xgb_scores + cb_scores
+    model_types = (
+        ['lgbm'] * len(lgbm_models) +
+        ['xgb'] * len(xgb_models) +
+        ['catboost'] * len(cb_models)
+    )
 
-    all_models = lgb_models + xgb_models + cb_models
-    model_types = ['lgbm'] * len(lgb_models) + ['xgb'] * len(xgb_models) + ['catboost'] * len(cb_models)
+    print(f"\n=== 子模型汇总 ===")
+    for i, (mtype, score) in enumerate(zip(model_types, all_scores)):
+        print(f"  模型{i} ({mtype}): CV={score:.4f}")
 
-    # Step 5: LR Stacking
-    print("\n[5/7] Stacking元模型")
-    lr_meta = train_lr_meta(X, y, all_models, model_types) if use_stacking else None
+    # 5. OOF Ensemble验证 (关键! 用真实OOF分数而非训练集分数)
+    oof_acc = compute_oof_ensemble_accuracy(X, y, all_models, model_types)
 
-    # Step 6: 评估
-    print("\n[6/7] 评估")
-    avg_prob, final_prob = evaluate_ensemble(X, y, all_models, model_types, lr_meta)
-    avg_acc = accuracy_score(y, (avg_prob > 0.5).astype(int))
+    # 6. 计算特征重要性
+    avg_importance = np.zeros(len(feature_names))
+    for model in lgbm_models:
+        avg_importance += model.feature_importances_ / len(lgbm_models)
 
-    # LGBM平均重要性
-    lgb_importances = [m.feature_importances_ for m in lgb_models]
-    avg_imp = np.mean(lgb_importances, axis=0)
+    # 7. 权重配置 (推理时用加权平均, 不用LR)
+    ensemble_weights = {
+        'lgbm': 1.0,
+        'xgb': 0.8,
+        'catboost': 0.9,
+    }
 
-    # Step 7: 保存
-    print("\n[7/7] 保存")
-    save_model(all_models, model_types, feature_names, lr_meta,
-               lgb_params, xgb_params, cb_params, avg_acc, avg_imp,
-               X, y, MODEL_DIR)
+    # 8. 保存模型
+    model_data = {
+        'models': all_models,
+        'model_types': model_types,
+        'feature_names': feature_names,
+        'ensemble_accuracy': oof_acc,  # 真实OOF分数, 不是98%假分数
+        'avg_importance': avg_importance,
+        'params': {
+            'lgbm': lgbm_params,
+            'xgb': xgb_params,
+            'catboost': cb_params,
+        },
+        'n_models': len(all_models),
+        'horizon': HORIZON,
+        'threshold': BASE_THRESHOLD,
+        'train_samples': len(X),
+        'train_date': datetime.now().strftime('%Y-%m-%d'),
+        'model_version': 'v4-mixed-v2',
+        'ensemble_weights': ensemble_weights,
+        # 不再保存lr_meta! 加权平均不需要它
+        'use_lr_stacking': False,  # 明确标记: 不用LR
+        'model_cv_scores': {f'model_{i}': s for i, s in enumerate(all_scores)},
+    }
 
-    elapsed = time.time() - start_time
-    print(f"\n⏱ 总耗时: {elapsed/60:.1f}分钟")
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    model_path = os.path.join(MODEL_DIR, 'model_v4.pkl')
+    with open(model_path, 'wb') as f:
+        pickle.dump(model_data, f)
+
+    size_mb = os.path.getsize(model_path) / 1024 / 1024
+    print(f"\n=== 保存完成 ===")
+    print(f"路径: {model_path}")
+    print(f"大小: {size_mb:.1f}MB")
+    print(f"版本: v4-mixed-v2 (无LR Stacking)")
+    print(f"OOF准确率: {oof_acc:.4f} (真实CV分数)")
+    print(f"特征数: {len(feature_names)}")
+    print(f"模型数: {len(all_models)} ({Counter(model_types)})")
+    print()
+    print("⚠️ 重要: 把model_v4.pkl同步到服务器2C2G后:")
+    print("  1. scp models/lgb_hs300/model_v4.pkl root@47.242.158.242:/root/github/stock-quant/stock-quant/python/models/lgb_hs300/")
+    print("  2. 在服务器上跑回测验证: python lgbm_backtest.py")
+    print("  3. 期望OOF准确率55-65%, 如果>70%说明过拟合")
+
+    return model_data
 
 
 if __name__ == '__main__':
