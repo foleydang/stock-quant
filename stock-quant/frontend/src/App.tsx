@@ -499,10 +499,13 @@ const App: React.FC = () => {
                             <Statistic title="胜率" value={backtestResults.summary.winRate} precision={1} suffix="%" valueStyle={{ color: backtestResults.summary.winRate >= 50 ? '#52c41a' : '#ff4d4f' }} />
                           </Col>
                           <Col span={3}>
-                            <Statistic title="交易次数" value={backtestResults.summary.tradeCount} suffix="笔" />
+                            <Statistic title="Sharpe" value={backtestResults.summary.sharpe || 0} precision={2} valueStyle={{ color: (backtestResults.summary.sharpe || 0) >= 1 ? '#52c41a' : (backtestResults.summary.sharpe || 0) >= 0 ? '#faad14' : '#ff4d4f', fontSize: 24 }} />
                           </Col>
                           <Col span={3}>
                             <Statistic title="最大回撤" value={backtestResults.summary.maxDrawdown} precision={2} suffix="%" valueStyle={{ color: backtestResults.summary.maxDrawdown > 10 ? '#ff4d4f' : '#faad14' }} />
+                          </Col>
+                          <Col span={3}>
+                            <Statistic title="交易" value={backtestResults.summary.tradeCount} suffix="笔" valueStyle={{ color: 'rgba(255,255,255,0.85)' }} />
                           </Col>
                         </Row>
                       </Card>
@@ -535,30 +538,42 @@ const App: React.FC = () => {
                         </Col>
                       </Row>
 
-                      {/* 预测概率分布 - 全宽 */}
-                      <Card title="预测概率分布" size="small" style={{ marginBottom: 16, background: '#242830', border: '1px solid #3a3f4a' }} styles={{ body: { padding: 12 } }}>
-                        <div style={{ height: 200 }}>{predictionChart && <Bar data={predictionChart} options={volumeOptions} />}</div>
-                      </Card>
-
-                      {/* 买入/卖出点 - 并排各占50% */}
+                      {/* 预测概率分布 + 每笔收益分布 */}
                       <Row gutter={16} style={{ marginBottom: 16 }}>
-                        <Col span={12}>
+                        <Col span={6}>
+                          <Card title="预测概率分布" size="small" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
+                            <div style={{ height: 200 }}>{predictionChart && <Bar data={predictionChart} options={volumeOptions} />}</div>
+                          </Card>
+                        </Col>
+                        <Col span={6}>
+                          <Card title="每笔交易盈亏" size="small" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
+                            <div style={{ height: 200 }}>{backtestResults.trades && <Bar data={{
+                              labels: backtestResults.trades.filter((t: any) => t.type === 'sell').slice(-20).map((t: any) => t.time?.slice(5, 16) || ''),
+                              datasets: [{
+                                label: '盈亏(元)',
+                                data: backtestResults.trades.filter((t: any) => t.type === 'sell').slice(-20).map((t: any) => t.profit || 0),
+                                backgroundColor: backtestResults.trades.filter((t: any) => t.type === 'sell').slice(-20).map((t: any) => (t.profit || 0) >= 0 ? 'rgba(63,185,80,0.6)' : 'rgba(248,81,73,0.6)'),
+                              }],
+                            }} options={{ responsive: true, maintainAspectRatio: false, plugins: { title: { display: false }, legend: { labels: { color: 'rgba(255,255,255,0.5)' } } }, scales: { x: { ticks: { color: 'rgba(255,255,255,0.4)', maxRotation: 45 }, grid: { color: '#3a3f4a' } }, y: { ticks: { color: 'rgba(255,255,255,0.4)' }, grid: { color: '#3a3f4a' } } } }} />}</div>
+                          </Card>
+                        </Col>
+                        <Col span={6}>
                           <Card title="买入点" size="small" style={{ background: '#1a3328', border: '1px solid #3fb950' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
-                              {(backtestResults?.buyPoints || []).slice(-10).map((bp: any, i: number) => (
+                              {(backtestResults?.trades || []).filter((t: any) => t.type === 'buy').slice(-10).map((t: any, i: number) => (
                                 <div key={i} style={{ padding: 4, borderBottom: '1px solid #3a3f4a', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
-                                  <Tag color="blue">{bp?.date?.slice(5, 10) || ""}</Tag> ¥{bp.price?.toFixed(2)}
+                                  <Tag color="blue">{t.time?.slice(5, 10) || ''}</Tag> ¥{t.price?.toFixed(2)} | {t.shares}股 | <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{t.reason?.slice(0, 20) || ''}</span>
                                 </div>
                               ))}
                             </div>
                           </Card>
                         </Col>
-                        <Col span={12}>
+                        <Col span={6}>
                           <Card title="卖出点" size="small" style={{ background: '#2a2818', border: '1px solid #faad14' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
-                              {(backtestResults?.sellPoints || []).slice(-10).map((sp: any, i: number) => (
+                              {(backtestResults?.trades || []).filter((t: any) => t.type === 'sell').slice(-10).map((t: any, i: number) => (
                                 <div key={i} style={{ padding: 4, borderBottom: '1px solid #3a3f4a', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
-                                  <Tag color="orange">{sp?.date?.slice(5, 10) || ""}</Tag> ¥{sp.price?.toFixed(2)}
+                                  <Tag color="orange">{t.time?.slice(5, 10) || ''}</Tag> ¥{t.price?.toFixed(2)} | {t.shares}股 | <span style={{ color: (t.profit || 0) >= 0 ? '#52c41a' : '#ff4d4f' }}>{(t.profit || 0) >= 0 ? '+' : ''}¥{(t.profit || 0).toFixed(0)}</span>
                                 </div>
                               ))}
                             </div>
