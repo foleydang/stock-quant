@@ -268,7 +268,7 @@ const TradeRecord: React.FC = () => {
               </p>
             </Col>
             <Col span={12} style={{ textAlign: 'right' }}>
-              <Button onClick={() => navigate('/')}>返回首页</Button>
+              <Button onClick={() => navigate('/')} style={{ background: 'rgba(226,176,74,0.15)', borderColor: 'rgba(226,176,74,0.3)', color: 'rgba(255,255,255,0.8)' }}>← 返回主页</Button>
             </Col>
           </Row>
         </Card>

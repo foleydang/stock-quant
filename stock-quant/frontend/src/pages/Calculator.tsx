@@ -81,7 +81,7 @@ export default function Calculator() {
           <CalculatorOutlined style={{ marginRight: 10, color: GOLD }} />
           成本计算器
         </h2>
-        <Link to="/" style={{ color: GOLD, textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 14, fontWeight: 600, border: `1px solid ${GOLD}` }}>← 返回主页</Link>
+        <Link to="/" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>← 返回主页</Link>
       </div>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 24px 48px' }}>
