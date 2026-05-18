@@ -12,7 +12,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Button, Select, Table, Spin, message, Card, Statistic, Row, Col, Tag, Tabs, Progress, Descriptions, DatePicker } from 'antd';
+import { Button, Select, Table, Spin, message, Card, Statistic, Row, Col, Tag, Tabs, Progress, Descriptions, DatePicker, ConfigProvider, theme } from 'antd';
 import { RiseOutlined, FallOutlined, StockOutlined, FundOutlined, SwapOutlined, AimOutlined, CalculatorOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -355,6 +355,7 @@ const App: React.FC = () => {
   };
 
   return (
+    <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
     <Router>
       <Routes>
         <Route path="/trade" element={
@@ -617,7 +618,7 @@ const App: React.FC = () => {
 
                       {/* 交易记录 */}
                       <Card title="交易记录" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
-                        <Table columns={tradeColumns} dataSource={backtestResults.trades} rowKey="date" pagination={{ pageSize: 15 }} size="small" scroll={{ x: 700 }}
+                        <Table columns={tradeColumns} dataSource={backtestResults.trades} rowKey="date" pagination={{ pageSize: 15 }} size="small" scroll={{ x: 700 }} locale={{ emptyText: <span style={{ color: 'rgba(255,255,255,0.4)' }}>暂无交易记录，点击上方「执行回测」开始</span> }}
                           summary={(pageData) => {
                             const sells = pageData.filter((t: any) => t.type === 'sell' && t.profit);
                             const totalProfit = sells.reduce((sum: number, t: any) => sum + (t.profit || 0), 0);
@@ -648,6 +649,7 @@ const App: React.FC = () => {
         } />
       </Routes>
     </Router>
+    </ConfigProvider>
   );
 };
 
