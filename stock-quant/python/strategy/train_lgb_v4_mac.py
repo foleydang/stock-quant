@@ -607,7 +607,7 @@ def main():
     n_trials_xgb = 15 if args.quick else 100
     n_trials_cb = 10 if args.quick else 50
     use_cb = HAS_CB and not args.no_catboost
-    use_xgb = HAS_XGB and not args.no_xgb
+    use_xgb = HAS_XGB and not args.no_xgboost
     use_stacking = not args.no_stacking
 
     print("=" * 60)
