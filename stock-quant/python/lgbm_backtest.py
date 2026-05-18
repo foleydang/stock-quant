@@ -134,7 +134,7 @@ class LGBMBacktesterOptimized:
             return None
 
     def _get_model_prediction(self, symbol: str, local_idx: int) -> Tuple[float, str]:
-        """获取模型预测 - 支持混合ensemble"""
+        """获取模型预测 - 支持v4混合+LR Stacking"""
         if not self.models:
             return 0.5, "模型未加载"
 
@@ -145,9 +145,9 @@ class LGBMBacktesterOptimized:
         try:
             last_row = features.iloc[local_idx]
             if last_row.isna().any():
-                return 0.5, "特征含NaN"
+                last_row = last_row.fillna(0)
 
-            # 混合ensemble: 每个模型类型用不同的predict方式
+            # 每个模型类型用不同的predict方式
             probs = []
             model_types = self.model_data.get('model_types', ['lgbm'] * len(self.models))
 
@@ -161,18 +161,34 @@ class LGBMBacktesterOptimized:
                         probs.append(p[1] if len(p) > 1 else p[0])
                     elif mtype == 'catboost':
                         p = model.predict_proba(last_row.values.reshape(1, -1))
-                        # CatBoost返回2D array
                         probs.append(float(p[0][1]) if len(p[0]) > 1 else float(p[0][0]))
                     else:
                         probs.append(0.5)
                 except Exception:
                     probs.append(0.5)
 
-            up_prob = float(np.mean(probs))
-            n_types = Counter(model_types)
-            type_str = '+'.join(f"{cnt}{t}" for t, cnt in n_types.items())
+            avg_prob = float(np.mean(probs))
 
-            return up_prob, f"上涨概率:{up_prob:.1%}(混合:{type_str})"
+            # LR Stacking元模型 (如果可用)
+            lr_meta = self.model_data.get('lr_meta')
+            if lr_meta is not None:
+                std_prob = float(np.std(probs))
+                signal_strength = avg_prob - 0.5
+                strong_up = 1.0 if avg_prob > 0.6 else 0.0
+                strong_down = 1.0 if avg_prob < 0.4 else 0.0
+                stacking_input = np.array([
+                    *probs, avg_prob, std_prob,
+                    signal_strength, strong_up, strong_down,
+                ]).reshape(1, -1)
+                up_prob = float(lr_meta.predict_proba(stacking_input)[0][1])
+                method = f"LR-stacking"
+            else:
+                up_prob = avg_prob
+                n_types = Counter(model_types)
+                type_str = '+'.join(f"{cnt}{t}" for t, cnt in n_types.items())
+                method = f"混合:{type_str}"
+
+            return up_prob, f"上涨概率:{up_prob:.1%}({method})"
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
