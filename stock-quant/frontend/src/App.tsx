@@ -13,12 +13,14 @@ import {
   Legend,
 } from 'chart.js';
 import { Button, Select, Table, Spin, message, Card, Statistic, Row, Col, Tag, Tabs, Progress, Descriptions, DatePicker } from 'antd';
-import { RiseOutlined, FallOutlined, StockOutlined, FundOutlined, SwapOutlined, AimOutlined } from '@ant-design/icons';
+import { RiseOutlined, FallOutlined, StockOutlined, FundOutlined, SwapOutlined, AimOutlined, LineChartOutlined, CalculatorOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import TradeRecord from './pages/TradeRecord';
 import ForecastAccuracy from './pages/ForecastAccuracy';
+import Forecast7Days from './pages/Forecast7Days';
+import Calculator from './pages/Calculator';
 
 const { RangePicker } = DatePicker;
 
@@ -424,6 +426,12 @@ const App: React.FC = () => {
         <Route path="/forecast" element={
           <ForecastAccuracy />
         } />
+        <Route path="/forecast7" element={
+          <Forecast7Days />
+        } />
+        <Route path="/calculator" element={
+          <Calculator />
+        } />
         <Route path="/" element={
           <div style={{ minHeight: '100vh', backgroundColor: '#1e2229' }}>
             {/* 顶部标题栏 - 深色金融风格 */}
@@ -445,6 +453,14 @@ const App: React.FC = () => {
                 <Link to="/forecast" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
                   <AimOutlined />
                   预测验证
+                </Link>
+                <Link to="/forecast7" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
+                  <LineChartOutlined />
+                  7天预测
+                </Link>
+                <Link to="/calculator" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
+                  <CalculatorOutlined />
+                  成本计算
                 </Link>
               </div>
             </div>

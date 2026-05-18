@@ -17,12 +17,14 @@ from routes.stock_routes import stock_bp
 from routes.strategy_routes import strategy_bp
 from routes.db_routes import db_bp
 from routes.forecast_routes import forecast_bp
+from routes.calculator_routes import calculator_bp
 
 # 注册蓝图
 app.register_blueprint(stock_bp)
 app.register_blueprint(strategy_bp)
 app.register_blueprint(db_bp)
 app.register_blueprint(forecast_bp)
+app.register_blueprint(calculator_bp)
 
 # 健康检查
 @app.route('/health', methods=['GET'])
