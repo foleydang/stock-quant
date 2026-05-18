@@ -189,22 +189,16 @@ class LGBMBacktesterOptimized:
                 ]).reshape(1, -1)
                 up_prob = float(lr_meta.predict_proba(stacking_input)[0][1])
                 method = f"LR-stacking"
-            elif lr_meta is not None:
-                # 禁用LR, 用加权平均(LGBM权重1.0, XGB权重0.8)
-                weights = []
-                for mt in model_types:
-                    if mt == 'lgbm':
-                        weights.append(1.0)
-                    elif mt == 'xgb':
-                        weights.append(0.8)
-                    elif mt == 'catboost':
-                        weights.append(0.9)
-                    else:
-                        weights.append(1.0)
+            elif self.model_data.get('ensemble_weights'):
+                # 加权平均 (从模型数据读取权重配置)
+                ew = self.model_data['ensemble_weights']
+                weights = [ew.get(mt, 1.0) for mt in model_types]
                 total_w = sum(weights)
                 weighted_avg = sum(p * w for p, w in zip(probs, weights)) / total_w
                 up_prob = weighted_avg
-                method = f"加权混合({len(probs)}模型)"
+                n_types = Counter(model_types)
+                type_str = '+'.join(f"{cnt}{t}" for t, cnt in n_types.items())
+                method = f"加权混合({type_str})"
             else:
                 up_prob = avg_prob
                 n_types = Counter(model_types)
