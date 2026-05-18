@@ -7,6 +7,11 @@ __pycache__/
 *.pyc
 .vite/
 
-# 大文件 - Mac训练时单独scp
-*.db
-models/
+# 只排除临时文件, db和model通过LFS管理
+*.csv
+logs/cron.log
+logs/monitor.log
+logs/hs300_update.log
+logs/service_check.log
+logs/kline_accumulate.log
+logs/backtest.log
