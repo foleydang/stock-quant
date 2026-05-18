@@ -91,26 +91,23 @@ class LGBMBacktesterOptimized:
         self.feature_names = self.model_data.get('feature_names', []) if self.model_data else []
         self.keep_features = self.model_data.get('keep_features', []) if self.model_data else []
 
-        # H5 双确认模型
+        # H5 双确认模型 (备用)
         h5_path = model_path.replace('lgb_hs300', 'lgb_hs300_h5')
         if os.path.exists(h5_path):
             with open(h5_path, 'rb') as f:
                 self.model_data_h5 = pickle.load(f)
             self.models_h5 = self.model_data_h5.get('models', [])
-            logger.info(f"✓ H5双确认模型加载 ({len(self.models_h5)}子模型, horizon={self.model_data_h5.get('horizon')})")
-        else:
-            self.model_data_h5 = None
-            self.models_h5 = []
 
         # 参数 - 短线策略
         self.position_pct = 0.30  # 仓位比例
         self.max_positions = 3    # 集中持仓
         self.min_hold_periods = 6   # 最小持仓6根K线=3小时
         self.max_hold_periods = 24  # 最大持仓24根K线=12小时
-        self.stop_loss_pct = 0.015   # 止损1.5%（快止损，防止大跌时深亏）
+        self.stop_loss_pct = 0.015   # 止损1.5%
         self.take_profit_pct = 0.035  # 止盈3.5%
         self.buy_threshold = 0.55   # 买入阈值(最优值,回测验证)
         self.sell_threshold = 0.35  # 卖出阈值
+        self.dynamic_stop_loss = False  # 动态止损(验证无效,关闭)
 
         # 特征缓存
         self.features_cache: Dict[str, pd.DataFrame] = {}
@@ -149,7 +146,7 @@ class LGBMBacktesterOptimized:
             for model in self.models:
                 p = model.predict_proba([last_row.values])[0]
                 probs.append(p[1] if len(p) > 1 else p[0])
-            up_prob = np.mean(probs)
+            up_prob = float(np.mean(probs))
 
             return up_prob, f"上涨概率:{up_prob:.1%}(ensemble:{len(self.models)})"
 
@@ -326,7 +323,7 @@ class LGBMBacktesterOptimized:
                     pos.available = True
 
     def _check_sell(self, all_data: Dict, current_time: datetime):
-        """检查卖出"""
+        """检查卖出 - 支持动态止损"""
         for symbol, pos in list(self.positions.items()):
             if not pos.available:
                 continue
@@ -347,8 +344,17 @@ class LGBMBacktesterOptimized:
 
             loss_pct = (current_price - pos.cost_price) / pos.cost_price
 
-            if loss_pct <= -self.stop_loss_pct:
-                sell_reason = "止损"
+            # 动态止损: 根据近期波动率调整止损幅度
+            if self.dynamic_stop_loss and current_idx >= 10:
+                recent_prices = df['close'].iloc[current_idx-10:current_idx+1].values
+                recent_vol = np.std(np.diff(recent_prices) / recent_prices[:-1])  # 10根K线的波动率
+                # 高波动: 止损放宽到2.5%; 低波动: 收紧到1.2%
+                dynamic_stop = min(0.025, max(0.012, recent_vol * 3))  # 3倍波动率作为止损
+            else:
+                dynamic_stop = self.stop_loss_pct
+
+            if loss_pct <= -dynamic_stop:
+                sell_reason = f"止损(动态{dynamic_stop:.1%})"
             elif current_price >= pos.take_profit:
                 sell_reason = "止盈"
             elif hold_periods >= self.max_hold_periods:
