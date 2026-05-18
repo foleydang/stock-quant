@@ -12,30 +12,30 @@
     "滚动验证评估"
   ],
   "target_definition": {
-    "horizon": "3根K线 (90分钟)",
-    "threshold": "自适应, 基础1.7999999999999998%"
+    "horizon": "5根K线 (150分钟)",
+    "threshold": "自适应, 基础2.0%"
   },
   "performance": {
-    "ensemble_accuracy": 0.7606,
+    "ensemble_accuracy": 0.7782,
     "n_models": 3,
     "best_iterations": [
-      190,
-      110,
-      146
+      311,
+      323,
+      329
     ],
     "total_features": 118,
     "recommended_features": 118,
-    "train_samples": 24296
+    "train_samples": 44710
   },
   "hyperparameters": {
-    "num_leaves": 31,
+    "num_leaves": 63,
     "max_depth": 9,
-    "learning_rate": 0.03627698547388074,
-    "min_child_samples": 40,
-    "feature_fraction": 0.7384881184998682,
-    "bagging_fraction": 0.8635369161907083,
-    "reg_alpha": 0.23619195551476868,
-    "reg_lambda": 0.0001746128825695914,
+    "learning_rate": 0.01332649246548117,
+    "min_child_samples": 67,
+    "feature_fraction": 0.6709362236837388,
+    "bagging_fraction": 0.8496551449823758,
+    "reg_alpha": 0.6092899846642197,
+    "reg_lambda": 0.8448486258103103,
     "n_estimators": 500,
     "objective": "binary",
     "metric": "binary_logloss",

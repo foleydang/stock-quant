@@ -1,5 +1,6 @@
 #!/bin/bash
 # 统一的K线累积脚本 - 每30分钟运行一次
+# 采集所有关注列表 + 沪深300核心股票
 
 cd /root/github/stock-quant/stock-quant/python
 /root/miniconda3/bin/python -c "
@@ -8,6 +9,9 @@ sys.path.insert(0, '.')
 from data.kline_accumulator import KlineAccumulator
 
 acc = KlineAccumulator()
-symbols = ['300124.SZ', '600048.SH', '3690.HK', '300015.SZ', '159792.SZ', '9988.HK']
-acc.accumulate_realtime(symbols)
+# Watchlist股票 + 港股 + ETF
+watchlist = ['300015.SZ', '300124.SZ', '600048.SH', '600519.SH', '000001.SZ',
+             '000333.SZ', '002594.SZ', '601318.SH', '600036.SH', '000858.SZ',
+             '3690.HK', '0700.HK', '9988.HK', '159792.SZ']
+acc.accumulate_realtime(watchlist)
 " >> logs/kline_accumulate.log 2>&1
