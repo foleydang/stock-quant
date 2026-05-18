@@ -19,6 +19,13 @@ _feature_engineer = None
 _filtered_feature_names = None
 TIME_FEATURES = ['day_of_week', 'day_of_month', 'hour', 'minute',
                   'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
+ZERO_IMP_FEATURES = [
+    'price_above_ma5', 'price_above_ma10', 'price_above_ma20',
+    'price_above_ma30', 'price_above_ma60', 'price_above_ma80',
+    'price_above_ma100', 'price_above_ma120',
+    'ma5_cross_ma10', 'ma10_cross_ma20', 'ma20_cross_ma60', 'ma60_cross_ma120',
+    'macd_cross', 'kdj_cross_signal', 'inside_bar', 'breakout_20', 'trend_direction',
+]
 
 
 def _load_model():
@@ -136,14 +143,15 @@ def forecast_accuracy(symbol):
         except Exception:
             pass  # v2模型不需要高级特征
 
-        # 过滤时间特征
+        # 过滤时间特征 + 零重要性特征
         if filtered_feature_names:
             missing = [c for c in filtered_feature_names if c not in features.columns]
             for c in missing:
                 features[c] = 0
             features = features[filtered_feature_names]
         else:
-            features = features[[c for c in features.columns if c not in TIME_FEATURES]]
+            drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
+            features = features[[c for c in features.columns if c not in drop_cols]]
 
         # 评估参数
         horizon = model_data.get('horizon', 3)
@@ -211,7 +219,7 @@ def forecast_accuracy(symbol):
         predicted_prices = [actual_prices[0]]
         for i in range(1, len(predictions)):
             p = predictions[i - 1]
-            change = avg_up_change * (p / 0.5) if p >= 0.5 else avg_down * ((1 - p) / 0.5)
+            change = avg_up * (p / 0.5) if p >= 0.5 else avg_down * ((1 - p) / 0.5)
             predicted_prices.append(predicted_prices[-1] * (1 + change))
 
         final_deviation = (predicted_prices[-1] - actual_prices[-1]) / actual_prices[-1] * 100

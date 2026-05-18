@@ -20,6 +20,7 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 
 from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+from strategy.train_lgb_v3 import AdvancedFeatureEngineer, ZERO_IMP_FEATURES, TIME_FEATURES
 
 # 配置日志
 logger = logging.getLogger(__name__)  
@@ -86,17 +87,19 @@ class LGBMBacktesterOptimized:
             model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_hs300/model.pkl')
 
         self.model_data = self._load_model(model_path)
-        self.model = self.model_data.get('model') if self.model_data else None
+        self.models = self.model_data.get('models', []) if self.model_data else []
         self.feature_names = self.model_data.get('feature_names', []) if self.model_data else []
+        self.keep_features = self.model_data.get('keep_features', []) if self.model_data else []
 
-        # 参数
-        self.position_pct = 0.30  # 提高仓位比例，适应高价股
-        self.max_positions = 5
-        self.min_hold_periods = 12  # 缩短最小持仓周期
-        self.max_hold_periods = 48  # 缩短最大持仓周期
-        self.stop_loss_pct = 0.03  # 降低止损阈值
-        self.take_profit_pct = 0.05  # 降低止盈阈值
-        self.buy_threshold = 0.48  # 降低买入阈值，提高交易频率
+        # 参数 - 短线策略
+        self.position_pct = 0.30  # 仓位比例
+        self.max_positions = 3    # 集中持仓
+        self.min_hold_periods = 6   # 最小持仓6根K线=3小时
+        self.max_hold_periods = 24  # 最大持仓24根K线=12小时
+        self.stop_loss_pct = 0.015   # 止损1.5%（快止损，防止大跌时深亏）
+        self.take_profit_pct = 0.035  # 止盈3.5%
+        self.buy_threshold = 0.60   # 强信号买入（匹配高阈值）
+        self.sell_threshold = 0.35  # 卖出阈值
 
         # 特征缓存
         self.features_cache: Dict[str, pd.DataFrame] = {}
@@ -116,8 +119,8 @@ class LGBMBacktesterOptimized:
             return None
 
     def _get_model_prediction(self, symbol: str, local_idx: int) -> Tuple[float, str]:
-        """获取模型预测 - 使用股票局部索引"""
-        if self.model is None:
+        """获取模型预测 - Ensemble投票版"""
+        if not self.models:
             return 0.5, "模型未加载"
 
         features = self.features_cache.get(symbol)
@@ -130,10 +133,14 @@ class LGBMBacktesterOptimized:
             if last_row.isna().any():
                 return 0.5, "特征含NaN"
 
-            prob = self.model.predict_proba([last_row.values])[0]
-            up_prob = prob[1] if len(prob) > 1 else prob[0]
+            # Ensemble: 取所有子模型的平均概率
+            probs = []
+            for model in self.models:
+                p = model.predict_proba([last_row.values])[0]
+                probs.append(p[1] if len(p) > 1 else p[0])
+            up_prob = np.mean(probs)
 
-            return up_prob, f"上涨概率:{up_prob:.1%}"
+            return up_prob, f"上涨概率:{up_prob:.1%}(ensemble:{len(self.models)})"
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
@@ -178,8 +185,15 @@ class LGBMBacktesterOptimized:
         logger.info("\n预计算特征...")
         for symbol, df in all_data.items():
             logger.debug(f"计算 {symbol} 特征...")
-            features = EnhancedFeatureEngineer.calculate_features(df)
-            self.features_cache[symbol] = features
+            # 使用 v3 的组合特征 (基础+高级，过滤时间和零重要性)
+            base_features = EnhancedFeatureEngineer.calculate_features(df)
+            adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
+            all_features = pd.concat([base_features, adv_features], axis=1)
+            drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
+            keep_cols = [c for c in all_features.columns if c not in drop_cols]
+            all_features = all_features[keep_cols]
+            all_features = all_features.fillna(0)
+            self.features_cache[symbol] = all_features
             # 建立时间到索引的映射
             self.time_index_map[symbol] = {row['date']: idx for idx, row in df.iterrows()}
         logger.info(f"特征预计算完成，共 {len(self.features_cache)} 只股票")
@@ -308,11 +322,36 @@ class LGBMBacktesterOptimized:
                 sell_reason = "到期"
             elif hold_periods >= self.min_hold_periods:
                 up_prob, _ = self._get_model_prediction(symbol, current_idx)
-                if up_prob < 0.45:
+                if up_prob < self.sell_threshold:
                     sell_reason = f"模型看跌({up_prob:.0%})"
 
             if sell_reason:
                 self._sell_position(symbol, current_time, current_price, sell_reason, hold_periods)
+
+    def _check_market_trend(self, all_data: Dict, current_time: datetime) -> str:
+        """判断大盘趋势: 'up'/'down'/'neutral'"""
+        # 用平安银行作为大盘代理
+        proxy = '000001.SZ'
+        df = all_data.get(proxy)
+        if df is None or len(df) < 20:
+            return 'neutral'  # 无数据时不限制
+
+        idx = self._get_stock_local_idx(proxy, current_time)
+        if idx is None or idx < 10:
+            return 'neutral'
+
+        # 最近10根K线的趋势 (5小时=约1.5个交易日)
+        recent_close = df['close'].iloc[idx-10:idx+1].values
+        if len(recent_close) < 5:
+            return 'neutral'
+
+        ret_10 = (recent_close[-1] - recent_close[0]) / recent_close[0]
+        if ret_10 > 0.008:   # 5小时内涨>0.8% = 上涨趋势
+            return 'up'
+        elif ret_10 < -0.008:  # 5小时内跌>0.8% = 下跌趋势
+            return 'down'
+        else:
+            return 'neutral'
 
     def _check_buy_ml(self, all_data: Dict, current_time: datetime, stocks: List[Dict]):
         """检查买入"""
@@ -329,7 +368,7 @@ class LGBMBacktesterOptimized:
                 continue
 
             current_idx = self._get_stock_local_idx(symbol, current_time)
-            if current_idx is None or current_idx < 120:  # 需要足够的特征计算窗口
+            if current_idx is None or current_idx < 120:
                 continue
 
             up_prob, reason = self._get_model_prediction(symbol, current_idx)

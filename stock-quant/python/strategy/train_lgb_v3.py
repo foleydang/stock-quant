@@ -43,10 +43,18 @@ from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
 DB_PATH = os.path.join(os.path.dirname(__file__), '../data/stock_data.db')
 MODEL_DIR = os.path.join(os.path.dirname(__file__), '../models/lgb_hs300')
 HORIZON = 3               # 预测3根K线后(90分钟)
-BASE_THRESHOLD = 0.012     # 基础阈值1.2%
-N_BAGGING = 5              # 5个子模型集成
+BASE_THRESHOLD = 0.018     # 阈值1.8% (只标记强趋势)
+N_BAGGING = 3              # 3个子模型集成(2G内存限制)
 TIME_FEATURES = ['day_of_week', 'day_of_month', 'hour', 'minute',
                   'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
+# 零重要性特征 - 首轮训练确认无用，直接剔除
+ZERO_IMP_FEATURES = [
+    'price_above_ma5', 'price_above_ma10', 'price_above_ma20',
+    'price_above_ma30', 'price_above_ma60', 'price_above_ma80',
+    'price_above_ma100', 'price_above_ma120',
+    'ma5_cross_ma10', 'ma10_cross_ma20', 'ma20_cross_ma60', 'ma60_cross_ma120',
+    'macd_cross', 'kdj_cross_signal', 'inside_bar', 'breakout_20', 'trend_direction',
+]
 
 
 # ============ 新增特征 ============
@@ -99,7 +107,7 @@ class AdvancedFeatureEngineer:
         body = close - open_price
         total_range = high - low + 1e-10
         adv['body_ratio'] = body / total_range
-        adv['upper_shadow'] = (high - np.maximum(close, open_price)) / total_range
+        adv['adv_upper_shadow'] = (high - np.maximum(close, open_price)) / total_range
 
         # === 4. 波动率聚类 (3个) ===
         # 波动率变化率
@@ -121,7 +129,7 @@ class AdvancedFeatureEngineer:
             period_high = pd.Series(high).rolling(period).max()
             period_low = pd.Series(low).rolling(period).min()
             period_range = period_high - period_low + 1e-10
-            adv[f'price_position_{period}'] = (close - period_low) / period_range.values
+            adv[f'adv_price_position_{period}'] = (close - period_low) / period_range.values
 
         # 突破信号 (价格突破20日高点)
         adv['breakout_20'] = (close > pd.Series(high).rolling(20).max().shift(1)).astype(int)
@@ -202,15 +210,16 @@ def load_all_data(db_path: str) -> Dict[str, pd.DataFrame]:
 
 # ============ 特征计算 ============
 def compute_all_features(df: pd.DataFrame) -> pd.DataFrame:
-    """计算基础 + 高级特征, 过滤时间特征"""
+    """计算基础 + 高级特征, 过滤时间特征和零重要性特征"""
     base_features = EnhancedFeatureEngineer.calculate_features(df)
     adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
 
     # 合并
     all_features = pd.concat([base_features, adv_features], axis=1)
 
-    # 过滤时间特征
-    keep_cols = [c for c in all_features.columns if c not in TIME_FEATURES]
+    # 过滤时间特征 + 零重要性特征
+    drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
+    keep_cols = [c for c in all_features.columns if c not in drop_cols]
     all_features = all_features[keep_cols]
 
     return all_features
@@ -234,14 +243,17 @@ def prepare_data(all_data: Dict[str, pd.DataFrame]) -> Tuple[np.ndarray, np.ndar
             features = compute_all_features(df)
             target = calculate_target_adaptive(df, horizon=HORIZON, base_threshold=BASE_THRESHOLD)
 
-            valid_mask = ~(features.isna().any(axis=1)) & (target >= 0)
-            features_valid = features[valid_mask].iloc[min_history:]
-            target_valid = target[valid_mask].astype(int).iloc[min_history:]
+            # 确保 valid_mask 是 numpy array 以正确索引
+            mask_features = features.isna().any(axis=1).values  # ndarray
+            mask_target = (target >= 0)  # ndarray
+            valid_mask = ~mask_features & mask_target  # ndarray
+            features_valid = features.iloc[valid_mask].iloc[min_history:]  # 先用 iloc 选择有效行
+            target_valid = target[valid_mask][min_history:]  # ndarray 直接切片
             features_valid = features_valid.fillna(0)
 
             if len(features_valid) > 30:
                 all_X.append(features_valid.values)
-                all_y.append(target_valid.values)
+                all_y.append(target_valid)  # target_valid 已经是 ndarray
         except Exception as e:
             if i < 5:
                 print(f"  {symbol}: {e}")

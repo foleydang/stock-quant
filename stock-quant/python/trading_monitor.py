@@ -200,13 +200,14 @@ class TradingMonitor:
 
             # v3 高级特征
             try:
-                from strategy.train_lgb_v3 import AdvancedFeatureEngineer, TIME_FEATURES
+                from strategy.train_lgb_v3 import AdvancedFeatureEngineer, TIME_FEATURES, ZERO_IMP_FEATURES
                 adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
                 features = pd.concat([features, adv_features], axis=1)
             except Exception:
-                pass
+                ZERO_IMP_FEATURES = []
+                TIME_FEATURES = ['day_of_week', 'day_of_month', 'hour', 'minute', 'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
 
-            # 过滤时间特征 + 使用模型特征名
+            # 过滤时间特征 + 零重要性特征 + 使用模型特征名
             feature_names = self.model_data.get('feature_names')
             if feature_names:
                 missing = [c for c in feature_names if c not in features.columns]
@@ -214,8 +215,8 @@ class TradingMonitor:
                     features[c] = 0
                 features = features[feature_names]
             else:
-                TIME_FEATS = ['day_of_week', 'day_of_month', 'hour', 'minute', 'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
-                features = features[[c for c in features.columns if c not in TIME_FEATS]]
+                drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
+                features = features[[c for c in features.columns if c not in drop_cols]]
 
             last_features = features.iloc[-1].fillna(0)
 
