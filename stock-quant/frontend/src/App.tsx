@@ -29,31 +29,105 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 
 // 沪深300典型蓝筹股
 const stockList = [
-  { value: '000001.SZ', label: '平安银行' },
-  { value: '000002.SZ', label: '万科A' },
+  // 港股
+  { value: '9988.HK', label: '🇭🇰 阿里巴巴' },
+  { value: '0700.HK', label: '🇭🇰 腾讯控股' },
+  { value: '3690.HK', label: '🇭🇰 美团-W' },
+  { value: '159792.SZ', label: '🇭🇰 港股通互联网ETF' },
+  // A股热门 - 白酒消费
+  { value: '600519.SH', label: '贵州茅台' },
+  { value: '000858.SZ', label: '五粮液' },
+  { value: '000568.SZ', label: '泸州老窖' },
+  { value: '600809.SH', label: '山西汾酒' },
+  { value: '002304.SZ', label: '洋河股份' },
+  { value: '600887.SH', label: '伊利股份' },
+  { value: '603288.SH', label: '海天味业' },
+  { value: '605499.SH', label: '东鹏饮料' },
+  // A股热门 - 科技半导体
+  { value: '300750.SZ', label: '宁德时代' },
+  { value: '002594.SZ', label: '比亚迪' },
+  { value: '002415.SZ', label: '海康威视' },
+  { value: '002371.SZ', label: '北方华创' },
+  { value: '300308.SZ', label: '中际旭创' },
+  { value: '002475.SZ', label: '立讯精密' },
+  { value: '300015.SZ', label: '爱尔眼科' },
+  { value: '300760.SZ', label: '迈瑞医疗' },
+  { value: '002230.SZ', label: '科大讯飞' },
+  { value: '601138.SH', label: '工业富联' },
+  { value: '000725.SZ', label: '京东方A' },
+  { value: '688981.SH', label: '中芯国际' },
+  { value: '688041.SH', label: '海光信息' },
+  { value: '688256.SH', label: '寒武纪' },
+  { value: '688012.SH', label: '中微公司' },
+  { value: '688111.SH', label: '金山办公' },
+  { value: '688271.SH', label: '联影医疗' },
+  { value: '688036.SH', label: '传音控股' },
+  { value: '300124.SZ', label: '汇川技术' },
+  { value: '300274.SZ', label: '阳光电源' },
+  { value: '300782.SZ', label: '卓胜微' },
+  { value: '300059.SZ', label: '东方财富' },
+  { value: '603986.SH', label: '兆易创新' },
+  { value: '603019.SH', label: '中科曙光' },
+  { value: '600703.SH', label: '三安光电' },
+  { value: '600745.SH', label: '闻泰科技' },
+  // A股热门 - 金融银行
+  { value: '601398.SH', label: '工商银行' },
+  { value: '601939.SH', label: '建设银行' },
+  { value: '601988.SH', label: '中国银行' },
+  { value: '600036.SH', label: '招商银行' },
+  { value: '601318.SH', label: '中国平安' },
+  { value: '601166.SH', label: '兴业银行' },
+  { value: '600030.SH', label: '中信证券' },
+  { value: '601688.SH', label: '华泰证券' },
+  { value: '600999.SH', label: '招商证券' },
+  { value: '601995.SH', label: '中金公司' },
+  // A股热门 - 新能源
+  { value: '601012.SH', label: '隆基绿能' },
+  { value: '600438.SH', label: '通威股份' },
+  { value: '603799.SH', label: '华友钴业' },
+  { value: '600905.SH', label: '三峡能源' },
+  { value: '601985.SH', label: '中国核电' },
+  // A股热门 - 资源能源
+  { value: '601899.SH', label: '紫金矿业' },
+  { value: '601088.SH', label: '中国神华' },
+  { value: '600028.SH', label: '中国石化' },
+  { value: '601857.SH', label: '中国石油' },
+  { value: '600938.SH', label: '中国海油' },
+  { value: '600900.SH', label: '长江电力' },
+  { value: '603993.SH', label: '洛阳钼业' },
+  // A股热门 - 地产基建
+  { value: '601668.SH', label: '中国建筑' },
+  { value: '601390.SH', label: '中国中铁' },
+  { value: '601800.SH', label: '中国交建' },
+  { value: '600048.SH', label: '保利发展' },
+  { value: '601816.SH', label: '京沪高铁' },
+  // A股热门 - 制造化工
+  { value: '600031.SH', label: '三一重工' },
+  { value: '600309.SH', label: '万华化学' },
+  { value: '600346.SH', label: '恒力石化' },
   { value: '000333.SZ', label: '美的集团' },
   { value: '000651.SZ', label: '格力电器' },
-  { value: '000858.SZ', label: '五粮液' },
-  { value: '002415.SZ', label: '海康威视' },
-  { value: '002594.SZ', label: '比亚迪' },
-  { value: '300015.SZ', label: '爱尔眼科' },
-  { value: '300124.SZ', label: '汇川技术' },
-  { value: '300750.SZ', label: '宁德时代' },
-  { value: '600000.SH', label: '浦发银行' },
-  { value: '600036.SH', label: '招商银行' },
-  { value: '600048.SH', label: '保利发展' },
-  { value: '600276.SH', label: '恒瑞医药' },
-  { value: '600309.SH', label: '万华化学' },
-  { value: '600519.SH', label: '贵州茅台' },
+  { value: '600690.SH', label: '海尔智家' },
   { value: '600585.SH', label: '海螺水泥' },
-  { value: '600887.SH', label: '伊利股份' },
-  { value: '600900.SH', label: '长江电力' },
-  { value: '601012.SH', label: '隆基绿能' },
-  { value: '601166.SH', label: '兴业银行' },
-  { value: '601318.SH', label: '中国平安' },
-  { value: '601398.SH', label: '工商银行' },
+  // A股热门 - 医药
+  { value: '600276.SH', label: '恒瑞医药' },
+  { value: '603259.SH', label: '药明康德' },
+  { value: '600436.SH', label: '片仔癀' },
+  // A股热门 - 其他蓝筹
+  { value: '000001.SZ', label: '平安银行' },
+  { value: '000002.SZ', label: '万科A' },
+  { value: '002352.SZ', label: '顺丰控股' },
+  { value: '000977.SZ', label: '浪潮信息' },
+  { value: '600519.SH', label: '贵州茅台' },
+  { value: '600570.SH', label: '恒生电子' },
+  { value: '600406.SH', label: '国电南瑞' },
+  { value: '600660.SH', label: '福耀玻璃' },
   { value: '601888.SH', label: '中国中免' },
-  { value: '601939.SH', label: '建设银行' },
+  { value: '002714.SZ', label: '牧原股份' },
+  { value: '601633.SH', label: '长城汽车' },
+  { value: '600150.SH', label: '中国船舶' },
+  { value: '600104.SH', label: '上汽集团' },
+  { value: '605117.SH', label: '德业股份' },
 ];
 
 interface StockData {
@@ -288,34 +362,16 @@ const App: React.FC = () => {
   } : null;
 
   // 超额收益图表
-  const excessReturnChart = backtestResults && backtestResults?.portfolioValues ? {
-    labels: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 4 === 0).map((v: any) => v?.date?.slice(5, 10) || ""),
-    datasets: [
-      {
-        label: '超额收益',
-        data: backtestResults?.portfolioValues?.filter((_: any, i: number) => i % 4 === 0).map((v: any) => {
-          const portfolioReturn = ((v.portfolioValue - 100000) / 100000) * 100;
-          return portfolioReturn - (backtestResults.summary.benchmarkReturn || 0);
-        }),
-        borderColor: '#13c2c2',
-        backgroundColor: 'rgba(19, 194, 194, 0.1)',
-        borderWidth: 2,
-        tension: 0.3,
-        fill: true,
-      },
-    ],
-  } : null;
-
   // 交易表格列
   const tradeColumns = [
-    { title: '时间', dataIndex: 'date', width: 100, render: (d: string) => d?.slice(5, 16) || "" },
-    { title: '操作', dataIndex: 'type', width: 60, render: (t: string) => <Tag color={t === 'buy' ? 'green' : 'red'}>{t === 'buy' ? '买入' : '卖出'}</Tag> },
-    { title: '价格', dataIndex: 'price', width: 70, render: (p: number) => `¥${p?.toFixed(2) || "0.00"}` },
-    { title: '数量', dataIndex: 'shares', width: 60, render: (s: number) => `${s}股` },
-    { title: '金额', dataIndex: 'amount', width: 80, render: (a: number) => a ? `¥${(a/1000)?.toFixed(1)}k` : '--' },
-    { title: '盈亏', dataIndex: 'profit', width: 80, render: (p: number) => p ? <span style={{ color: p > 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>{p > 0 ? '+' : ''}¥{p?.toFixed(0) || "0"}</span> : '--' },
-    { title: '预测', dataIndex: 'up_prob', width: 60, render: (p: number) => <Tag color={p > 55 ? 'green' : p < 45 ? 'red' : 'default'}>{p}%</Tag> },
-    { title: '原因', dataIndex: 'reason', ellipsis: true, render: (r: string) => r?.slice(0, 15) || "" },
+    { title: '时间', dataIndex: 'date', render: (d: string) => d?.slice(5, 16) || "" },
+    { title: '操作', dataIndex: 'type', width: 70, render: (t: string) => <Tag color={t === 'buy' ? 'green' : 'red'}>{t === 'buy' ? '买入' : '卖出'}</Tag> },
+    { title: '价格', dataIndex: 'price', width: 90, render: (p: number) => `¥${p?.toFixed(2) || "0.00"}` },
+    { title: '数量', dataIndex: 'shares', width: 80, render: (s: number) => `${s}股` },
+    { title: '金额', dataIndex: 'amount', width: 100, render: (a: number) => a ? `¥${(a/1000)?.toFixed(1)}k` : '--' },
+    { title: '盈亏', dataIndex: 'profit', width: 100, render: (p: number) => p ? <span style={{ color: p > 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>{p > 0 ? '+' : ''}¥{p?.toFixed(0) || "0"}</span> : '--' },
+    { title: '预测', dataIndex: 'up_prob', width: 80, render: (p: number) => <Tag color={p > 55 ? 'green' : p < 45 ? 'red' : 'default'}>{p}%</Tag> },
+    { title: '原因', dataIndex: 'reason' },
   ];
 
   // 选股结果表格列
@@ -572,27 +628,20 @@ const App: React.FC = () => {
                           </Card>
                         </Col>
                         <Col span={12}>
-                          <Card title="市值曲线" size="small" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
+                          <Card title="市值曲线" size="small" styles={{ body: { padding: 12 } }} style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
                             <div style={{ height: 280 }}>{portfolioChart && <Line data={portfolioChart} options={chartOptions} />}</div>
                           </Card>
                         </Col>
                       </Row>
 
-                      <Row gutter={16} style={{ marginBottom: 16 }}>
-                        <Col span={12}>
-                          <Card title="超额收益（相对基准）" size="small" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
-                            <div style={{ height: 200 }}>{excessReturnChart && <Line data={excessReturnChart} options={chartOptions} />}</div>
-                          </Card>
-                        </Col>
-                        <Col span={12}>
-                          <Card title="预测概率分布" size="small" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
-                            <div style={{ height: 200 }}>{predictionChart && <Bar data={predictionChart} options={volumeOptions} />}</div>
-                          </Card>
-                        </Col>
-                      </Row>
+                      {/* 预测概率分布 - 全宽 */}
+                      <Card title="预测概率分布" size="small" style={{ marginBottom: 16, background: '#242830', border: '1px solid #3a3f4a' }} styles={{ body: { padding: 12 } }}>
+                        <div style={{ height: 200 }}>{predictionChart && <Bar data={predictionChart} options={volumeOptions} />}</div>
+                      </Card>
 
+                      {/* 买入/卖出点 - 并排各占50% */}
                       <Row gutter={16} style={{ marginBottom: 16 }}>
-                        <Col span={6}>
+                        <Col span={12}>
                           <Card title="买入点" size="small" style={{ background: '#1a3328', border: '1px solid #3fb950' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
                               {(backtestResults?.buyPoints || []).slice(-10).map((bp: any, i: number) => (
@@ -603,7 +652,7 @@ const App: React.FC = () => {
                             </div>
                           </Card>
                         </Col>
-                        <Col span={6}>
+                        <Col span={12}>
                           <Card title="卖出点" size="small" style={{ background: '#2a2818', border: '1px solid #faad14' }}>
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
                               {(backtestResults?.sellPoints || []).slice(-10).map((sp: any, i: number) => (
@@ -618,7 +667,7 @@ const App: React.FC = () => {
 
                       {/* 交易记录 */}
                       <Card title="交易记录" style={{ background: '#242830', border: '1px solid #3a3f4a' }}>
-                        <Table columns={tradeColumns} dataSource={backtestResults.trades} rowKey="date" pagination={{ pageSize: 15 }} size="small" scroll={{ x: 700 }} locale={{ emptyText: <span style={{ color: 'rgba(255,255,255,0.4)' }}>暂无交易记录，点击上方「执行回测」开始</span> }}
+                        <Table columns={tradeColumns} dataSource={backtestResults.trades} rowKey="date" pagination={{ pageSize: 15 }} size="small" locale={{ emptyText: <span style={{ color: 'rgba(255,255,255,0.4)' }}>暂无交易记录，点击上方「执行回测」开始</span> }}
                           summary={(pageData) => {
                             const sells = pageData.filter((t: any) => t.type === 'sell' && t.profit);
                             const totalProfit = sells.reduce((sum: number, t: any) => sum + (t.profit || 0), 0);
