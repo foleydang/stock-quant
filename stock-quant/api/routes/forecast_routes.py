@@ -70,8 +70,26 @@ def _load_model():
 
 
 def _predict_proba(feat_row, model_data):
-    """预测上涨概率（支持集成和单模型）"""
-    if 'models' in model_data:
+    """预测上涨概率（支持v4混合/v3集成/v2单模型）"""
+    if 'models' in model_data and 'model_types' in model_data:
+        # v4 混合ensemble
+        probs = []
+        model_types = model_data.get('model_types', ['lgbm'] * len(model_data['models']))
+        for model, mtype in zip(model_data['models'], model_types):
+            try:
+                if mtype == 'lgbm':
+                    probs.append(model.predict_proba([feat_row])[0][1])
+                elif mtype == 'xgb':
+                    probs.append(model.predict_proba(feat_row.reshape(1, -1))[0][1])
+                elif mtype == 'catboost':
+                    p = model.predict_proba(feat_row.reshape(1, -1))
+                    probs.append(float(p[0][1]))
+                else:
+                    probs.append(0.5)
+            except Exception:
+                probs.append(0.5)
+        return np.mean(probs)
+    elif 'models' in model_data:
         # v3 集成: 平均概率
         probs = []
         for model in model_data['models']:

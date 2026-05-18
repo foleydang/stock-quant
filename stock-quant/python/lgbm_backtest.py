@@ -18,6 +18,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
+from collections import Counter
 
 from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
 from strategy.train_lgb_v3 import AdvancedFeatureEngineer, ZERO_IMP_FEATURES, TIME_FEATURES
@@ -82,9 +83,15 @@ class LGBMBacktesterOptimized:
         self.trades: List[Trade] = []
         self.daily_values = []
 
-        # 加载模型
+        # 加载模型 (支持v4混合/v3 ensemble)
         if model_path is None:
             model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_hs300/model.pkl')
+
+        # 优先加载v4混合模型
+        v4_path = model_path.replace('model.pkl', 'model_v4.pkl')
+        if os.path.exists(v4_path):
+            model_path = v4_path
+            logger.info(f"✓ 使用v4混合模型")
 
         self.model_data = self._load_model(model_path)
         self.models = self.model_data.get('models', []) if self.model_data else []
@@ -127,7 +134,7 @@ class LGBMBacktesterOptimized:
             return None
 
     def _get_model_prediction(self, symbol: str, local_idx: int) -> Tuple[float, str]:
-        """获取模型预测 - Ensemble投票版"""
+        """获取模型预测 - 支持混合ensemble"""
         if not self.models:
             return 0.5, "模型未加载"
 
@@ -137,18 +144,35 @@ class LGBMBacktesterOptimized:
 
         try:
             last_row = features.iloc[local_idx]
-
             if last_row.isna().any():
                 return 0.5, "特征含NaN"
 
-            # Ensemble: 取所有子模型的平均概率
+            # 混合ensemble: 每个模型类型用不同的predict方式
             probs = []
-            for model in self.models:
-                p = model.predict_proba([last_row.values])[0]
-                probs.append(p[1] if len(p) > 1 else p[0])
-            up_prob = float(np.mean(probs))
+            model_types = self.model_data.get('model_types', ['lgbm'] * len(self.models))
 
-            return up_prob, f"上涨概率:{up_prob:.1%}(ensemble:{len(self.models)})"
+            for model, mtype in zip(self.models, model_types):
+                try:
+                    if mtype == 'lgbm':
+                        p = model.predict_proba([last_row.values])[0]
+                        probs.append(p[1] if len(p) > 1 else p[0])
+                    elif mtype == 'xgb':
+                        p = model.predict_proba(last_row.values.reshape(1, -1))[0]
+                        probs.append(p[1] if len(p) > 1 else p[0])
+                    elif mtype == 'catboost':
+                        p = model.predict_proba(last_row.values.reshape(1, -1))
+                        # CatBoost返回2D array
+                        probs.append(float(p[0][1]) if len(p[0]) > 1 else float(p[0][0]))
+                    else:
+                        probs.append(0.5)
+                except Exception:
+                    probs.append(0.5)
+
+            up_prob = float(np.mean(probs))
+            n_types = Counter(model_types)
+            type_str = '+'.join(f"{cnt}{t}" for t, cnt in n_types.items())
+
+            return up_prob, f"上涨概率:{up_prob:.1%}(混合:{type_str})"
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
