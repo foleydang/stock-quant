@@ -18,20 +18,7 @@ import axios from 'axios';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
-const stockList = [
-  { value: '300124.SZ', label: '汇川技术' },
-  { value: '600048.SH', label: '保利发展' },
-  { value: '300015.SZ', label: '爱尔眼科' },
-  { value: '600519.SH', label: '贵州茅台' },
-  { value: '000333.SZ', label: '美的集团' },
-  { value: '600036.SH', label: '招商银行' },
-  { value: '002415.SZ', label: '海康威视' },
-  { value: '300750.SZ', label: '宁德时代' },
-  { value: '000858.SZ', label: '五粮液' },
-  { value: '600276.SH', label: '恒瑞医药' },
-  { value: '601318.SH', label: '中国平安' },
-  { value: '000001.SZ', label: '平安银行' },
-];
+import { stockList } from '../constants/stocks';
 
 interface DailyItem {
   date: string;
