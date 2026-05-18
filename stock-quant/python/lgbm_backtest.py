@@ -87,9 +87,9 @@ class LGBMBacktesterOptimized:
         if model_path is None:
             model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_hs300/model.pkl')
 
-        # 优先加载v4混合模型
+        # v4混合模型 (需要用use_v4=True参数启用)
         v4_path = model_path.replace('model.pkl', 'model_v4.pkl')
-        if os.path.exists(v4_path):
+        if os.path.exists(v4_path) and getattr(self, 'use_v4', False):
             model_path = v4_path
             logger.info(f"✓ 使用v4混合模型")
 
