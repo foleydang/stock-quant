@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Card, InputNumber, Statistic, Row, Col, Tag, Divider } from 'antd';
 import { CalculatorOutlined, RiseOutlined, FallOutlined } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 
 const GOLD = '#e2b04a';
 
@@ -21,15 +22,12 @@ export default function Calculator() {
     const totalCost = costPrice * shares;
 
     // 计算达到目标成本需要的补仓数量
-    // newCost = (totalCost + addPrice * addShares) / (shares + addShares) = targetCost
-    // addShares = (totalCost - targetCost * shares) / (targetCost - addPrice)
     let addShares: number;
     if (targetCost <= addPrice) {
       addShares = 0; // 目标成本低于当前价格，无法通过当前价格补仓降低成本
     } else if (targetCost <= costPrice) {
       addShares = Math.ceil((totalCost - targetCost * shares) / (targetCost - addPrice) / 100) * 100;
     } else {
-      // 目标成本高于原成本，不需要补仓降低（实际是增加了成本）
       addShares = 0;
     }
 
@@ -83,15 +81,16 @@ export default function Calculator() {
           <CalculatorOutlined style={{ marginRight: 10, color: GOLD }} />
           成本计算器
         </h2>
+        <Link to="/" style={{ color: GOLD, textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 14, fontWeight: 600, border: `1px solid ${GOLD}` }}>← 返回主页</Link>
       </div>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 24px 48px' }}>
-        {/* 输入区域 - 上下结构 */}
+        {/* 输入区域 - 四个参数同一行 */}
         <Card style={{ background: '#242830', border: '1px solid #3a3f4a', marginBottom: 20 }} styles={{ body: { padding: 20 } }}>
           <h3 style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 16 }}>输入参数</h3>
-          <Row gutter={[16, 16]}>
-            <Col span={12}>
-              <div style={{ marginBottom: 8, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>成本价格 (每股)</div>
+          <Row gutter={16}>
+            <Col span={6}>
+              <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>成本价格</div>
               <InputNumber
                 value={costPrice}
                 onChange={(v) => setCostPrice(v || 0)}
@@ -102,8 +101,8 @@ export default function Calculator() {
                 step={0.1}
               />
             </Col>
-            <Col span={12}>
-              <div style={{ marginBottom: 8, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>当前持股 (股数)</div>
+            <Col span={6}>
+              <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>当前持股</div>
               <InputNumber
                 value={shares}
                 onChange={(v) => setShares(v || 0)}
@@ -114,8 +113,8 @@ export default function Calculator() {
                 step={100}
               />
             </Col>
-            <Col span={12}>
-              <div style={{ marginBottom: 8, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>当前价格 (补仓默认按此价格)</div>
+            <Col span={6}>
+              <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>当前价格</div>
               <InputNumber
                 value={currentPrice}
                 onChange={(v) => setCurrentPrice(v || 0)}
@@ -126,8 +125,8 @@ export default function Calculator() {
                 step={0.1}
               />
             </Col>
-            <Col span={12}>
-              <div style={{ marginBottom: 8, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>目标成本价</div>
+            <Col span={6}>
+              <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>目标成本价</div>
               <InputNumber
                 value={targetCost}
                 onChange={(v) => setTargetCost(v || 0)}
@@ -143,7 +142,7 @@ export default function Calculator() {
 
         {result && (
           <>
-            {/* 计算结果 - 上下结构 */}
+            {/* 计算结果 */}
             <Card style={{ background: '#242830', border: '1px solid #3a3f4a', marginBottom: 20 }} styles={{ body: { padding: 20 } }}>
               <h3 style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 16 }}>💡 计算结果</h3>
 
