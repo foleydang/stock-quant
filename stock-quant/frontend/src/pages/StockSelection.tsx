@@ -71,7 +71,7 @@ export default function StockSelection() {
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: 1 }}>
           <StockOutlined style={{ marginRight: 10, color: GOLD }} /> 智能选股
         </h2>
-        <Link to="/" style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, border: '1px solid rgba(255,255,255,0.15)' }}>主页</Link>
+        <Link to="/" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>← 返回主页</Link>
       </div>
 
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
