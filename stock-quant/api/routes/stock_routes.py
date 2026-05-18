@@ -60,18 +60,10 @@ def get_stock_data(symbol):
 
 @stock_bp.route('/stock/<symbol>/<period>', methods=['GET'])
 def get_stock_data_by_period(symbol, period):
-    """获取指定周期的股票数据"""
+    """获取指定周期的股票数据 - 日线/周线/月线从30分钟数据动态聚合"""
     try:
         import sqlite3
-        
-        period_map = {
-            '30m': ('kline_30m', 50),
-            'daily': ('kline_daily', 100),
-            'weekly': ('kline_weekly', 50),
-            'monthly': ('kline_monthly', 24),
-        }
-        
-        table, limit = period_map.get(period, ('kline_30m', 50))
+        import pandas as pd
         
         conn = sqlite3.connect(get_db_path())
         cursor = conn.cursor()
@@ -80,23 +72,78 @@ def get_stock_data_by_period(symbol, period):
         row = cursor.fetchone()
         name = row[0] if row and row[0] else symbol
         
-        cursor.execute(f"SELECT date, open, high, low, close, volume FROM {table} WHERE symbol=? ORDER BY date DESC LIMIT {limit}", (symbol,))
-        rows = cursor.fetchall()
-        conn.close()
-        
-        if not rows:
-            return jsonify({'status': 'error', 'message': '无数据'}), 404
-        
-        data = []
-        for r in rows:
-            data.append({
-                'date': r[0],
-                'open': float(r[1]),
-                'high': float(r[2]),
-                'low': float(r[3]),
-                'close': float(r[4]),
-                'volume': int(r[5])
-            })
+        if period == '30m':
+            # 30分钟线直接从表读
+            limit = 50
+            cursor.execute(f"SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT {limit}", (symbol,))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            if not rows:
+                return jsonify({'status': 'error', 'message': '无数据'}), 404
+            
+            data = [{'date': r[0], 'open': float(r[1]), 'high': float(r[2]), 'low': float(r[3]), 'close': float(r[4]), 'volume': int(r[5])} for r in rows]
+            data.reverse()
+        else:
+            # 日线/周线/月线: 从30分钟数据聚合
+            cursor.execute("SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date ASC", (symbol,))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            if not rows:
+                return jsonify({'status': 'error', 'message': '无数据'}), 404
+            
+            df = pd.DataFrame(rows, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+            df['date'] = pd.to_datetime(df['date'])
+            df['open'] = df['open'].astype(float)
+            df['high'] = df['high'].astype(float)
+            df['low'] = df['low'].astype(float)
+            df['close'] = df['close'].astype(float)
+            df['volume'] = df['volume'].astype(int)
+            
+            if period == 'daily':
+                df_agg = df.groupby(df['date'].dt.date).agg(
+                    open=('open', 'first'),
+                    high=('high', 'max'),
+                    low=('low', 'min'),
+                    close=('close', 'last'),
+                    volume=('volume', 'sum')
+                ).reset_index()
+                df_agg = df_agg.tail(100)
+            elif period == 'weekly':
+                df['week'] = df['date'].dt.to_period('W').apply(lambda x: x.start_time)
+                df_agg = df.groupby('week').agg(
+                    open=('open', 'first'),
+                    high=('high', 'max'),
+                    low=('low', 'min'),
+                    close=('close', 'last'),
+                    volume=('volume', 'sum')
+                ).reset_index()
+                df_agg = df_agg.tail(50)
+            elif period == 'monthly':
+                df['month'] = df['date'].dt.to_period('M').apply(lambda x: x.start_time)
+                df_agg = df.groupby('month').agg(
+                    open=('open', 'first'),
+                    high=('high', 'max'),
+                    low=('low', 'min'),
+                    close=('close', 'last'),
+                    volume=('volume', 'sum')
+                ).reset_index()
+                df_agg = df_agg.tail(24)
+            else:
+                return jsonify({'status': 'error', 'message': f'未知周期: {period}'}), 400
+            
+            data = []
+            for _, r in df_agg.iterrows():
+                date_col = 'date' if 'date' in df_agg.columns else 'week' if 'week' in df_agg.columns else 'month'
+                data.append({
+                    'date': str(r[date_col]),
+                    'open': float(r['open']),
+                    'high': float(r['high']),
+                    'low': float(r['low']),
+                    'close': float(r['close']),
+                    'volume': int(r['volume'])
+                })
         
         prices = [d['close'] for d in data]
         latest_price = prices[0]
