@@ -13,13 +13,14 @@ import {
   Legend,
 } from 'chart.js';
 import { Button, Select, Table, Spin, message, Card, Statistic, Row, Col, Tag, Tabs, Progress, Descriptions, DatePicker } from 'antd';
-import { RiseOutlined, FallOutlined, StockOutlined, FundOutlined, SwapOutlined, AimOutlined, LineChartOutlined, CalculatorOutlined } from '@ant-design/icons';
+import { RiseOutlined, FallOutlined, StockOutlined, FundOutlined, SwapOutlined, AimOutlined, CalculatorOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import TradeRecord from './pages/TradeRecord';
 import ForecastAccuracy from './pages/ForecastAccuracy';
-import Forecast7Days from './pages/Forecast7Days';
+import Forecast7Tab from './pages/Forecast7Tab';
+import StockSelection from './pages/StockSelection';
 import Calculator from './pages/Calculator';
 
 const { RangePicker } = DatePicker;
@@ -71,10 +72,7 @@ const App: React.FC = () => {
   const [stockInfo, setStockInfo] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [backtestLoading, setBacktestLoading] = useState<boolean>(false);
-  const [selectLoading, setSelectLoading] = useState<boolean>(false);
   const [backtestResults, setBacktestResults] = useState<any>(null);
-  const [selectedStocks, setSelectedStocks] = useState<any[]>([]);
-  const [batchResults, setBatchResults] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(() => {
     // 默认日期区间：最近 1 个月（截止到今天）
     const end = dayjs();
@@ -147,55 +145,6 @@ const App: React.FC = () => {
       message.error('无法连接到服务器');
     } finally {
       setBacktestLoading(false);
-    }
-  };
-
-  // 智能选股
-  const runStockSelection = async () => {
-    setSelectLoading(true);
-    setSelectedStocks([]);
-    setBatchResults([]);
-
-    try {
-      // 1. 获取选股结果
-      const selectRes = await axios.get('/api/select');
-      const selectData = selectRes.data;
-
-      if (selectData.status === 'success' && selectData.selected_stocks) {
-        setSelectedStocks(selectData.selected_stocks.slice(0, 10));
-
-        // 2. 对每只股票进行回测
-        const results = [];
-        for (const stock of selectData.selected_stocks.slice(0, 10)) {
-          try {
-            const backtestRes = await axios.get(`/api/lgbm_backtest/${stock.symbol}`);
-            if (backtestRes.data.status === 'success') {
-              results.push({
-                symbol: stock.symbol,
-                name: stock.name,
-                current_price: stock.current_price,
-                predicted_return: stock.predicted_return,
-                ...backtestRes.data.summary,
-                trades: backtestRes.data.trades,
-                buyPoints: backtestRes.data.buyPoints,
-                sellPoints: backtestRes.data.sellPoints,
-              });
-            }
-          } catch {
-            continue;
-          }
-        }
-
-        // 按收益率排序
-        results.sort((a, b) => b.profitRate - a.profitRate);
-        setBatchResults(results);
-
-        message.success(`完成 ${results.length} 只股票的策略回测`);
-      }
-    } catch (error) {
-      message.error('选股失败');
-    } finally {
-      setSelectLoading(false);
     }
   };
 
@@ -370,18 +319,6 @@ const App: React.FC = () => {
   ];
 
   // 选股结果表格列
-  const selectColumns = [
-    { title: '排名', dataIndex: 'rank', width: 50, render: (_: any, __: any, i: number) => i + 1 },
-    { title: '股票', dataIndex: 'name', width: 100 },
-    { title: '代码', dataIndex: 'symbol', width: 100 },
-    { title: '现价', dataIndex: 'current_price', width: 70, render: (p: number) => `¥${p?.toFixed(2)}` },
-    { title: '预测收益', dataIndex: 'predicted_return', width: 90, render: (r: number) => <Tag color={r > 0 ? 'green' : 'red'}>{r?.toFixed(2)}%</Tag> },
-    { title: '回测收益', dataIndex: 'profitRate', width: 90, render: (r: number) => <span style={{ color: r >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>{r >= 0 ? '+' : ''}{r?.toFixed(2)}%</span> },
-    { title: '胜率', dataIndex: 'winRate', width: 70, render: (r: number) => <span style={{ color: r >= 50 ? '#52c41a' : '#ff4d4f' }}>{r?.toFixed(1)}%</span> },
-    { title: '交易次数', dataIndex: 'tradeCount', width: 80 },
-    { title: '最大回撤', dataIndex: 'maxDrawdown', width: 90, render: (d: number) => <span style={{ color: d > 10 ? '#ff4d4f' : '#faad14' }}>-{d?.toFixed(2)}%</span> },
-  ];
-
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -426,8 +363,8 @@ const App: React.FC = () => {
         <Route path="/forecast" element={
           <ForecastAccuracy />
         } />
-        <Route path="/forecast7" element={
-          <Forecast7Days />
+        <Route path="/select" element={
+          <StockSelection />
         } />
         <Route path="/calculator" element={
           <Calculator />
@@ -454,9 +391,9 @@ const App: React.FC = () => {
                   <AimOutlined />
                   预测验证
                 </Link>
-                <Link to="/forecast7" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
-                  <LineChartOutlined />
-                  7天预测
+                <Link to="/select" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
+                  <StockOutlined />
+                  智能选股
                 </Link>
                 <Link to="/calculator" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
                   <CalculatorOutlined />
@@ -695,127 +632,9 @@ const App: React.FC = () => {
               ),
             },
             {
-              key: 'selection',
-              label: <span><StockOutlined /> 股票池智能选股</span>,
-              children: (
-                <div>
-                  <Card style={{ marginBottom: 16 }}>
-                    <Row gutter={16} align="middle">
-                      <Col span={6}>
-                        <Button type="primary" size="large" onClick={runStockSelection} loading={selectLoading} block icon={<StockOutlined />}>
-                          执行智能选股
-                        </Button>
-                      </Col>
-                      <Col span={18}>
-                        <p style={{ margin: 0, color: '#666' }}>
-                          系统将从沪深300成分股中，基于模型预测选出预期收益最高的股票，并对每只股票进行策略回测验证。
-                          选股标准：预测上涨概率 &gt; 55%，预测收益率排名前10。
-                        </p>
-                      </Col>
-                    </Row>
-                  </Card>
-
-                  {selectedStocks.length > 0 && (
-                    <Card title="选股结果" style={{ marginBottom: 16 }}>
-                      <Row gutter={[16, 16]}>
-                        {selectedStocks.map((stock, i) => (
-                          <Col span={6} key={i}>
-                            <Card size="small" hoverable style={{ background: i < 3 ? '#f6ffed' : '#fff' }}>
-                              <Statistic
-                                title={<span style={{ fontSize: 14 }}>{stock.name} ({stock.symbol})</span>}
-                                value={stock.predicted_return}
-                                precision={2}
-                                suffix="%"
-                                valueStyle={{ color: stock.predicted_return > 0 ? '#52c41a' : '#ff4d4f', fontSize: 20 }}
-                              />
-                              <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-                                现价: ¥{stock.current_price?.toFixed(2)} | 排名: #{i + 1}
-                              </div>
-                            </Card>
-                          </Col>
-                        ))}
-                      </Row>
-                    </Card>
-                  )}
-
-                  {batchResults.length > 0 && (
-                    <>
-                      <Card title="策略回测对比" style={{ marginBottom: 16 }}>
-                        <Table
-                          columns={selectColumns}
-                          dataSource={batchResults}
-                          rowKey="symbol"
-                          pagination={false}
-                          size="small"
-                          scroll={{ x: 800 }}
-                          onRow={(record) => ({
-                            onClick: () => {
-                              setSymbol(record.symbol);
-                              // 切换到个股回测tab
-                            },
-                            style: { cursor: 'pointer' },
-                          })}
-                        />
-                      </Card>
-
-                      {/* 收益对比图 */}
-                      <Card title="收益率对比" style={{ marginBottom: 16 }}>
-                        <div style={{ height: 300 }}>
-                          <Bar
-                            data={{
-                              labels: batchResults.map(r => r.name),
-                              datasets: [
-                                {
-                                  label: '回测收益率(%)',
-                                  data: batchResults.map(r => r.profitRate),
-                                  backgroundColor: batchResults.map(r => r.profitRate >= 0 ? 'rgba(82, 196, 26, 0.6)' : 'rgba(255, 77, 79, 0.6)'),
-                                },
-                                {
-                                  label: '预测收益率(%)',
-                                  data: batchResults.map(r => r.predicted_return),
-                                  backgroundColor: 'rgba(24, 144, 255, 0.4)',
-                                },
-                              ],
-                            }}
-                            options={{
-                              responsive: true,
-                              maintainAspectRatio: false,
-                              plugins: { legend: { position: 'top' } },
-                            }}
-                          />
-                        </div>
-                      </Card>
-
-                      {/* 胜率对比 */}
-                      <Card title="胜率与回撤对比">
-                        <div style={{ height: 250 }}>
-                          <Bar
-                            data={{
-                              labels: batchResults.map(r => r.name),
-                              datasets: [
-                                { label: '胜率(%)', data: batchResults.map(r => r.winRate), backgroundColor: 'rgba(82, 196, 26, 0.6)' },
-                                { label: '最大回撤(%)', data: batchResults.map(r => -r.maxDrawdown), backgroundColor: 'rgba(255, 77, 79, 0.6)' },
-                              ],
-                            }}
-                            options={{
-                              responsive: true,
-                              maintainAspectRatio: false,
-                              plugins: { legend: { position: 'top' } },
-                            }}
-                          />
-                        </div>
-                      </Card>
-                    </>
-                  )}
-
-                  {!selectLoading && selectedStocks.length === 0 && (
-                    <Card style={{ textAlign: 'center', padding: 60 }}>
-                      <StockOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
-                      <p style={{ marginTop: 16, color: '#999' }}>点击上方按钮开始智能选股</p>
-                    </Card>
-                  )}
-                </div>
-              ),
+              key: 'forecast7',
+              label: <span><AimOutlined /> 7天预测</span>,
+              children: <Forecast7Tab symbol={symbol} />,
             },
           ]}
         />
