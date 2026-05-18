@@ -1,0 +1,48 @@
+{
+  "model_name": "lgb_hs300_v3",
+  "version": "3.0",
+  "train_date": "2026-05-18",
+  "architecture": "Bagging ensemble (5 LGBM models, majority vote)",
+  "inference_memory_mb": "~15 (5个LGBM模型，2G服务器可运行)",
+  "improvements": [
+    "新增23个高级特征(动量加速度/成交量剖面/价格形态/波动率聚类/支撑压力)",
+    "Optuna超参数搜索",
+    "Bagging集成(5个子模型投票)",
+    "自适应阈值(按波动率动态调整)",
+    "滚动验证评估"
+  ],
+  "target_definition": {
+    "horizon": "5根K线 (150分钟)",
+    "threshold": "自适应, 基础2.0%"
+  },
+  "performance": {
+    "ensemble_accuracy": 0.7782,
+    "n_models": 3,
+    "best_iterations": [
+      311,
+      323,
+      329
+    ],
+    "total_features": 118,
+    "recommended_features": 118,
+    "train_samples": 44710
+  },
+  "hyperparameters": {
+    "num_leaves": 63,
+    "max_depth": 9,
+    "learning_rate": 0.01332649246548117,
+    "min_child_samples": 67,
+    "feature_fraction": 0.6709362236837388,
+    "bagging_fraction": 0.8496551449823758,
+    "reg_alpha": 0.6092899846642197,
+    "reg_lambda": 0.8448486258103103,
+    "n_estimators": 500,
+    "objective": "binary",
+    "metric": "binary_logloss",
+    "boosting_type": "gbdt",
+    "bagging_freq": 5,
+    "verbose": -1,
+    "random_state": 42,
+    "n_jobs": -1
+  }
+}
