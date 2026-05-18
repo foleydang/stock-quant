@@ -547,7 +547,7 @@ const App: React.FC = () => {
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
                               {(backtestResults?.buyPoints || []).slice(-10).map((bp: any, i: number) => (
                                 <div key={i} style={{ padding: 4, borderBottom: '1px solid #3a3f4a', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
-                                  <Tag color="blue">{bp?.date?.slice(5, 10) || ""}</Tag> ¥{bp.price} | {bp.shares}股 | {bp.up_prob}%
+                                  <Tag color="blue">{bp?.date?.slice(5, 10) || ""}</Tag> ¥{bp.price?.toFixed(2)}
                                 </div>
                               ))}
                             </div>
@@ -558,7 +558,7 @@ const App: React.FC = () => {
                             <div style={{ maxHeight: 200, overflow: 'auto' }}>
                               {(backtestResults?.sellPoints || []).slice(-10).map((sp: any, i: number) => (
                                 <div key={i} style={{ padding: 4, borderBottom: '1px solid #3a3f4a', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
-                                  <Tag color="orange">{sp?.date?.slice(5, 10) || ""}</Tag> ¥{sp.price} | <span style={{ color: sp.profit_pct >= 0 ? '#52c41a' : '#ff4d4f' }}>{sp.profit_pct}%</span>
+                                  <Tag color="orange">{sp?.date?.slice(5, 10) || ""}</Tag> ¥{sp.price?.toFixed(2)}
                                 </div>
                               ))}
                             </div>
