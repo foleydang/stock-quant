@@ -294,14 +294,23 @@ class DataHandler:
         """批量获取实时价格（腾讯财经，适合监控）"""
         # 构建查询字符串
         queries = []
+        symbol_to_query = {}  # 反查映射
         for symbol in symbols:
             code = symbol.split('.')[0]
             if symbol.endswith('.HK'):
-                queries.append(f"hk0{code}")
+                # 港股代码必须补齐5位：0700 -> 00700 -> hk00700
+                hk_code = code.zfill(5)
+                query = f"hk{hk_code}"
+                queries.append(query)
+                symbol_to_query[query] = symbol
             elif symbol.endswith('.SZ'):
-                queries.append(f"sz{code}")
+                query = f"sz{code}"
+                queries.append(query)
+                symbol_to_query[query] = symbol
             elif symbol.endswith('.SH'):
-                queries.append(f"sh{code}")
+                query = f"sh{code}"
+                queries.append(query)
+                symbol_to_query[query] = symbol
         
         if not queries:
             return {}
@@ -317,32 +326,32 @@ class DataHandler:
                     query_key = match.group(1)
                     fields = match.group(2).split('~')
                     if len(fields) >= 7:
-                        # 解析查询键获取原始代码
-                        # hk03690 -> 3690.HK, sz159792 -> 159792.SZ
-                        if query_key.startswith('hk'):
-                            # hk03690 -> 去掉前导0 -> 3690.HK
-                            code = query_key[2:].lstrip('0')  # 03690 -> 3690
-                            if not code:
-                                code = query_key[2:]  # 如果全是0，保留原样
-                            symbol = f"{code}.HK"
-                        elif query_key.startswith('sz'):
-                            code = query_key[2:]
-                            symbol = f"{code}.SZ"
-                        elif query_key.startswith('sh'):
-                            code = query_key[2:]
-                            symbol = f"{code}.SH"
+                        # 用映射表反查原始symbol，避免港股前导0丢失
+                        symbol = symbol_to_query.get(query_key)
+                        if not symbol:
+                            # fallback: 尝试从query_key解析
+                            if query_key.startswith('hk'):
+                                code = query_key[2:].lstrip('0')
+                                if not code:
+                                    code = query_key[2:]
+                                symbol = f"{code}.HK"
+                            elif query_key.startswith('sz'):
+                                symbol = f"{query_key[2:]}.SZ"
+                            elif query_key.startswith('sh'):
+                                symbol = f"{query_key[2:]}.SH"
                         
-                        prices[symbol] = {
-                            "name": fields[1],
-                            "price": float(fields[3]),
-                            "prev_close": float(fields[4]),
-                            "open": float(fields[5]),
-                            "high": float(fields[33]) if len(fields) > 33 and fields[33] else float(fields[3]),
-                            "low": float(fields[34]) if len(fields) > 34 and fields[34] else float(fields[3]),
-                            "volume": float(fields[6]),
-                            "time": fields[30],
-                            "change_pct": (float(fields[3]) - float(fields[4])) / float(fields[4]) * 100
-                        }
+                        if symbol:
+                            prices[symbol] = {
+                                "name": fields[1],
+                                "price": float(fields[3]),
+                                "prev_close": float(fields[4]),
+                                "open": float(fields[5]),
+                                "high": float(fields[33]) if len(fields) > 33 and fields[33] else float(fields[3]),
+                                "low": float(fields[34]) if len(fields) > 34 and fields[34] else float(fields[3]),
+                                "volume": float(fields[6]),
+                                "time": fields[30],
+                                "change_pct": (float(fields[3]) - float(fields[4])) / float(fields[4]) * 100
+                            }
             
             return prices
         except Exception as e:

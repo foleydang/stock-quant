@@ -13,29 +13,29 @@
   ],
   "target_definition": {
     "horizon": "3根K线 (90分钟)",
-    "threshold": "自适应, 基础1.7999999999999998%"
+    "threshold": "自适应, 基础1.0%"
   },
   "performance": {
-    "ensemble_accuracy": 0.7606,
+    "ensemble_accuracy": 0.7267,
     "n_models": 3,
     "best_iterations": [
-      190,
-      110,
-      146
+      308,
+      295,
+      299
     ],
     "total_features": 118,
     "recommended_features": 118,
-    "train_samples": 24296
+    "train_samples": 101722
   },
   "hyperparameters": {
-    "num_leaves": 31,
-    "max_depth": 9,
-    "learning_rate": 0.03627698547388074,
-    "min_child_samples": 40,
-    "feature_fraction": 0.7384881184998682,
-    "bagging_fraction": 0.8635369161907083,
-    "reg_alpha": 0.23619195551476868,
-    "reg_lambda": 0.0001746128825695914,
+    "num_leaves": 60,
+    "max_depth": 6,
+    "learning_rate": 0.04013503368132197,
+    "min_child_samples": 24,
+    "feature_fraction": 0.7052235537899878,
+    "bagging_fraction": 0.7470739955399709,
+    "reg_alpha": 0.8092722323148648,
+    "reg_lambda": 0.9583970412303829,
     "n_estimators": 500,
     "objective": "binary",
     "metric": "binary_logloss",

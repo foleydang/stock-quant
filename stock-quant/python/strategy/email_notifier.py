@@ -155,20 +155,14 @@ class EmailNotifier:
             发送是否成功
         """
         try:
-            # 创建邮件
-            msg = MIMEMultipart('alternative')
+            # 创建邮件 - 只用HTML，避免multipart/alternative导致某些客户端显示两封
+            if html_content:
+                msg = MIMEText(html_content, 'html', 'utf-8')
+            else:
+                msg = MIMEText(text_content, 'plain', 'utf-8')
             msg['Subject'] = subject
             msg['From'] = self.username
             msg['To'] = ', '.join(self.receivers)
-
-            # 添加纯文本部分
-            part1 = MIMEText(text_content, 'plain', 'utf-8')
-            msg.attach(part1)
-
-            # 添加 HTML 部分
-            if html_content:
-                part2 = MIMEText(html_content, 'html', 'utf-8')
-                msg.attach(part2)
 
             # 发送邮件 - 重试 3 次
             max_retries = 3

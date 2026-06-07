@@ -372,8 +372,12 @@ class TradingMonitor:
         # 分析持仓
         suggestions = self.analyze_positions()
 
-        # 分析做T机会
-        t_suggestions = self.analyze_t_opportunities()
+        # 分析做T机会（异常不应阻断邮件）
+        try:
+            t_suggestions = self.analyze_t_opportunities()
+        except Exception as e:
+            sys.stderr.write(f"⚠️ 做T分析异常: {e}\n")
+            t_suggestions = []
 
         print(f"\n【持仓分析】")
         for s in suggestions:
@@ -666,7 +670,6 @@ class TradingMonitor:
 """
 
         self.email_notifier.send(subject, text, html)
-        print("✓ 邮件已发送")
 
     def _save_result(self, positions, suggestions, total_cost, total_value, total_profit):
         """保存结果"""

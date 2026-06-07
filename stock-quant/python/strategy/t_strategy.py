@@ -158,10 +158,18 @@ class TStrategy:
         """计算日内波动幅度"""
         high = float(today_df['high'].max())
         low = float(today_df['low'].min())
-        open_price = float(today_df['open'].iloc[0])
 
-        # 相对于开盘价的波动
-        range_pct = (high - low) / open_price * 100
+        # 取非零的价格作为基准（港股/ETF开盘价可能为0）
+        valid_prices = today_df['close'].dropna()
+        valid_prices = valid_prices[valid_prices > 0]
+        if len(valid_prices) == 0:
+            return 0.0
+        base_price = float(valid_prices.iloc[0])
+
+        # 相对于基准价的波动
+        if base_price == 0:
+            return 0.0
+        range_pct = (high - low) / base_price * 100
         return range_pct
 
     def _calc_trend(self, today_df: pd.DataFrame) -> str:
