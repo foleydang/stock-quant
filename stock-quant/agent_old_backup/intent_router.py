@@ -125,31 +125,13 @@ def classify_intent(text: str) -> Tuple[str, Dict]:
     if any(k in text_lower for k in ['持仓', '仓位', '持仓概览', '我的股票', '持有']):
         return 'positions', {}
 
-    if any(k in text_lower for k in ['做t', 't操作', '做t建议', '日内', '做T', '怎么操作']):
+    if any(k in text_lower for k in ['做t', 't操作', '做t建议', '日内', '做T']):
         return 't_strategy', {}
-
-    # 风控评分
-    if any(k in text_lower for k in ['风险', '风控', '评分', '危险', '安全']):
-        return 'risk', {}
-
-    # 综合操作建议
-    if any(k in text_lower for k in ['建议', '操作建议', '该怎么办', '综合建议']):
-        return 'recommend', {}
-
-    # 财经要闻
-    if any(k in text_lower for k in ['新闻', '要闻', '资讯']):
-        keyword = text.replace('新闻', '').replace('要闻', '').replace('资讯', '').strip()
-        return 'news', {'keyword': keyword}
-
-    # 估值判断
-    if text_lower.strip() in ['估值', '估值判断', '贵不贵', '便宜吗'] or (any(k in text_lower for k in ['估值', '贵不贵', '值不值']) and not any(k in text_lower for k in ['深度', '分析', 'pe', 'pb', 'roe', '基本面'])):
-        symbol = extract_symbol(text)
-        return 'valuation', {'symbol': symbol}
 
     if any(k in text_lower for k in ['回测', '测试策略', '策略测试']):
         return 'backtest', {'symbol': extract_symbol(text)}
 
-    if any(k in text_lower for k in ['信号', '交易信号', '买卖信号']):
+    if any(k in text_lower for k in ['信号', '交易信号', '买卖信号', '操作建议']):
         return 'signals', {}
 
     if any(k in text_lower for k in ['总结', '日报', '盘后', '今日总结', '今日行情']):
@@ -163,35 +145,6 @@ def classify_intent(text: str) -> Tuple[str, Dict]:
 
     if any(k in text_lower for k in ['分析', '综合分析', '诊断', '深度分析']):
         return 'analyze', {'symbol': extract_symbol(text)}
-
-    # 资金流向
-    if any(k in text_lower for k in ['资金', '资金流向', '主力资金', '大单', '小单', '流入', '流出']):
-        return 'money_flow', {'symbol': extract_symbol(text)}
-
-    # 深度数据
-    if any(k in text_lower for k in ['深度', '深度分析', 'pe', 'pb', 'roe', '基本面', '财报']):
-        return 'deep', {'symbol': extract_symbol(text)}
-
-    # 北向资金
-    if any(k in text_lower for k in ['北向', '北向资金', '沪股通', '深股通', '外资']):
-        return 'north_flow', {}
-
-    # 技术指标
-    if any(k in text_lower for k in ['指标', '技术指标', '技术分析', '均线', 'macd', 'rsi', 'kdj', '布林', 'boll', '压力位', '支撑位']):
-        return 'technical', {'symbol': extract_symbol(text)}
-
-    # 异动检测
-    if any(k in text_lower for k in ['异动', '异动监控', '预警', '告警', '警报', '提醒', '盯盘']):
-        return 'alert', {}
-
-    # 止损止盈
-    if any(k in text_lower for k in ['止损', '止盈', '止损价', '止盈价']):
-        symbol = extract_symbol(text)
-        # 尝试提取价格
-        price_match = re.search(r'(\d+\.?\d*)', text)
-        price = float(price_match.group(1)) if price_match else None
-        action = 'stop_loss' if '止损' in text_lower else 'take_profit'
-        return 'stop_alert', {'symbol': symbol, 'action': action, 'price': price}
 
     # 行情/价格（带明确关键词才走stock）
     if any(k in text_lower for k in ['行情', '价格', '现价', '多少钱', '股价', '涨跌']):

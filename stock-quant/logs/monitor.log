@@ -7310,3 +7310,5524 @@ AttributeError: 'TradingMonitor' object has no attribute 'add_position_up_prob'
 ✓ 邮件已发送
 ✓ 结果已保存
 2026-05-18 14:30:04 - 监控完成
+2026-05-19 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-19 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.11
+  保利发展(600048.SH)... done 6.05
+  美团-W(3690.HK)... done 82.10
+  爱尔眼科(300015.SZ)... done 10.22
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 130.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥858,417
+  浮动盈亏: ¥-186,544 (-17.9%)
+  可用现金: ¥150,000
+  总资产: ¥1,008,417
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.11
+     盈亏: ¥16,841 (17.0%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥6.05
+     盈亏: ¥-17,744 (-13.6%) | 模型预测: 67%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥82.10
+     盈亏: ¥-33,670 (-24.0%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥10.22
+     盈亏: ¥-10,071 (-10.3%) | 模型预测: 65%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.66
+     盈亏: ¥-141,900 (-24.6%) | 模型预测: 56%
+     🟢 补仓: 浮亏-25%，模型看涨56%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.11 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥6.05 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥82.10 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥10.22 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.66 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥130.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-19 - 浮亏¥-186,544
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-19 09:30:05 - 监控完成
+2026-05-19 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-19 10:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 77.60
+  保利发展(600048.SH)... done 6.14
+  美团-W(3690.HK)... done 82.55
+  爱尔眼科(300015.SZ)... done 9.98
+  港股通互联网ETF(159792.SZ)... done 0.67
+  阿里巴巴-W(9988.HK)... done 133.50
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥863,967
+  浮动盈亏: ¥-180,994 (-17.3%)
+  可用现金: ¥150,000
+  总资产: ¥1,013,967
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.60
+     盈亏: ¥17,575 (17.8%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥6.14
+     盈亏: ¥-16,070 (-12.3%) | 模型预测: 44%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥82.55
+     盈亏: ¥-33,085 (-23.6%) | 模型预测: 44%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.98
+     盈亏: ¥-12,135 (-12.4%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.67
+     盈亏: ¥-137,280 (-23.8%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.60 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥6.14 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥82.55 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.98 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.67 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥133.50
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-19 - 浮亏¥-180,994
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-19 10:30:04 - 监控完成
+2026-05-19 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-19 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.56
+  保利发展(600048.SH)... done 6.17
+  美团-W(3690.HK)... done 82.10
+  爱尔眼科(300015.SZ)... done 9.96
+  港股通互联网ETF(159792.SZ)... done 0.67
+  阿里巴巴-W(9988.HK)... done 133.80
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥861,548
+  浮动盈亏: ¥-183,414 (-17.6%)
+  可用现金: ¥150,000
+  总资产: ¥1,011,548
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-19 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-19 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.48
+  保利发展(600048.SH)... done 6.16
+  美团-W(3690.HK)... done 82.55
+  爱尔眼科(300015.SZ)... done 9.96
+  港股通互联网ETF(159792.SZ)... done 0.67
+  阿里巴巴-W(9988.HK)... done 133.70
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥863,327
+  浮动盈亏: ¥-181,634 (-17.4%)
+  可用现金: ¥150,000
+  总资产: ¥1,013,327
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-19 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-19 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.49
+  保利发展(600048.SH)... done 6.16
+  美团-W(3690.HK)... done 82.65
+  爱尔眼科(300015.SZ)... done 9.88
+  港股通互联网ETF(159792.SZ)... done 0.67
+  阿里巴巴-W(9988.HK)... done 133.70
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥862,784
+  浮动盈亏: ¥-182,178 (-17.4%)
+  可用现金: ¥150,000
+  总资产: ¥1,012,784
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-19 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-19 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.72
+  保利发展(600048.SH)... done 6.13
+  美团-W(3690.HK)... done 82.85
+  爱尔眼科(300015.SZ)... done 9.82
+  港股通互联网ETF(159792.SZ)... done 0.67
+  阿里巴巴-W(9988.HK)... done 133.20
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥861,655
+  浮动盈亏: ¥-183,306 (-17.5%)
+  可用现金: ¥150,000
+  总资产: ¥1,011,655
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-19 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-19 14:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 77.62
+  保利发展(600048.SH)... done 6.18
+  美团-W(3690.HK)... done 83.40
+  爱尔眼科(300015.SZ)... done 9.86
+  港股通互联网ETF(159792.SZ)... done 0.67
+  阿里巴巴-W(9988.HK)... done 133.50
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥866,134
+  浮动盈亏: ¥-178,828 (-17.1%)
+  可用现金: ¥150,000
+  总资产: ¥1,016,134
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-20 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-20 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.43
+  保利发展(600048.SH)... done 6.15
+  美团-W(3690.HK)... done 83.60
+  爱尔眼科(300015.SZ)... done 9.78
+  港股通互联网ETF(159792.SZ)... done 0.67
+  阿里巴巴-W(9988.HK)... done 131.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥862,883
+  浮动盈亏: ¥-182,078 (-17.4%)
+  可用现金: ¥150,000
+  总资产: ¥1,012,883
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.43
+     盈亏: ¥17,321 (17.5%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥6.15
+     盈亏: ¥-15,884 (-12.2%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥83.60
+     盈亏: ¥-31,720 (-22.6%) | 模型预测: 34%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.78
+     盈亏: ¥-13,855 (-14.1%) | 模型预测: 64%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.67
+     盈亏: ¥-137,940 (-23.9%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.43 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥6.15 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥83.60 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.78 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.67 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥131.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-20 - 浮亏¥-182,078
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-20 09:30:05 - 监控完成
+2026-05-20 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-20 10:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 77.16
+  保利发展(600048.SH)... done 6.07
+  美团-W(3690.HK)... done 83.00
+  爱尔眼科(300015.SZ)... done 9.51
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 131.90
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥852,608
+  浮动盈亏: ¥-192,354 (-18.4%)
+  可用现金: ¥150,000
+  总资产: ¥1,002,608
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.16
+     盈亏: ¥16,916 (17.1%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥6.07
+     盈亏: ¥-17,372 (-13.3%) | 模型预测: 40%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥83.00
+     盈亏: ¥-32,500 (-23.1%) | 模型预测: 38%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.51
+     盈亏: ¥-16,177 (-16.5%) | 模型预测: 65%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.66
+     盈亏: ¥-143,220 (-24.8%) | 模型预测: 42%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.16 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥6.07 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥83.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.51 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.66 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥131.90
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-20 - 浮亏¥-192,354
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-20 10:30:04 - 监控完成
+2026-05-20 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-20 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.25
+  保利发展(600048.SH)... done 6.07
+  美团-W(3690.HK)... done 82.40
+  爱尔眼科(300015.SZ)... done 9.51
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 132.10
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥850,463
+  浮动盈亏: ¥-194,498 (-18.6%)
+  可用现金: ¥150,000
+  总资产: ¥1,000,463
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-20 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-20 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.21
+  保利发展(600048.SH)... done 6.06
+  美团-W(3690.HK)... done 83.10
+  爱尔眼科(300015.SZ)... done 9.51
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 133.70
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥851,967
+  浮动盈亏: ¥-192,994 (-18.5%)
+  可用现金: ¥150,000
+  总资产: ¥1,001,967
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-20 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-20 13:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 77.15
+  保利发展(600048.SH)... done 6.08
+  美团-W(3690.HK)... done 82.65
+  爱尔眼科(300015.SZ)... done 9.49
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 133.20
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥850,172
+  浮动盈亏: ¥-194,790 (-18.6%)
+  可用现金: ¥150,000
+  总资产: ¥1,000,172
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-20 14:00:02 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-20 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.99
+  保利发展(600048.SH)... done 6.08
+  美团-W(3690.HK)... done 82.60
+  爱尔眼科(300015.SZ)... done 9.45
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 132.60
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥850,183
+  浮动盈亏: ¥-194,778 (-18.6%)
+  可用现金: ¥150,000
+  总资产: ¥1,000,183
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-20 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-20 14:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.16
+  保利发展(600048.SH)... done 6.08
+  美团-W(3690.HK)... done 82.55
+  爱尔眼科(300015.SZ)... done 9.44
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 132.20
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥850,947
+  浮动盈亏: ¥-194,014 (-18.6%)
+  可用现金: ¥150,000
+  总资产: ¥1,000,947
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-21 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-21 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.82
+  保利发展(600048.SH)... done 6.09
+  美团-W(3690.HK)... done 84.10
+  爱尔眼科(300015.SZ)... done 9.41
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 133.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥854,360
+  浮动盈亏: ¥-190,602 (-18.2%)
+  可用现金: ¥150,000
+  总资产: ¥1,004,360
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.82
+     盈亏: ¥16,405 (16.6%) | 模型预测: 60%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥6.09
+     盈亏: ¥-17,000 (-13.0%) | 模型预测: 59%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥84.10
+     盈亏: ¥-31,070 (-22.1%) | 模型预测: 38%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.41
+     盈亏: ¥-17,037 (-17.4%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.66
+     盈亏: ¥-141,900 (-24.6%) | 模型预测: 55%
+     🟢 补仓: 浮亏-25%，模型看涨55%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.82 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥6.09 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥84.10 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.41 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.66 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥133.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-21 - 浮亏¥-190,602
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-21 09:30:05 - 监控完成
+2026-05-21 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-21 10:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 77.00
+  保利发展(600048.SH)... done 5.99
+  美团-W(3690.HK)... done 85.45
+  爱尔眼科(300015.SZ)... done 9.51
+  港股通互联网ETF(159792.SZ)... done 0.65
+  阿里巴巴-W(9988.HK)... done 129.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥849,445
+  浮动盈亏: ¥-195,516 (-18.7%)
+  可用现金: ¥150,000
+  总资产: ¥999,445
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.00
+     盈亏: ¥16,676 (16.9%) | 模型预测: 56%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.99
+     盈亏: ¥-18,860 (-14.5%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥85.45
+     盈亏: ¥-29,315 (-20.9%) | 模型预测: 40%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.51
+     盈亏: ¥-16,177 (-16.5%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.65
+     盈亏: ¥-147,840 (-25.6%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.99 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥85.45 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.51 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.65 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥129.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-21 - 浮亏¥-195,516
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-21 10:30:04 - 监控完成
+2026-05-21 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-21 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.91
+  保利发展(600048.SH)... done 5.98
+  美团-W(3690.HK)... done 84.10
+  爱尔眼科(300015.SZ)... done 9.42
+  港股通互联网ETF(159792.SZ)... done 0.65
+  阿里巴巴-W(9988.HK)... done 128.40
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥846,955
+  浮动盈亏: ¥-198,006 (-18.9%)
+  可用现金: ¥150,000
+  总资产: ¥996,955
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-21 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-21 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.89
+  保利发展(600048.SH)... done 5.98
+  美团-W(3690.HK)... done 84.05
+  爱尔眼科(300015.SZ)... done 9.41
+  港股通互联网ETF(159792.SZ)... done 0.65
+  阿里巴巴-W(9988.HK)... done 128.10
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥846,774
+  浮动盈亏: ¥-198,188 (-19.0%)
+  可用现金: ¥150,000
+  总资产: ¥996,774
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-21 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-21 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.89
+  保利发展(600048.SH)... done 5.96
+  美团-W(3690.HK)... done 83.70
+  爱尔眼科(300015.SZ)... done 9.46
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 127.80
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥844,397
+  浮动盈亏: ¥-200,564 (-19.2%)
+  可用现金: ¥150,000
+  总资产: ¥994,397
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-21 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-21 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 79.98
+  保利发展(600048.SH)... done 5.94
+  美团-W(3690.HK)... done 83.10
+  爱尔眼科(300015.SZ)... done 9.45
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 126.80
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥842,814
+  浮动盈亏: ¥-202,148 (-19.3%)
+  可用现金: ¥150,000
+  总资产: ¥992,814
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-21 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-21 14:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 79.03
+  保利发展(600048.SH)... done 5.91
+  美团-W(3690.HK)... done 83.15
+  爱尔眼科(300015.SZ)... done 9.40
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 126.90
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥839,146
+  浮动盈亏: ¥-205,816 (-19.7%)
+  可用现金: ¥150,000
+  总资产: ¥989,146
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-22 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-22 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.77
+  保利发展(600048.SH)... done 5.90
+  美团-W(3690.HK)... done 84.00
+  爱尔眼科(300015.SZ)... done 9.33
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 128.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥839,553
+  浮动盈亏: ¥-205,408 (-19.7%)
+  可用现金: ¥150,000
+  总资产: ¥989,553
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.77
+     盈亏: ¥17,830 (18.0%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.90
+     盈亏: ¥-20,534 (-15.8%) | 模型预测: 69%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥84.00
+     盈亏: ¥-31,200 (-22.2%) | 模型预测: 37%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.33
+     盈亏: ¥-17,725 (-18.1%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.64
+     盈亏: ¥-153,780 (-26.6%) | 模型预测: 70%
+     🟢 补仓: 浮亏-27%，模型看涨70%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.77 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.90 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥84.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.33 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.64 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥128.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-22 - 浮亏¥-205,408
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-22 09:30:05 - 监控完成
+2026-05-22 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-22 10:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.87
+  保利发展(600048.SH)... done 5.85
+  美团-W(3690.HK)... done 81.05
+  爱尔眼科(300015.SZ)... done 9.20
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.10
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥827,220
+  浮动盈亏: ¥-217,742 (-20.8%)
+  可用现金: ¥150,000
+  总资产: ¥977,220
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.87
+     盈亏: ¥17,981 (18.2%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.85
+     盈亏: ¥-21,464 (-16.5%) | 模型预测: 67%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.05
+     盈亏: ¥-35,035 (-25.0%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.20
+     盈亏: ¥-18,843 (-19.2%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-160,380 (-27.8%) | 模型预测: 65%
+     🟢 补仓: 浮亏-28%，模型看涨65%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.87 | 支撑- | 阻力-
+     当前盈利18.2%，不建议做T
+  ❌ 保利发展: 现价¥5.85 | 支撑- | 阻力-
+     日内波动仅1.9%，波动太小不适合做T
+  ❌ 美团-W: 现价¥81.05 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.20 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     日内波动仅1.6%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.10
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-22 - 浮亏¥-217,742
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-22 10:30:04 - 监控完成
+2026-05-22 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-22 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.63
+  保利发展(600048.SH)... done 5.85
+  美团-W(3690.HK)... done 81.45
+  爱尔眼科(300015.SZ)... done 9.21
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 127.50
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥831,426
+  浮动盈亏: ¥-213,536 (-20.4%)
+  可用现金: ¥150,000
+  总资产: ¥981,426
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-22 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-22 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.35
+  保利发展(600048.SH)... done 5.85
+  美团-W(3690.HK)... done 81.70
+  爱尔眼科(300015.SZ)... done 9.21
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 128.40
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥832,831
+  浮动盈亏: ¥-212,130 (-20.3%)
+  可用现金: ¥150,000
+  总资产: ¥982,831
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-22 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-22 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.37
+  保利发展(600048.SH)... done 5.88
+  美团-W(3690.HK)... done 81.95
+  爱尔眼科(300015.SZ)... done 9.20
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 128.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥834,978
+  浮动盈亏: ¥-209,984 (-20.1%)
+  可用现金: ¥150,000
+  总资产: ¥984,978
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-22 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-22 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.18
+  保利发展(600048.SH)... done 5.85
+  美团-W(3690.HK)... done 82.05
+  爱尔眼科(300015.SZ)... done 9.19
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 127.90
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥833,519
+  浮动盈亏: ¥-211,442 (-20.2%)
+  可用现金: ¥150,000
+  总资产: ¥983,519
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-22 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-22 14:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 78.21
+  保利发展(600048.SH)... done 5.83
+  美团-W(3690.HK)... done 81.75
+  爱尔眼科(300015.SZ)... done 9.18
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 127.80
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥833,376
+  浮动盈亏: ¥-211,586 (-20.2%)
+  可用现金: ¥150,000
+  总资产: ¥983,376
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-25 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-25 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.99
+  保利发展(600048.SH)... done 5.79
+  美团-W(3690.HK)... done 81.35
+  爱尔眼科(300015.SZ)... done 9.18
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥827,342
+  浮动盈亏: ¥-217,620 (-20.8%)
+  可用现金: ¥150,000
+  总资产: ¥977,342
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.99
+     盈亏: ¥19,660 (19.9%) | 模型预测: 63%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.79
+     盈亏: ¥-22,580 (-17.3%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.35
+     盈亏: ¥-34,645 (-24.7%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.18
+     盈亏: ¥-19,015 (-19.4%) | 模型预测: 60%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,040 (-27.9%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.99 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.79 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥81.35 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.18 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-25 - 浮亏¥-217,620
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-25 09:30:05 - 监控完成
+2026-05-25 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-25 10:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 79.40
+  保利发展(600048.SH)... done 5.86
+  美团-W(3690.HK)... done 81.35
+  爱尔眼科(300015.SZ)... done 9.12
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥829,403
+  浮动盈亏: ¥-215,558 (-20.6%)
+  可用现金: ¥150,000
+  总资产: ¥979,403
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥79.40
+     盈亏: ¥20,276 (20.5%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.86
+     盈亏: ¥-21,278 (-16.3%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.35
+     盈亏: ¥-34,645 (-24.7%) | 模型预测: 55%
+     🟢 补仓: 浮亏-25%，模型看涨55%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.12
+     盈亏: ¥-19,531 (-19.9%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-160,380 (-27.8%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥79.40 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.86 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥81.35 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.12 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-25 - 浮亏¥-215,558
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-25 10:30:04 - 监控完成
+2026-05-25 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-25 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 79.12
+  保利发展(600048.SH)... done 5.90
+  美团-W(3690.HK)... done 81.35
+  爱尔眼科(300015.SZ)... done 9.29
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥829,209
+  浮动盈亏: ¥-215,752 (-20.6%)
+  可用现金: ¥150,000
+  总资产: ¥979,209
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥79.12
+     盈亏: ¥19,856 (20.1%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.90
+     盈亏: ¥-20,534 (-15.8%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.35
+     盈亏: ¥-34,645 (-24.7%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.29
+     盈亏: ¥-18,069 (-18.4%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-162,360 (-28.1%) | 模型预测: 59%
+     🟢 补仓: 浮亏-28%，模型看涨59%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥79.12 | 支撑- | 阻力-
+     当前盈利20.1%，不建议做T
+  ⚠️ 保利发展: 现价¥5.90 | 支撑¥5.79 | 阻力¥5.99
+     当前位置不适合做T，等待更好机会（支撑¥5.79，阻力¥5.99）
+  ⚠️ 美团-W: 现价¥81.35 | 支撑¥80.15 | 阻力¥83.52
+     当前位置不适合做T，等待更好机会（支撑¥80.15，阻力¥83.52）
+  ⚠️ 爱尔眼科: 现价¥9.29 | 支撑¥8.99 | 阻力¥9.40
+     当前位置不适合做T，等待更好机会（支撑¥8.99，阻力¥9.40）
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     日内波动仅0.8%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-25 - 浮亏¥-215,752
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-25 11:30:04 - 监控完成
+2026-05-25 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-25 13:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 79.15
+  保利发展(600048.SH)... done 5.89
+  美团-W(3690.HK)... done 81.35
+  爱尔眼科(300015.SZ)... done 9.28
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥828,982
+  浮动盈亏: ¥-215,980 (-20.7%)
+  可用现金: ¥150,000
+  总资产: ¥978,982
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥79.15
+     盈亏: ¥19,901 (20.1%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.89
+     盈亏: ¥-20,720 (-15.9%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.35
+     盈亏: ¥-34,645 (-24.7%) | 模型预测: 55%
+     🟢 补仓: 浮亏-25%，模型看涨55%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.28
+     盈亏: ¥-18,155 (-18.5%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-162,360 (-28.1%) | 模型预测: 59%
+     🟢 补仓: 浮亏-28%，模型看涨59%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥79.15 | 支撑- | 阻力-
+     当前盈利20.1%，不建议做T
+  ⚠️ 保利发展: 现价¥5.89 | 支撑¥5.79 | 阻力¥5.99
+     当前位置不适合做T，等待更好机会（支撑¥5.79，阻力¥5.99）
+  ⚠️ 美团-W: 现价¥81.35 | 支撑¥80.15 | 阻力¥83.52
+     当前位置不适合做T，等待更好机会（支撑¥80.15，阻力¥83.52）
+  ⚠️ 爱尔眼科: 现价¥9.28 | 支撑¥8.99 | 阻力¥9.40
+     当前位置不适合做T，等待更好机会（支撑¥8.99，阻力¥9.40）
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     日内波动仅0.8%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-25 - 浮亏¥-215,980
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-25 13:00:04 - 监控完成
+2026-05-25 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-25 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 79.15
+  保利发展(600048.SH)... done 5.87
+  美团-W(3690.HK)... done 81.35
+  爱尔眼科(300015.SZ)... done 9.25
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥829,012
+  浮动盈亏: ¥-215,950 (-20.7%)
+  可用现金: ¥150,000
+  总资产: ¥979,012
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥79.15
+     盈亏: ¥19,901 (20.1%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.87
+     盈亏: ¥-21,092 (-16.2%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.35
+     盈亏: ¥-34,645 (-24.7%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.25
+     盈亏: ¥-18,413 (-18.8%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,700 (-28.0%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥79.15 | 支撑- | 阻力-
+     当前盈利20.1%，不建议做T
+  ⚠️ 保利发展: 现价¥5.87 | 支撑¥5.79 | 阻力¥5.99
+     当前位置不适合做T，等待更好机会（支撑¥5.79，阻力¥5.99）
+  ⚠️ 美团-W: 现价¥81.35 | 支撑¥80.15 | 阻力¥83.52
+     当前位置不适合做T，等待更好机会（支撑¥80.15，阻力¥83.52）
+  ⚠️ 爱尔眼科: 现价¥9.25 | 支撑¥8.99 | 阻力¥9.40
+     当前位置不适合做T，等待更好机会（支撑¥8.99，阻力¥9.40）
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     日内波动仅0.8%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-25 - 浮亏¥-215,950
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-25 13:30:05 - 监控完成
+2026-05-25 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-25 14:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 78.80
+  保利发展(600048.SH)... done 5.84
+  美团-W(3690.HK)... done 81.35
+  爱尔眼科(300015.SZ)... done 9.27
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥828,101
+  浮动盈亏: ¥-216,860 (-20.8%)
+  可用现金: ¥150,000
+  总资产: ¥978,101
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.80
+     盈亏: ¥19,376 (19.6%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.84
+     盈亏: ¥-21,650 (-16.6%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.35
+     盈亏: ¥-34,645 (-24.7%) | 模型预测: 56%
+     🟢 补仓: 浮亏-25%，模型看涨56%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.27
+     盈亏: ¥-18,241 (-18.6%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,700 (-28.0%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.80 | 支撑- | 阻力-
+     当前盈利19.6%，不建议做T
+  🟢 保利发展: 现价¥5.84 | 支撑¥5.79 | 阻力¥5.99
+     震荡走势，支撑¥5.79买入，阻力¥5.99卖出，预期利润2.4%
+     💰 建议买入: ¥5.82 × 6100股
+     💵 建议卖出: ¥5.96 × 6100股
+  ⚠️ 美团-W: 现价¥81.35 | 支撑¥80.15 | 阻力¥83.52
+     当前位置不适合做T，等待更好机会（支撑¥80.15，阻力¥83.52）
+  ⚠️ 爱尔眼科: 现价¥9.27 | 支撑¥8.99 | 阻力¥9.40
+     当前位置不适合做T，等待更好机会（支撑¥8.99，阻力¥9.40）
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     日内波动仅0.8%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-25 - 浮亏¥-216,860
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-25 14:00:04 - 监控完成
+2026-05-25 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-25 14:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.55
+  保利发展(600048.SH)... done 5.86
+  美团-W(3690.HK)... done 81.35
+  爱尔眼科(300015.SZ)... done 9.30
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.00
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥828,356
+  浮动盈亏: ¥-216,606 (-20.7%)
+  可用现金: ¥150,000
+  总资产: ¥978,356
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.55
+     盈亏: ¥19,001 (19.2%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.86
+     盈亏: ¥-21,278 (-16.3%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.35
+     盈亏: ¥-34,645 (-24.7%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.30
+     盈亏: ¥-17,983 (-18.4%) | 模型预测: 60%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,700 (-28.0%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.55 | 支撑- | 阻力-
+     当前盈利19.2%，不建议做T
+  ⚠️ 保利发展: 现价¥5.86 | 支撑¥5.79 | 阻力¥5.99
+     当前位置不适合做T，等待更好机会（支撑¥5.79，阻力¥5.99）
+  ⚠️ 美团-W: 现价¥81.35 | 支撑¥80.15 | 阻力¥83.52
+     当前位置不适合做T，等待更好机会（支撑¥80.15，阻力¥83.52）
+  ⚠️ 爱尔眼科: 现价¥9.30 | 支撑¥8.99 | 阻力¥9.40
+     当前位置不适合做T，等待更好机会（支撑¥8.99，阻力¥9.40）
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     日内波动仅0.8%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.00
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-25 - 浮亏¥-216,606
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-25 14:30:05 - 监控完成
+2026-05-26 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.83
+  保利发展(600048.SH)... done 5.85
+  美团-W(3690.HK)... done 80.00
+  爱尔眼科(300015.SZ)... done 9.26
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 125.10
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥827,811
+  浮动盈亏: ¥-217,150 (-20.8%)
+  可用现金: ¥150,000
+  总资产: ¥977,811
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.83
+     盈亏: ¥19,421 (19.7%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.85
+     盈亏: ¥-21,464 (-16.5%) | 模型预测: 57%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥80.00
+     盈亏: ¥-36,400 (-25.9%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.26
+     盈亏: ¥-18,327 (-18.7%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-160,380 (-27.8%) | 模型预测: 66%
+     🟢 补仓: 浮亏-28%，模型看涨66%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.83 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.85 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥80.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.26 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥125.10
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-26 - 浮亏¥-217,150
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-26 09:30:05 - 监控完成
+2026-05-26 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 10:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 79.35
+  保利发展(600048.SH)... done 5.78
+  美团-W(3690.HK)... done 79.10
+  爱尔眼科(300015.SZ)... done 9.07
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.10
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥825,145
+  浮动盈亏: ¥-219,816 (-21.0%)
+  可用现金: ¥150,000
+  总资产: ¥975,145
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥79.35
+     盈亏: ¥20,200 (20.4%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.78
+     盈亏: ¥-22,766 (-17.5%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥79.10
+     盈亏: ¥-37,570 (-26.8%) | 模型预测: 35%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.07
+     盈亏: ¥-19,961 (-20.4%) | 模型预测: 57%
+     🟢 补仓: 浮亏-20%，模型看涨57%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-159,720 (-27.7%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥79.35 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.78 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥79.10 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.07 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.10
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-26 - 浮亏¥-219,816
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-26 10:30:05 - 监控完成
+2026-05-26 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 11:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 81.33
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 79.20
+  爱尔眼科(300015.SZ)... done 9.02
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.80
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥826,867
+  浮动盈亏: ¥-218,094 (-20.9%)
+  可用现金: ¥150,000
+  总资产: ¥976,867
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-26 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 13:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 80.83
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 79.80
+  爱尔眼科(300015.SZ)... done 9.01
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 128.60
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥828,131
+  浮动盈亏: ¥-216,830 (-20.8%)
+  可用现金: ¥150,000
+  总资产: ¥978,131
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-26 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 13:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 80.84
+  保利发展(600048.SH)... done 5.78
+  美团-W(3690.HK)... done 79.20
+  爱尔眼科(300015.SZ)... done 9.01
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 128.10
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥825,014
+  浮动盈亏: ¥-219,948 (-21.0%)
+  可用现金: ¥150,000
+  总资产: ¥975,014
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-26 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 14:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 80.41
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 79.00
+  爱尔眼科(300015.SZ)... done 9.02
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.80
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥823,247
+  浮动盈亏: ¥-221,714 (-21.2%)
+  可用现金: ¥150,000
+  总资产: ¥973,247
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-26 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 14:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 80.60
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 79.20
+  爱尔眼科(300015.SZ)... done 9.03
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 128.20
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥825,198
+  浮动盈亏: ¥-219,764 (-21.0%)
+  可用现金: ¥150,000
+  总资产: ¥975,198
+Traceback (most recent call last):
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 707, in <module>
+    main()
+    ~~~~^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 703, in main
+    monitor.run(send_email=not args.no_email)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 376, in run
+    t_suggestions = self.analyze_t_opportunities()
+  File "/root/github/stock-quant/stock-quant/python/trading_monitor.py", line 323, in analyze_t_opportunities
+    suggestion = self.t_strategy.analyze(df, position_dict)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 94, in analyze
+    intraday_range = self._calc_intraday_range(today_df)
+  File "/root/github/stock-quant/stock-quant/python/strategy/t_strategy.py", line 164, in _calc_intraday_range
+    range_pct = (high - low) / open_price * 100
+                ~~~~~~~~~~~~~^~~~~~~~~~~~
+ZeroDivisionError: float division by zero
+2026-05-26 15:49:16 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 15:49:18
+======================================================================
+  汇川技术(300124.SZ)... done 81.05
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 79.20
+  爱尔眼科(300015.SZ)... done 9.03
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 128.20
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥825,873
+  浮动盈亏: ¥-219,088 (-21.0%)
+  可用现金: ¥150,000
+  总资产: ¥975,873
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥81.05
+     盈亏: ¥22,751 (23.0%) | 模型预测: 44%
+     🔴 减仓: 浮盈23%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.80
+     盈亏: ¥-22,394 (-17.2%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥79.20
+     盈亏: ¥-37,440 (-26.7%) | 模型预测: 37%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.03
+     盈亏: ¥-20,305 (-20.7%) | 模型预测: 60%
+     🟢 补仓: 浮亏-21%，模型看涨60%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,700 (-28.0%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥81.05 | 支撑- | 阻力-
+     当前盈利23.0%，不建议做T
+  🟢 保利发展: 现价¥5.80 | 支撑¥5.76 | 阻力¥5.91
+     震荡走势，支撑¥5.76买入，阻力¥5.91卖出，预期利润1.6%
+     💰 建议买入: ¥5.79 × 6100股
+     💵 建议卖出: ¥5.88 × 6100股
+  ⚠️ 美团-W: 现价¥79.20 | 支撑- | 阻力¥80.90
+     当前位置不适合做T，等待更好机会（支撑¥0.00，阻力¥80.90）
+  🟢 爱尔眼科: 现价¥9.03 | 支撑¥9.00 | 阻力¥9.32
+     下跌接近支撑位¥9.00，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥9.04 × 2800股
+     💵 建议卖出: ¥9.17 × 2800股
+  ⚠️ 港股通互联网ETF: 现价¥0.63 | 支撑¥0.62 | 阻力¥0.64
+     当前位置不适合做T，等待更好机会（支撑¥0.62，阻力¥0.64）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥128.20
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-26 - 浮亏¥-219,088
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-26 15:49:19 - 监控完成
+2026-05-26 15:49:56 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 15:49:57
+======================================================================
+  汇川技术(300124.SZ)... done 81.05
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 79.20
+  爱尔眼科(300015.SZ)... done 9.03
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 128.20
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥825,873
+  浮动盈亏: ¥-219,088 (-21.0%)
+  可用现金: ¥150,000
+  总资产: ¥975,873
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥81.05
+     盈亏: ¥22,751 (23.0%) | 模型预测: 44%
+     🔴 减仓: 浮盈23%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.80
+     盈亏: ¥-22,394 (-17.2%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥79.20
+     盈亏: ¥-37,440 (-26.7%) | 模型预测: 37%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.03
+     盈亏: ¥-20,305 (-20.7%) | 模型预测: 60%
+     🟢 补仓: 浮亏-21%，模型看涨60%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,700 (-28.0%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥81.05 | 支撑- | 阻力-
+     当前盈利23.0%，不建议做T
+  🟢 保利发展: 现价¥5.80 | 支撑¥5.76 | 阻力¥5.91
+     震荡走势，支撑¥5.76买入，阻力¥5.91卖出，预期利润1.6%
+     💰 建议买入: ¥5.79 × 6100股
+     💵 建议卖出: ¥5.88 × 6100股
+  ⚠️ 美团-W: 现价¥79.20 | 支撑- | 阻力¥80.90
+     当前位置不适合做T，等待更好机会（支撑¥0.00，阻力¥80.90）
+  🟢 爱尔眼科: 现价¥9.03 | 支撑¥9.00 | 阻力¥9.32
+     下跌接近支撑位¥9.00，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥9.04 × 2800股
+     💵 建议卖出: ¥9.17 × 2800股
+  ⚠️ 港股通互联网ETF: 现价¥0.63 | 支撑¥0.62 | 阻力¥0.64
+     当前位置不适合做T，等待更好机会（支撑¥0.62，阻力¥0.64）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥128.20
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-26 - 浮亏¥-219,088
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-26 15:49:58 - 监控完成
+2026-05-26 15:49:58 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 15:50:00
+======================================================================
+  汇川技术(300124.SZ)... done 81.05
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 79.20
+  爱尔眼科(300015.SZ)... done 9.03
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 128.20
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥825,873
+  浮动盈亏: ¥-219,088 (-21.0%)
+  可用现金: ¥150,000
+  总资产: ¥975,873
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥81.05
+     盈亏: ¥22,751 (23.0%) | 模型预测: 44%
+     🔴 减仓: 浮盈23%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.80
+     盈亏: ¥-22,394 (-17.2%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥79.20
+     盈亏: ¥-37,440 (-26.7%) | 模型预测: 37%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.03
+     盈亏: ¥-20,305 (-20.7%) | 模型预测: 60%
+     🟢 补仓: 浮亏-21%，模型看涨60%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,700 (-28.0%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥81.05 | 支撑- | 阻力-
+     当前盈利23.0%，不建议做T
+  🟢 保利发展: 现价¥5.80 | 支撑¥5.76 | 阻力¥5.91
+     震荡走势，支撑¥5.76买入，阻力¥5.91卖出，预期利润1.6%
+     💰 建议买入: ¥5.79 × 6100股
+     💵 建议卖出: ¥5.88 × 6100股
+  ⚠️ 美团-W: 现价¥79.20 | 支撑- | 阻力¥80.90
+     当前位置不适合做T，等待更好机会（支撑¥0.00，阻力¥80.90）
+  🟢 爱尔眼科: 现价¥9.03 | 支撑¥9.00 | 阻力¥9.32
+     下跌接近支撑位¥9.00，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥9.04 × 2800股
+     💵 建议卖出: ¥9.17 × 2800股
+  ⚠️ 港股通互联网ETF: 现价¥0.63 | 支撑¥0.62 | 阻力¥0.64
+     当前位置不适合做T，等待更好机会（支撑¥0.62，阻力¥0.64）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥128.20
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-26 - 浮亏¥-219,088
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-26 15:50:01 - 监控完成
+2026-05-26 16:43:52 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-26 16:43:53
+======================================================================
+  汇川技术(300124.SZ)... done 80.88
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 78.80
+  爱尔眼科(300015.SZ)... done 9.03
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.60
+  腾讯控股(0700.HK)... done 439.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥827,078
+  浮动盈亏: ¥-217,884 (-20.9%)
+  可用现金: ¥150,000
+  总资产: ¥977,078
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥80.88
+     盈亏: ¥22,496 (22.8%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.80
+     盈亏: ¥-22,394 (-17.2%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.80
+     盈亏: ¥-37,960 (-27.0%) | 模型预测: 43%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.03
+     盈亏: ¥-20,305 (-20.7%) | 模型预测: 60%
+     🟢 补仓: 浮亏-21%，模型看涨60%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-159,720 (-27.7%) | 模型预测: 43%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥80.88 | 支撑- | 阻力-
+     当前盈利22.8%，不建议做T
+  🟢 保利发展: 现价¥5.80 | 支撑¥5.76 | 阻力¥5.91
+     震荡走势，支撑¥5.76买入，阻力¥5.91卖出，预期利润1.6%
+     💰 建议买入: ¥5.79 × 6100股
+     💵 建议卖出: ¥5.88 × 6100股
+  ⚠️ 美团-W: 现价¥78.80 | 支撑¥77.00 | 阻力¥80.90
+     当前位置不适合做T，等待更好机会（支撑¥77.00，阻力¥80.90）
+  🟢 爱尔眼科: 现价¥9.03 | 支撑¥9.00 | 阻力¥9.32
+     下跌接近支撑位¥9.00，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥9.04 × 2800股
+     💵 建议卖出: ¥9.17 × 2800股
+  ⚠️ 港股通互联网ETF: 现价¥0.63 | 支撑¥0.62 | 阻力¥0.64
+     当前位置不适合做T，等待更好机会（支撑¥0.62，阻力¥0.64）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.60
+  👀 腾讯控股: ¥439.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-26 - 浮亏¥-217,884
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-26 16:43:54 - 监控完成
+2026-05-27 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-27 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 80.88
+  保利发展(600048.SH)... done 5.83
+  美团-W(3690.HK)... done 77.30
+  爱尔眼科(300015.SZ)... done 9.02
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 126.00
+  腾讯控股(0700.HK)... done 431.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥823,620
+  浮动盈亏: ¥-221,342 (-21.2%)
+  可用现金: ¥150,000
+  总资产: ¥973,620
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥80.88
+     盈亏: ¥22,496 (22.8%) | 模型预测: 44%
+     🔴 减仓: 浮盈23%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.83
+     盈亏: ¥-21,836 (-16.8%) | 模型预测: 59%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.30
+     盈亏: ¥-39,910 (-28.4%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.02
+     盈亏: ¥-20,391 (-20.8%) | 模型预测: 57%
+     🟢 补仓: 浮亏-21%，模型看涨57%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,700 (-28.0%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥80.88 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.83 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥77.30 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.02 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥126.00
+  👀 腾讯控股: ¥431.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-27 - 浮亏¥-221,342
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-27 09:30:05 - 监控完成
+2026-05-27 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-27 10:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 79.85
+  保利发展(600048.SH)... done 5.68
+  美团-W(3690.HK)... done 78.10
+  爱尔眼科(300015.SZ)... done 9.06
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 125.90
+  腾讯控股(0700.HK)... done 438.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥818,029
+  浮动盈亏: ¥-226,932 (-21.7%)
+  可用现金: ¥150,000
+  总资产: ¥968,029
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥79.85
+     盈亏: ¥20,950 (21.2%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.68
+     盈亏: ¥-24,626 (-18.9%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.10
+     盈亏: ¥-38,870 (-27.7%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.06
+     盈亏: ¥-20,047 (-20.5%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-164,340 (-28.5%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥79.85 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.68 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥78.10 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.06 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥125.90
+  👀 腾讯控股: ¥438.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-27 - 浮亏¥-226,932
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-27 10:30:04 - 监控完成
+2026-05-27 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-27 11:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 80.07
+  保利发展(600048.SH)... done 5.62
+  美团-W(3690.HK)... done 77.80
+  爱尔眼科(300015.SZ)... done 9.01
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 124.30
+  腾讯控股(0700.HK)... done 434.60
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥812,463
+  浮动盈亏: ¥-232,498 (-22.2%)
+  可用现金: ¥150,000
+  总资产: ¥962,463
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥80.07
+     盈亏: ¥21,280 (21.5%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.62
+     盈亏: ¥-25,742 (-19.8%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.80
+     盈亏: ¥-39,260 (-28.0%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.01
+     盈亏: ¥-20,477 (-20.9%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-168,300 (-29.1%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥80.07 | 支撑- | 阻力-
+     当前盈利21.5%，不建议做T
+  🟢 保利发展: 现价¥5.62 | 支撑¥5.61 | 阻力¥5.87
+     下跌接近支撑位¥5.61，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.64 × 6100股
+     💵 建议卖出: ¥5.70 × 6100股
+  ⚠️ 美团-W: 现价¥77.80 | 支撑¥77.30 | 阻力¥79.39
+     当前位置不适合做T，等待更好机会（支撑¥77.30，阻力¥79.39）
+  🟢 爱尔眼科: 现价¥9.01 | 支撑¥8.95 | 阻力¥9.23
+     下跌接近支撑位¥8.95，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥8.99 × 2800股
+     💵 建议卖出: ¥9.15 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     下跌接近支撑位¥0.62，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥124.30
+  👀 腾讯控股: ¥434.60
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-27 - 浮亏¥-232,498
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-27 11:30:04 - 监控完成
+2026-05-27 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-27 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.77
+  保利发展(600048.SH)... done 5.62
+  美团-W(3690.HK)... done 77.70
+  爱尔眼科(300015.SZ)... done 9.01
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.90
+  腾讯控股(0700.HK)... done 434.60
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥810,383
+  浮动盈亏: ¥-234,578 (-22.4%)
+  可用现金: ¥150,000
+  总资产: ¥960,383
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.77
+     盈亏: ¥19,330 (19.6%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.62
+     盈亏: ¥-25,742 (-19.8%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.70
+     盈亏: ¥-39,390 (-28.1%) | 模型预测: 55%
+     🟢 补仓: 浮亏-28%，模型看涨55%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.01
+     盈亏: ¥-20,477 (-20.9%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-168,300 (-29.1%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.77 | 支撑- | 阻力-
+     当前盈利19.6%，不建议做T
+  🟢 保利发展: 现价¥5.62 | 支撑¥5.61 | 阻力¥5.87
+     下跌接近支撑位¥5.61，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.64 × 6100股
+     💵 建议卖出: ¥5.70 × 6100股
+  🟢 美团-W: 现价¥77.70 | 支撑¥77.30 | 阻力¥79.39
+     震荡走势，支撑¥77.30买入，阻力¥79.39卖出，预期利润1.7%
+     💰 建议买入: ¥77.69 × 400股
+     💵 建议卖出: ¥79.00 × 400股
+  🟢 爱尔眼科: 现价¥9.01 | 支撑¥8.95 | 阻力¥9.23
+     下跌接近支撑位¥8.95，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥8.99 × 2800股
+     💵 建议卖出: ¥9.15 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     下跌接近支撑位¥0.62，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.90
+  👀 腾讯控股: ¥434.60
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-27 - 浮亏¥-234,578
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-27 13:00:05 - 监控完成
+2026-05-27 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-27 13:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 78.79
+  保利发展(600048.SH)... done 5.66
+  美团-W(3690.HK)... done 77.75
+  爱尔眼科(300015.SZ)... done 9.10
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 124.10
+  腾讯控股(0700.HK)... done 435.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥813,316
+  浮动盈亏: ¥-231,646 (-22.2%)
+  可用现金: ¥150,000
+  总资产: ¥963,316
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.79
+     盈亏: ¥19,361 (19.6%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.66
+     盈亏: ¥-24,998 (-19.2%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.75
+     盈亏: ¥-39,325 (-28.0%) | 模型预测: 45%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.10
+     盈亏: ¥-19,703 (-20.1%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-166,980 (-28.9%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.79 | 支撑- | 阻力-
+     当前盈利19.6%，不建议做T
+  🟢 保利发展: 现价¥5.66 | 支撑¥5.61 | 阻力¥5.87
+     下跌接近支撑位¥5.61，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.64 × 6100股
+     💵 建议卖出: ¥5.74 × 6100股
+  🟢 美团-W: 现价¥77.75 | 支撑¥77.30 | 阻力¥79.39
+     震荡走势，支撑¥77.30买入，阻力¥79.39卖出，预期利润1.7%
+     💰 建议买入: ¥77.69 × 400股
+     💵 建议卖出: ¥79.00 × 400股
+  ⚠️ 爱尔眼科: 现价¥9.10 | 支撑¥8.95 | 阻力¥9.23
+     当前位置不适合做T，等待更好机会（支撑¥8.95，阻力¥9.23）
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     下跌接近支撑位¥0.62，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥124.10
+  👀 腾讯控股: ¥435.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-27 - 浮亏¥-231,646
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-27 13:30:04 - 监控完成
+2026-05-27 14:00:02 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-27 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.74
+  保利发展(600048.SH)... done 5.65
+  美团-W(3690.HK)... done 77.95
+  爱尔眼科(300015.SZ)... done 9.16
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.80
+  腾讯控股(0700.HK)... done 435.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥813,831
+  浮动盈亏: ¥-231,130 (-22.1%)
+  可用现金: ¥150,000
+  总资产: ¥963,831
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.74
+     盈亏: ¥19,286 (19.5%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.65
+     盈亏: ¥-25,184 (-19.3%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.95
+     盈亏: ¥-39,065 (-27.8%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.16
+     盈亏: ¥-19,187 (-19.6%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-166,980 (-28.9%) | 模型预测: 55%
+     🟢 补仓: 浮亏-29%，模型看涨55%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.74 | 支撑- | 阻力-
+     当前盈利19.5%，不建议做T
+  🟢 保利发展: 现价¥5.65 | 支撑¥5.61 | 阻力¥5.87
+     下跌接近支撑位¥5.61，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.64 × 6100股
+     💵 建议卖出: ¥5.73 × 6100股
+  🟢 美团-W: 现价¥77.95 | 支撑¥77.30 | 阻力¥79.39
+     震荡走势，支撑¥77.30买入，阻力¥79.39卖出，预期利润1.7%
+     💰 建议买入: ¥77.69 × 400股
+     💵 建议卖出: ¥79.00 × 400股
+  ⚠️ 爱尔眼科: 现价¥9.16 | 支撑¥8.95 | 阻力¥9.34
+     当前位置不适合做T，等待更好机会（支撑¥8.95，阻力¥9.34）
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     下跌接近支撑位¥0.62，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.80
+  👀 腾讯控股: ¥435.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-27 - 浮亏¥-231,130
+✓ 邮件已发送
+✓ 结果已保存
+2026-05-27 14:00:05 - 监控完成
+2026-05-27 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-27 14:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.01
+  保利发展(600048.SH)... done 5.66
+  美团-W(3690.HK)... done 78.15
+  爱尔眼科(300015.SZ)... done 9.16
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.80
+  腾讯控股(0700.HK)... done 435.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥813,182
+  浮动盈亏: ¥-231,780 (-22.2%)
+  可用现金: ¥150,000
+  总资产: ¥963,182
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.01
+     盈亏: ¥18,191 (18.4%) | 模型预测: 43%
+     🔴 减仓: 浮盈18%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.66
+     盈亏: ¥-24,998 (-19.2%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.15
+     盈亏: ¥-38,805 (-27.6%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.16
+     盈亏: ¥-19,187 (-19.6%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-166,980 (-28.9%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.01 | 支撑- | 阻力-
+     当前盈利18.4%，不建议做T
+  🟢 保利发展: 现价¥5.66 | 支撑¥5.61 | 阻力¥5.87
+     下跌接近支撑位¥5.61，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.64 × 6100股
+     💵 建议卖出: ¥5.74 × 6100股
+  ⚠️ 美团-W: 现价¥78.15 | 支撑¥77.30 | 阻力¥79.39
+     当前位置不适合做T，等待更好机会（支撑¥77.30，阻力¥79.39）
+  ⚠️ 爱尔眼科: 现价¥9.16 | 支撑¥8.95 | 阻力¥9.34
+     当前位置不适合做T，等待更好机会（支撑¥8.95，阻力¥9.34）
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     下跌接近支撑位¥0.62，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.80
+  👀 腾讯控股: ¥435.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-27 - 浮亏¥-231,780
+✓ 结果已保存
+2026-05-27 14:30:05 - 监控完成
+2026-05-28 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-28 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.45
+  保利发展(600048.SH)... done 5.65
+  美团-W(3690.HK)... done 77.20
+  爱尔眼科(300015.SZ)... done 9.13
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 122.80
+  腾讯控股(0700.HK)... done 430.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥808,863
+  浮动盈亏: ¥-236,098 (-22.6%)
+  可用现金: ¥150,000
+  总资产: ¥958,863
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.45
+     盈亏: ¥18,851 (19.1%) | 模型预测: 60%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.65
+     盈亏: ¥-25,184 (-19.3%) | 模型预测: 65%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.20
+     盈亏: ¥-40,040 (-28.5%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.13
+     盈亏: ¥-19,445 (-19.8%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-170,280 (-29.5%) | 模型预测: 58%
+     🟢 补仓: 浮亏-29%，模型看涨58%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.45 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.65 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥77.20 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.13 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.62 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥122.80
+  👀 腾讯控股: ¥430.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-28 - 浮亏¥-236,098
+✓ 结果已保存
+2026-05-28 09:30:05 - 监控完成
+2026-05-28 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-28 10:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 78.00
+  保利发展(600048.SH)... done 5.63
+  美团-W(3690.HK)... done 73.15
+  爱尔眼科(300015.SZ)... done 9.15
+  港股通互联网ETF(159792.SZ)... done 0.60
+  阿里巴巴-W(9988.HK)... done 121.10
+  腾讯控股(0700.HK)... done 425.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥792,823
+  浮动盈亏: ¥-252,138 (-24.1%)
+  可用现金: ¥150,000
+  总资产: ¥942,823
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥78.00
+     盈亏: ¥18,176 (18.4%) | 模型预测: 66%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.63
+     盈亏: ¥-25,556 (-19.6%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥73.15
+     盈亏: ¥-45,305 (-32.3%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.15
+     盈亏: ¥-19,273 (-19.7%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.60
+     盈亏: ¥-180,180 (-31.2%) | 模型预测: 44%
+     ⚠️ 观望: 浮亏-31%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥78.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.63 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥73.15 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.15 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.60 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥121.10
+  👀 腾讯控股: ¥425.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-28 - 浮亏¥-252,138
+✓ 结果已保存
+2026-05-28 10:30:05 - 监控完成
+2026-05-28 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-28 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.85
+  保利发展(600048.SH)... done 5.67
+  美团-W(3690.HK)... done 72.75
+  爱尔眼科(300015.SZ)... done 9.19
+  港股通互联网ETF(159792.SZ)... done 0.60
+  阿里巴巴-W(9988.HK)... done 120.60
+  腾讯控股(0700.HK)... done 422.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥788,186
+  浮动盈亏: ¥-256,776 (-24.6%)
+  可用现金: ¥150,000
+  总资产: ¥938,186
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.85
+     盈亏: ¥14,950 (15.1%) | 模型预测: 59%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.67
+     盈亏: ¥-24,812 (-19.0%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥72.75
+     盈亏: ¥-45,825 (-32.6%) | 模型预测: 65%
+     🟢 补仓: 浮亏-33%，模型看涨65%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.19
+     盈亏: ¥-18,929 (-19.3%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.60
+     盈亏: ¥-182,160 (-31.5%) | 模型预测: 43%
+     ⚠️ 观望: 浮亏-32%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.85 | 支撑- | 阻力-
+     当前盈利15.1%，不建议做T
+  ⚠️ 保利发展: 现价¥5.67 | 支撑¥5.61 | 阻力¥5.82
+     当前位置不适合做T，等待更好机会（支撑¥5.61，阻力¥5.82）
+  🟢 美团-W: 现价¥72.75 | 支撑¥72.50 | 阻力¥77.69
+     下跌接近支撑位¥72.50，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥72.86 × 400股
+     💵 建议卖出: ¥73.84 × 400股
+  ❌ 爱尔眼科: 现价¥9.19 | 支撑- | 阻力-
+     日内波动仅2.0%，波动太小不适合做T
+  🟢 港股通互联网ETF: 现价¥0.60 | 支撑¥0.60 | 阻力¥0.62
+     下跌接近支撑位¥0.60，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.60 × 217800股
+     💵 建议卖出: ¥0.61 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥120.60
+  👀 腾讯控股: ¥422.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-28 - 浮亏¥-256,776
+✓ 结果已保存
+2026-05-28 11:30:04 - 监控完成
+2026-05-28 13:00:02 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-28 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.47
+  保利发展(600048.SH)... done 5.67
+  美团-W(3690.HK)... done 72.50
+  爱尔眼科(300015.SZ)... done 9.20
+  港股通互联网ETF(159792.SZ)... done 0.60
+  阿里巴巴-W(9988.HK)... done 120.40
+  腾讯控股(0700.HK)... done 421.60
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥788,877
+  浮动盈亏: ¥-256,084 (-24.5%)
+  可用现金: ¥150,000
+  总资产: ¥938,877
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.47
+     盈亏: ¥15,881 (16.1%) | 模型预测: 61%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.67
+     盈亏: ¥-24,812 (-19.0%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥72.50
+     盈亏: ¥-46,150 (-32.9%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.20
+     盈亏: ¥-18,843 (-19.2%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.60
+     盈亏: ¥-182,160 (-31.5%) | 模型预测: 43%
+     ⚠️ 观望: 浮亏-32%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.47 | 支撑- | 阻力-
+     当前盈利16.1%，不建议做T
+  ⚠️ 保利发展: 现价¥5.67 | 支撑¥5.61 | 阻力¥5.82
+     当前位置不适合做T，等待更好机会（支撑¥5.61，阻力¥5.82）
+  🟢 美团-W: 现价¥72.50 | 支撑¥72.25 | 阻力¥77.69
+     下跌接近支撑位¥72.25，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥72.61 × 400股
+     💵 建议卖出: ¥73.59 × 400股
+  ❌ 爱尔眼科: 现价¥9.20 | 支撑- | 阻力-
+     日内波动仅2.0%，波动太小不适合做T
+  🟢 港股通互联网ETF: 现价¥0.60 | 支撑¥0.60 | 阻力¥0.62
+     下跌接近支撑位¥0.60，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.60 × 217800股
+     💵 建议卖出: ¥0.61 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥120.40
+  👀 腾讯控股: ¥421.60
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-28 - 浮亏¥-256,084
+✓ 结果已保存
+2026-05-28 13:00:05 - 监控完成
+2026-05-28 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-28 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.45
+  保利发展(600048.SH)... done 5.61
+  美团-W(3690.HK)... done 72.30
+  爱尔眼科(300015.SZ)... done 9.19
+  港股通互联网ETF(159792.SZ)... done 0.60
+  阿里巴巴-W(9988.HK)... done 120.10
+  腾讯控股(0700.HK)... done 421.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥787,385
+  浮动盈亏: ¥-257,576 (-24.6%)
+  可用现金: ¥150,000
+  总资产: ¥937,385
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.45
+     盈亏: ¥15,851 (16.0%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.61
+     盈亏: ¥-25,928 (-19.9%) | 模型预测: 40%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥72.30
+     盈亏: ¥-46,410 (-33.1%) | 模型预测: 59%
+     🟢 补仓: 浮亏-33%，模型看涨59%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.19
+     盈亏: ¥-18,929 (-19.3%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.60
+     盈亏: ¥-182,160 (-31.5%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.45 | 支撑- | 阻力-
+     当前盈利16.0%，不建议做T
+  🟢 保利发展: 现价¥5.61 | 支撑¥5.59 | 阻力¥5.82
+     震荡走势，支撑¥5.59买入，阻力¥5.82卖出，预期利润3.1%
+     💰 建议买入: ¥5.62 × 6100股
+     💵 建议卖出: ¥5.79 × 6100股
+  🟢 美团-W: 现价¥72.30 | 支撑¥72.25 | 阻力¥77.69
+     下跌接近支撑位¥72.25，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥72.61 × 400股
+     💵 建议卖出: ¥73.38 × 400股
+  ❌ 爱尔眼科: 现价¥9.19 | 支撑- | 阻力-
+     日内波动仅2.0%，波动太小不适合做T
+  🟢 港股通互联网ETF: 现价¥0.60 | 支撑¥0.59 | 阻力¥0.62
+     下跌接近支撑位¥0.59，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.60 × 217800股
+     💵 建议卖出: ¥0.61 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥120.10
+  👀 腾讯控股: ¥421.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-28 - 浮亏¥-257,576
+✓ 结果已保存
+2026-05-28 13:30:05 - 监控完成
+2026-05-28 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-28 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.70
+  保利发展(600048.SH)... done 5.62
+  美团-W(3690.HK)... done 73.05
+  爱尔眼科(300015.SZ)... done 9.21
+  港股通互联网ETF(159792.SZ)... done 0.60
+  阿里巴巴-W(9988.HK)... done 121.70
+  腾讯控股(0700.HK)... done 424.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥790,413
+  浮动盈亏: ¥-254,548 (-24.4%)
+  可用现金: ¥150,000
+  总资产: ¥940,413
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.70
+     盈亏: ¥16,226 (16.4%) | 模型预测: 44%
+     🔴 减仓: 浮盈16%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.62
+     盈亏: ¥-25,742 (-19.8%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥73.05
+     盈亏: ¥-45,435 (-32.4%) | 模型预测: 57%
+     🟢 补仓: 浮亏-32%，模型看涨57%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.21
+     盈亏: ¥-18,757 (-19.1%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.60
+     盈亏: ¥-180,840 (-31.3%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.70 | 支撑- | 阻力-
+     当前盈利16.4%，不建议做T
+  🟢 保利发展: 现价¥5.62 | 支撑¥5.59 | 阻力¥5.82
+     震荡走势，支撑¥5.59买入，阻力¥5.82卖出，预期利润3.1%
+     💰 建议买入: ¥5.62 × 6100股
+     💵 建议卖出: ¥5.79 × 6100股
+  🟢 美团-W: 现价¥73.05 | 支撑¥72.25 | 阻力¥77.69
+     下跌接近支撑位¥72.25，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥72.61 × 400股
+     💵 建议卖出: ¥74.15 × 400股
+  ❌ 爱尔眼科: 现价¥9.21 | 支撑- | 阻力-
+     日内波动仅2.0%，波动太小不适合做T
+  🟢 港股通互联网ETF: 现价¥0.60 | 支撑¥0.59 | 阻力¥0.62
+     震荡走势，支撑¥0.59买入，阻力¥0.62卖出，预期利润3.3%
+     💰 建议买入: ¥0.60 × 217800股
+     💵 建议卖出: ¥0.62 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥121.70
+  👀 腾讯控股: ¥424.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-28 - 浮亏¥-254,548
+✓ 结果已保存
+2026-05-28 14:00:05 - 监控完成
+2026-05-28 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-28 14:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 77.00
+  保利发展(600048.SH)... done 5.61
+  美团-W(3690.HK)... done 73.35
+  爱尔眼科(300015.SZ)... done 9.19
+  港股通互联网ETF(159792.SZ)... done 0.60
+  阿里巴巴-W(9988.HK)... done 122.10
+  腾讯控股(0700.HK)... done 423.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥791,555
+  浮动盈亏: ¥-253,406 (-24.3%)
+  可用现金: ¥150,000
+  总资产: ¥941,555
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.00
+     盈亏: ¥16,676 (16.9%) | 模型预测: 57%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.61
+     盈亏: ¥-25,928 (-19.9%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥73.35
+     盈亏: ¥-45,045 (-32.1%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.19
+     盈亏: ¥-18,929 (-19.3%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.60
+     盈亏: ¥-180,180 (-31.2%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.00 | 支撑- | 阻力-
+     当前盈利16.9%，不建议做T
+  🟢 保利发展: 现价¥5.61 | 支撑¥5.58 | 阻力¥5.82
+     震荡走势，支撑¥5.58买入，阻力¥5.82卖出，预期利润3.2%
+     💰 建议买入: ¥5.61 × 6100股
+     💵 建议卖出: ¥5.79 × 6100股
+  🟢 美团-W: 现价¥73.35 | 支撑¥72.25 | 阻力¥77.69
+     下跌接近支撑位¥72.25，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥72.61 × 400股
+     💵 建议卖出: ¥74.45 × 400股
+  ❌ 爱尔眼科: 现价¥9.19 | 支撑- | 阻力-
+     日内波动仅2.0%，波动太小不适合做T
+  ⚠️ 港股通互联网ETF: 现价¥0.60 | 支撑¥0.59 | 阻力¥0.62
+     当前位置不适合做T，等待更好机会（支撑¥0.59，阻力¥0.62）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥122.10
+  👀 腾讯控股: ¥423.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-28 - 浮亏¥-253,406
+✓ 结果已保存
+2026-05-28 14:30:05 - 监控完成
+2026-05-29 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-29 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.95
+  保利发展(600048.SH)... done 5.64
+  美团-W(3690.HK)... done 74.40
+  爱尔眼科(300015.SZ)... done 9.19
+  港股通互联网ETF(159792.SZ)... done 0.61
+  阿里巴巴-W(9988.HK)... done 124.20
+  腾讯控股(0700.HK)... done 429.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥797,363
+  浮动盈亏: ¥-247,598 (-23.7%)
+  可用现金: ¥150,000
+  总资产: ¥947,363
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.95
+     盈亏: ¥16,601 (16.8%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.64
+     盈亏: ¥-25,370 (-19.5%) | 模型预测: 65%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥74.40
+     盈亏: ¥-43,680 (-31.1%) | 模型预测: 73%
+     🟢 补仓: 浮亏-31%，模型看涨73%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.19
+     盈亏: ¥-18,929 (-19.3%) | 模型预测: 39%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.61
+     盈亏: ¥-176,220 (-30.5%) | 模型预测: 65%
+     🟢 补仓: 浮亏-31%，模型看涨65%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.95 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.64 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥74.40 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.19 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.61 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥124.20
+  👀 腾讯控股: ¥429.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-29 - 浮亏¥-247,598
+✓ 结果已保存
+2026-05-29 09:30:05 - 监控完成
+2026-05-29 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-29 10:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 77.15
+  保利发展(600048.SH)... done 5.85
+  美团-W(3690.HK)... done 73.05
+  爱尔眼科(300015.SZ)... done 9.37
+  港股通互联网ETF(159792.SZ)... done 0.60
+  阿里巴巴-W(9988.HK)... done 121.40
+  腾讯控股(0700.HK)... done 427.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥796,082
+  浮动盈亏: ¥-248,880 (-23.8%)
+  可用现金: ¥150,000
+  总资产: ¥946,082
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.15
+     盈亏: ¥16,901 (17.1%) | 模型预测: 43%
+     🔴 减仓: 浮盈17%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.85
+     盈亏: ¥-21,464 (-16.5%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥73.05
+     盈亏: ¥-45,435 (-32.4%) | 模型预测: 55%
+     🟢 补仓: 浮亏-32%，模型看涨55%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.37
+     盈亏: ¥-17,381 (-17.7%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.60
+     盈亏: ¥-181,500 (-31.4%) | 模型预测: 43%
+     ⚠️ 观望: 浮亏-31%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.15 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.85 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥73.05 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.37 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.60 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥121.40
+  👀 腾讯控股: ¥427.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-29 - 浮亏¥-248,880
+✓ 结果已保存
+2026-05-29 10:30:04 - 监控完成
+2026-05-29 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-29 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.24
+  保利发展(600048.SH)... done 5.85
+  美团-W(3690.HK)... done 72.90
+  爱尔眼科(300015.SZ)... done 9.41
+  港股通互联网ETF(159792.SZ)... done 0.61
+  阿里巴巴-W(9988.HK)... done 122.00
+  腾讯控股(0700.HK)... done 429.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥797,986
+  浮动盈亏: ¥-246,976 (-23.6%)
+  可用现金: ¥150,000
+  总资产: ¥947,986
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.24
+     盈亏: ¥14,035 (14.2%) | 模型预测: 42%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.85
+     盈亏: ¥-21,464 (-16.5%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥72.90
+     盈亏: ¥-45,630 (-32.5%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.41
+     盈亏: ¥-17,037 (-17.4%) | 模型预测: 41%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.61
+     盈亏: ¥-176,880 (-30.6%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.24 | 支撑- | 阻力-
+     当前盈利14.2%，不建议做T
+  ⚠️ 保利发展: 现价¥5.85 | 支撑¥5.63 | 阻力¥6.05
+     当前位置不适合做T，等待更好机会（支撑¥5.63，阻力¥6.05）
+  🟢 美团-W: 现价¥72.90 | 支撑¥72.35 | 阻力¥74.77
+     下跌接近支撑位¥72.35，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥72.71 × 400股
+     💵 建议卖出: ¥73.99 × 400股
+  ⚠️ 爱尔眼科: 现价¥9.41 | 支撑¥9.11 | 阻力¥9.47
+     当前位置不适合做T，等待更好机会（支撑¥9.11，阻力¥9.47）
+  ❌ 港股通互联网ETF: 现价¥0.61 | 支撑- | 阻力-
+     日内波动仅2.0%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥122.00
+  👀 腾讯控股: ¥429.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-29 - 浮亏¥-246,976
+✓ 结果已保存
+2026-05-29 11:30:05 - 监控完成
+2026-05-29 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-29 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 74.81
+  保利发展(600048.SH)... done 5.85
+  美团-W(3690.HK)... done 75.50
+  爱尔眼科(300015.SZ)... done 9.42
+  港股通互联网ETF(159792.SZ)... done 0.61
+  阿里巴巴-W(9988.HK)... done 123.70
+  腾讯控股(0700.HK)... done 436.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥800,807
+  浮动盈亏: ¥-244,154 (-23.4%)
+  可用现金: ¥150,000
+  总资产: ¥950,807
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.81
+     盈亏: ¥13,391 (13.5%) | 模型预测: 42%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.85
+     盈亏: ¥-21,464 (-16.5%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥75.50
+     盈亏: ¥-42,250 (-30.1%) | 模型预测: 44%
+     ⚠️ 观望: 浮亏-30%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.42
+     盈亏: ¥-16,951 (-17.3%) | 模型预测: 38%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.61
+     盈亏: ¥-176,880 (-30.6%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.81 | 支撑- | 阻力-
+     当前盈利13.5%，不建议做T
+  ⚠️ 保利发展: 现价¥5.85 | 支撑¥5.63 | 阻力¥6.05
+     当前位置不适合做T，等待更好机会（支撑¥5.63，阻力¥6.05）
+  ⚠️ 美团-W: 现价¥75.50 | 支撑¥72.35 | 阻力¥76.48
+     当前位置不适合做T，等待更好机会（支撑¥72.35，阻力¥76.48）
+  ⚠️ 爱尔眼科: 现价¥9.42 | 支撑¥9.11 | 阻力¥9.47
+     当前位置不适合做T，等待更好机会（支撑¥9.11，阻力¥9.47）
+  ❌ 港股通互联网ETF: 现价¥0.61 | 支撑- | 阻力-
+     日内波动仅2.0%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.70
+  👀 腾讯控股: ¥436.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-29 - 浮亏¥-244,154
+✓ 结果已保存
+2026-05-29 13:00:05 - 监控完成
+2026-05-29 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-29 13:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 74.81
+  保利发展(600048.SH)... done 5.84
+  美团-W(3690.HK)... done 74.15
+  爱尔眼科(300015.SZ)... done 9.42
+  港股通互联网ETF(159792.SZ)... done 0.61
+  阿里巴巴-W(9988.HK)... done 122.60
+  腾讯控股(0700.HK)... done 433.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥799,526
+  浮动盈亏: ¥-245,436 (-23.5%)
+  可用现金: ¥150,000
+  总资产: ¥949,526
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.81
+     盈亏: ¥13,391 (13.5%) | 模型预测: 40%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.84
+     盈亏: ¥-21,650 (-16.6%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥74.15
+     盈亏: ¥-44,005 (-31.3%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.42
+     盈亏: ¥-16,951 (-17.3%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.61
+     盈亏: ¥-176,220 (-30.5%) | 模型预测: 57%
+     🟢 补仓: 浮亏-31%，模型看涨57%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.81 | 支撑- | 阻力-
+     当前盈利13.5%，不建议做T
+  ⚠️ 保利发展: 现价¥5.84 | 支撑¥5.63 | 阻力¥6.05
+     当前位置不适合做T，等待更好机会（支撑¥5.63，阻力¥6.05）
+  ⚠️ 美团-W: 现价¥74.15 | 支撑¥72.35 | 阻力¥76.48
+     当前位置不适合做T，等待更好机会（支撑¥72.35，阻力¥76.48）
+  ⚠️ 爱尔眼科: 现价¥9.42 | 支撑¥9.11 | 阻力¥9.51
+     当前位置不适合做T，等待更好机会（支撑¥9.11，阻力¥9.51）
+  ⚠️ 港股通互联网ETF: 现价¥0.61 | 支撑¥0.60 | 阻力¥0.62
+     当前位置不适合做T，等待更好机会（支撑¥0.60，阻力¥0.62）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥122.60
+  👀 腾讯控股: ¥433.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-29 - 浮亏¥-245,436
+✓ 结果已保存
+2026-05-29 13:30:04 - 监控完成
+2026-05-29 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-29 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 74.85
+  保利发展(600048.SH)... done 5.80
+  美团-W(3690.HK)... done 74.35
+  爱尔眼科(300015.SZ)... done 9.32
+  港股通互联网ETF(159792.SZ)... done 0.61
+  阿里巴巴-W(9988.HK)... done 122.30
+  腾讯控股(0700.HK)... done 432.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥797,582
+  浮动盈亏: ¥-247,380 (-23.7%)
+  可用现金: ¥150,000
+  总资产: ¥947,582
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.85
+     盈亏: ¥13,450 (13.6%) | 模型预测: 42%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.80
+     盈亏: ¥-22,394 (-17.2%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥74.35
+     盈亏: ¥-43,745 (-31.2%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.32
+     盈亏: ¥-17,811 (-18.2%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.61
+     盈亏: ¥-176,880 (-30.6%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.85 | 支撑- | 阻力-
+     当前盈利13.6%，不建议做T
+  ⚠️ 保利发展: 现价¥5.80 | 支撑¥5.63 | 阻力¥6.05
+     当前位置不适合做T，等待更好机会（支撑¥5.63，阻力¥6.05）
+  ⚠️ 美团-W: 现价¥74.35 | 支撑¥72.35 | 阻力¥76.48
+     当前位置不适合做T，等待更好机会（支撑¥72.35，阻力¥76.48）
+  ⚠️ 爱尔眼科: 现价¥9.32 | 支撑¥9.11 | 阻力¥9.51
+     当前位置不适合做T，等待更好机会（支撑¥9.11，阻力¥9.51）
+  ⚠️ 港股通互联网ETF: 现价¥0.61 | 支撑¥0.60 | 阻力¥0.62
+     当前位置不适合做T，等待更好机会（支撑¥0.60，阻力¥0.62）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥122.30
+  👀 腾讯控股: ¥432.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-29 - 浮亏¥-247,380
+✓ 结果已保存
+2026-05-29 14:00:05 - 监控完成
+2026-05-29 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-05-29 14:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 74.28
+  保利发展(600048.SH)... done 5.78
+  美团-W(3690.HK)... done 73.90
+  爱尔眼科(300015.SZ)... done 9.24
+  港股通互联网ETF(159792.SZ)... done 0.61
+  阿里巴巴-W(9988.HK)... done 121.90
+  腾讯控股(0700.HK)... done 429.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥795,082
+  浮动盈亏: ¥-249,880 (-23.9%)
+  可用现金: ¥150,000
+  总资产: ¥945,082
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.28
+     盈亏: ¥12,596 (12.7%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.78
+     盈亏: ¥-22,766 (-17.5%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥73.90
+     盈亏: ¥-44,330 (-31.6%) | 模型预测: 45%
+     ⚠️ 观望: 浮亏-32%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.24
+     盈亏: ¥-18,499 (-18.9%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.61
+     盈亏: ¥-176,880 (-30.6%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.28 | 支撑- | 阻力-
+     当前盈利12.7%，不建议做T
+  ⚠️ 保利发展: 现价¥5.78 | 支撑¥5.63 | 阻力¥6.05
+     当前位置不适合做T，等待更好机会（支撑¥5.63，阻力¥6.05）
+  ⚠️ 美团-W: 现价¥73.90 | 支撑¥72.35 | 阻力¥76.48
+     当前位置不适合做T，等待更好机会（支撑¥72.35，阻力¥76.48）
+  ⚠️ 爱尔眼科: 现价¥9.24 | 支撑¥9.11 | 阻力¥9.51
+     当前位置不适合做T，等待更好机会（支撑¥9.11，阻力¥9.51）
+  ⚠️ 港股通互联网ETF: 现价¥0.61 | 支撑¥0.60 | 阻力¥0.62
+     当前位置不适合做T，等待更好机会（支撑¥0.60，阻力¥0.62）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥121.90
+  👀 腾讯控股: ¥429.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】05-29 - 浮亏¥-249,880
+✓ 结果已保存
+2026-05-29 14:30:04 - 监控完成
+2026-06-01 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-01 09:30:04
+======================================================================
+  汇川技术(300124.SZ)... done 74.00
+  保利发展(600048.SH)... done 5.72
+  美团-W(3690.HK)... done 76.00
+  爱尔眼科(300015.SZ)... done 9.12
+  港股通互联网ETF(159792.SZ)... done 0.61
+  阿里巴巴-W(9988.HK)... done 120.90
+  腾讯控股(0700.HK)... done 431.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥795,244
+  浮动盈亏: ¥-249,718 (-23.9%)
+  可用现金: ¥150,000
+  总资产: ¥945,244
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.00
+     盈亏: ¥12,176 (12.3%) | 模型预测: 62%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.72
+     盈亏: ¥-23,882 (-18.3%) | 模型预测: 37%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥76.00
+     盈亏: ¥-41,600 (-29.6%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.12
+     盈亏: ¥-19,531 (-19.9%) | 模型预测: 57%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.61
+     盈亏: ¥-176,880 (-30.6%) | 模型预测: 44%
+     ⚠️ 观望: 浮亏-31%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.72 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥76.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.12 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.61 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥120.90
+  👀 腾讯控股: ¥431.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-01 - 浮亏¥-249,718
+✓ 结果已保存
+2026-06-01 09:30:05 - 监控完成
+2026-06-01 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-01 10:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 74.00
+  保利发展(600048.SH)... done 5.79
+  美团-W(3690.HK)... done 76.05
+  爱尔眼科(300015.SZ)... done 9.16
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 123.40
+  腾讯控股(0700.HK)... done 432.60
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥810,155
+  浮动盈亏: ¥-234,806 (-22.5%)
+  可用现金: ¥150,000
+  总资产: ¥960,155
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.00
+     盈亏: ¥12,176 (12.3%) | 模型预测: 56%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.79
+     盈亏: ¥-22,580 (-17.3%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥76.05
+     盈亏: ¥-41,535 (-29.6%) | 模型预测: 38%
+     ⚠️ 观望: 浮亏-30%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.16
+     盈亏: ¥-19,187 (-19.6%) | 模型预测: 57%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-163,680 (-28.3%) | 模型预测: 33%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.79 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥76.05 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.16 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.40
+  👀 腾讯控股: ¥432.60
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-01 - 浮亏¥-234,806
+✓ 结果已保存
+2026-06-01 10:30:05 - 监控完成
+2026-06-01 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-01 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.54
+  保利发展(600048.SH)... done 5.69
+  美团-W(3690.HK)... done 76.35
+  爱尔眼科(300015.SZ)... done 9.12
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 122.40
+  腾讯控股(0700.HK)... done 435.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥808,671
+  浮动盈亏: ¥-236,290 (-22.6%)
+  可用现金: ¥150,000
+  总资产: ¥958,671
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.54
+     盈亏: ¥14,486 (14.7%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.69
+     盈亏: ¥-24,440 (-18.8%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥76.35
+     盈亏: ¥-41,145 (-29.3%) | 模型预测: 38%
+     ⚠️ 观望: 浮亏-29%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.12
+     盈亏: ¥-19,531 (-19.9%) | 模型预测: 63%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-165,660 (-28.7%) | 模型预测: 36%
+     ⚠️ 观望: 浮亏-29%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.54 | 支撑- | 阻力-
+     当前盈利14.7%，不建议做T
+  🟢 保利发展: 现价¥5.69 | 支撑¥5.66 | 阻力¥5.87
+     下跌接近支撑位¥5.66，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.69 × 6100股
+     💵 建议卖出: ¥5.78 × 6100股
+  ⚠️ 美团-W: 现价¥76.35 | 支撑¥74.03 | 阻力¥77.74
+     当前位置不适合做T，等待更好机会（支撑¥74.03，阻力¥77.74）
+  ⚠️ 爱尔眼科: 现价¥9.12 | 支撑¥8.97 | 阻力¥9.25
+     当前位置不适合做T，等待更好机会（支撑¥8.97，阻力¥9.25）
+  ⚠️ 港股通互联网ETF: 现价¥0.62 | 支撑¥0.60 | 阻力¥0.63
+     当前位置不适合做T，等待更好机会（支撑¥0.60，阻力¥0.63）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥122.40
+  👀 腾讯控股: ¥435.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-01 - 浮亏¥-236,290
+✓ 结果已保存
+2026-06-01 11:30:04 - 监控完成
+2026-06-01 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-01 13:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 74.94
+  保利发展(600048.SH)... done 5.70
+  美团-W(3690.HK)... done 78.10
+  爱尔眼科(300015.SZ)... done 9.13
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.70
+  腾讯控股(0700.HK)... done 438.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥810,318
+  浮动盈亏: ¥-234,644 (-22.5%)
+  可用现金: ¥150,000
+  总资产: ¥960,318
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.94
+     盈亏: ¥13,586 (13.7%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.70
+     盈亏: ¥-24,254 (-18.6%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.10
+     盈亏: ¥-38,870 (-27.7%) | 模型预测: 37%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.13
+     盈亏: ¥-19,445 (-19.8%) | 模型预测: 64%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-165,660 (-28.7%) | 模型预测: 36%
+     ⚠️ 观望: 浮亏-29%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.94 | 支撑- | 阻力-
+     当前盈利13.7%，不建议做T
+  🟢 保利发展: 现价¥5.70 | 支撑¥5.66 | 阻力¥5.87
+     下跌接近支撑位¥5.66，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.69 × 6100股
+     💵 建议卖出: ¥5.79 × 6100股
+  🔵 美团-W: 现价¥78.10 | 支撑¥74.03 | 阻力¥78.64
+     上涨接近阻力位¥78.64，可卖出400股锁定利润
+     💵 建议卖出: ¥78.25 × 400股
+  ⚠️ 爱尔眼科: 现价¥9.13 | 支撑¥8.97 | 阻力¥9.25
+     当前位置不适合做T，等待更好机会（支撑¥8.97，阻力¥9.25）
+  ⚠️ 港股通互联网ETF: 现价¥0.62 | 支撑¥0.60 | 阻力¥0.63
+     当前位置不适合做T，等待更好机会（支撑¥0.60，阻力¥0.63）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.70
+  👀 腾讯控股: ¥438.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-01 - 浮亏¥-234,644
+✓ 结果已保存
+2026-06-01 13:00:04 - 监控完成
+2026-06-01 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-01 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 74.95
+  保利发展(600048.SH)... done 5.70
+  美团-W(3690.HK)... done 77.95
+  爱尔眼科(300015.SZ)... done 9.18
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.50
+  腾讯控股(0700.HK)... done 438.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥809,908
+  浮动盈亏: ¥-235,054 (-22.5%)
+  可用现金: ¥150,000
+  总资产: ¥959,908
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.95
+     盈亏: ¥13,601 (13.8%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.70
+     盈亏: ¥-24,254 (-18.6%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.95
+     盈亏: ¥-39,065 (-27.8%) | 模型预测: 34%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.18
+     盈亏: ¥-19,015 (-19.4%) | 模型预测: 58%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-166,320 (-28.8%) | 模型预测: 55%
+     🟢 补仓: 浮亏-29%，模型看涨55%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.95 | 支撑- | 阻力-
+     当前盈利13.8%，不建议做T
+  🟢 保利发展: 现价¥5.70 | 支撑¥5.66 | 阻力¥5.87
+     下跌接近支撑位¥5.66，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.69 × 6100股
+     💵 建议卖出: ¥5.79 × 6100股
+  ⚠️ 美团-W: 现价¥77.95 | 支撑¥74.03 | 阻力¥78.89
+     当前位置不适合做T，等待更好机会（支撑¥74.03，阻力¥78.89）
+  ⚠️ 爱尔眼科: 现价¥9.18 | 支撑¥8.97 | 阻力¥9.25
+     当前位置不适合做T，等待更好机会（支撑¥8.97，阻力¥9.25）
+  ⚠️ 港股通互联网ETF: 现价¥0.62 | 支撑¥0.60 | 阻力¥0.63
+     当前位置不适合做T，等待更好机会（支撑¥0.60，阻力¥0.63）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.50
+  👀 腾讯控股: ¥438.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-01 - 浮亏¥-235,054
+✓ 结果已保存
+2026-06-01 13:30:05 - 监控完成
+2026-06-01 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-01 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.69
+  保利发展(600048.SH)... done 5.73
+  美团-W(3690.HK)... done 77.55
+  爱尔眼科(300015.SZ)... done 9.19
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 123.00
+  腾讯控股(0700.HK)... done 436.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥813,122
+  浮动盈亏: ¥-231,840 (-22.2%)
+  可用现金: ¥150,000
+  总资产: ¥963,122
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.69
+     盈亏: ¥14,711 (14.9%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.73
+     盈亏: ¥-23,696 (-18.2%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.55
+     盈亏: ¥-39,585 (-28.2%) | 模型预测: 33%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.19
+     盈亏: ¥-18,929 (-19.3%) | 模型预测: 56%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-164,340 (-28.5%) | 模型预测: 42%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.69 | 支撑- | 阻力-
+     当前盈利14.9%，不建议做T
+  🟢 保利发展: 现价¥5.73 | 支撑¥5.66 | 阻力¥5.87
+     下跌接近支撑位¥5.66，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.69 × 6100股
+     💵 建议卖出: ¥5.82 × 6100股
+  ⚠️ 美团-W: 现价¥77.55 | 支撑¥74.03 | 阻力¥78.89
+     当前位置不适合做T，等待更好机会（支撑¥74.03，阻力¥78.89）
+  ⚠️ 爱尔眼科: 现价¥9.19 | 支撑¥8.97 | 阻力¥9.27
+     当前位置不适合做T，等待更好机会（支撑¥8.97，阻力¥9.27）
+  ⚠️ 港股通互联网ETF: 现价¥0.63 | 支撑¥0.60 | 阻力¥0.63
+     当前位置不适合做T，等待更好机会（支撑¥0.60，阻力¥0.63）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.00
+  👀 腾讯控股: ¥436.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-01 - 浮亏¥-231,840
+✓ 结果已保存
+2026-06-01 14:00:04 - 监控完成
+2026-06-01 14:30:02 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-01 14:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.36
+  保利发展(600048.SH)... done 5.75
+  美团-W(3690.HK)... done 77.90
+  爱尔眼科(300015.SZ)... done 9.18
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 122.80
+  腾讯控股(0700.HK)... done 436.60
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥814,028
+  浮动盈亏: ¥-230,934 (-22.1%)
+  可用现金: ¥150,000
+  总资产: ¥964,028
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.36
+     盈亏: ¥14,216 (14.4%) | 模型预测: 41%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.75
+     盈亏: ¥-23,324 (-17.9%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥77.90
+     盈亏: ¥-39,130 (-27.9%) | 模型预测: 38%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.18
+     盈亏: ¥-19,015 (-19.4%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-163,680 (-28.3%) | 模型预测: 41%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.36 | 支撑- | 阻力-
+     当前盈利14.4%，不建议做T
+  ⚠️ 保利发展: 现价¥5.75 | 支撑¥5.66 | 阻力¥5.87
+     当前位置不适合做T，等待更好机会（支撑¥5.66，阻力¥5.87）
+  ⚠️ 美团-W: 现价¥77.90 | 支撑¥74.03 | 阻力¥78.89
+     当前位置不适合做T，等待更好机会（支撑¥74.03，阻力¥78.89）
+  ⚠️ 爱尔眼科: 现价¥9.18 | 支撑¥8.97 | 阻力¥9.27
+     当前位置不适合做T，等待更好机会（支撑¥8.97，阻力¥9.27）
+  ⚠️ 港股通互联网ETF: 现价¥0.63 | 支撑¥0.60 | 阻力¥0.63
+     当前位置不适合做T，等待更好机会（支撑¥0.60，阻力¥0.63）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥122.80
+  👀 腾讯控股: ¥436.60
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-01 - 浮亏¥-230,934
+✓ 结果已保存
+2026-06-01 14:30:05 - 监控完成
+2026-06-02 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-02 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 74.63
+  保利发展(600048.SH)... done 5.74
+  美团-W(3690.HK)... done 78.60
+  爱尔眼科(300015.SZ)... done 9.18
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 126.60
+  腾讯控股(0700.HK)... done 445.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥816,297
+  浮动盈亏: ¥-228,664 (-21.9%)
+  可用现金: ¥150,000
+  总资产: ¥966,297
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.63
+     盈亏: ¥13,120 (13.3%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.74
+     盈亏: ¥-23,510 (-18.0%) | 模型预测: 62%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.60
+     盈亏: ¥-38,220 (-27.2%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.18
+     盈亏: ¥-19,015 (-19.4%) | 模型预测: 63%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-161,040 (-27.9%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.63 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.74 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥78.60 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.18 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥126.60
+  👀 腾讯控股: ¥445.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-02 - 浮亏¥-228,664
+✓ 结果已保存
+2026-06-02 09:30:05 - 监控完成
+2026-06-02 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-02 10:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 74.96
+  保利发展(600048.SH)... done 5.69
+  美团-W(3690.HK)... done 84.60
+  爱尔眼科(300015.SZ)... done 9.12
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 128.30
+  腾讯控股(0700.HK)... done 458.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥839,646
+  浮动盈亏: ¥-205,316 (-19.6%)
+  可用现金: ¥150,000
+  总资产: ¥989,646
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.96
+     盈亏: ¥13,615 (13.8%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.69
+     盈亏: ¥-24,440 (-18.8%) | 模型预测: 58%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥84.60
+     盈亏: ¥-30,420 (-21.7%) | 模型预测: 36%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.12
+     盈亏: ¥-19,531 (-19.9%) | 模型预测: 57%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.66
+     盈亏: ¥-144,540 (-25.0%) | 模型预测: 36%
+     ⚠️ 观望: 浮亏-25%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.96 | 支撑- | 阻力-
+     当前盈利13.8%，不建议做T
+  ❌ 保利发展: 现价¥5.69 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥84.60 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.12 | 支撑- | 阻力-
+     今日数据不足
+  🔵 港股通互联网ETF: 现价¥0.66 | 支撑¥0.63 | 阻力¥0.66
+     上涨接近阻力位¥0.66，可卖出217800股锁定利润
+     💵 建议卖出: ¥0.65 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥128.30
+  👀 腾讯控股: ¥458.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-02 - 浮亏¥-205,316
+✓ 结果已保存
+2026-06-02 10:30:04 - 监控完成
+2026-06-02 11:30:02 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-02 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.44
+  保利发展(600048.SH)... done 5.59
+  美团-W(3690.HK)... done 83.75
+  爱尔眼科(300015.SZ)... done 9.06
+  港股通互联网ETF(159792.SZ)... done 0.65
+  阿里巴巴-W(9988.HK)... done 128.20
+  腾讯控股(0700.HK)... done 463.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥834,425
+  浮动盈亏: ¥-210,536 (-20.1%)
+  可用现金: ¥150,000
+  总资产: ¥984,425
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.44
+     盈亏: ¥15,836 (16.0%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.59
+     盈亏: ¥-26,300 (-20.2%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥83.75
+     盈亏: ¥-31,525 (-22.5%) | 模型预测: 42%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.06
+     盈亏: ¥-20,047 (-20.5%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.65
+     盈亏: ¥-148,500 (-25.7%) | 模型预测: 42%
+     ⚠️ 观望: 浮亏-26%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.44 | 支撑- | 阻力-
+     当前盈利16.0%，不建议做T
+  🟢 保利发展: 现价¥5.59 | 支撑¥5.58 | 阻力¥5.81
+     下跌接近支撑位¥5.58，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.61 × 6100股
+     💵 建议卖出: ¥5.67 × 6100股
+  ⚠️ 美团-W: 现价¥83.75 | 支撑¥78.21 | 阻力¥85.15
+     当前位置不适合做T，等待更好机会（支撑¥78.21，阻力¥85.15）
+  ❌ 爱尔眼科: 现价¥9.06 | 支撑- | 阻力-
+     日内波动仅1.4%，波动太小不适合做T
+  ⚠️ 港股通互联网ETF: 现价¥0.65 | 支撑¥0.63 | 阻力¥0.66
+     当前位置不适合做T，等待更好机会（支撑¥0.63，阻力¥0.66）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥128.20
+  👀 腾讯控股: ¥463.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-02 - 浮亏¥-210,536
+✓ 结果已保存
+2026-06-02 11:30:05 - 监控完成
+2026-06-02 13:00:02 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-02 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.01
+  保利发展(600048.SH)... done 5.59
+  美团-W(3690.HK)... done 84.30
+  爱尔眼科(300015.SZ)... done 9.06
+  港股通互联网ETF(159792.SZ)... done 0.65
+  阿里巴巴-W(9988.HK)... done 129.30
+  腾讯控股(0700.HK)... done 469.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥835,155
+  浮动盈亏: ¥-209,806 (-20.1%)
+  可用现金: ¥150,000
+  总资产: ¥985,155
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.01
+     盈亏: ¥15,191 (15.4%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.59
+     盈亏: ¥-26,300 (-20.2%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥84.30
+     盈亏: ¥-30,810 (-21.9%) | 模型预测: 40%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.06
+     盈亏: ¥-20,047 (-20.5%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.65
+     盈亏: ¥-147,840 (-25.6%) | 模型预测: 38%
+     ⚠️ 观望: 浮亏-26%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.01 | 支撑- | 阻力-
+     当前盈利15.4%，不建议做T
+  🟢 保利发展: 现价¥5.59 | 支撑¥5.58 | 阻力¥5.81
+     下跌接近支撑位¥5.58，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.61 × 6100股
+     💵 建议卖出: ¥5.67 × 6100股
+  ⚠️ 美团-W: 现价¥84.30 | 支撑¥78.21 | 阻力¥85.15
+     当前位置不适合做T，等待更好机会（支撑¥78.21，阻力¥85.15）
+  ❌ 爱尔眼科: 现价¥9.06 | 支撑- | 阻力-
+     日内波动仅1.4%，波动太小不适合做T
+  ⚠️ 港股通互联网ETF: 现价¥0.65 | 支撑¥0.63 | 阻力¥0.66
+     当前位置不适合做T，等待更好机会（支撑¥0.63，阻力¥0.66）
+
+【关注股票】
+  👀 阿里巴巴-W: ¥129.30
+  👀 腾讯控股: ¥469.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-02 - 浮亏¥-209,806
+✓ 结果已保存
+2026-06-02 13:00:05 - 监控完成
+2026-06-02 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-02 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.02
+  保利发展(600048.SH)... done 5.60
+  美团-W(3690.HK)... done 84.85
+  爱尔眼科(300015.SZ)... done 9.10
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 129.90
+  腾讯控股(0700.HK)... done 474.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥841,035
+  浮动盈亏: ¥-203,926 (-19.5%)
+  可用现金: ¥150,000
+  总资产: ¥991,035
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.02
+     盈亏: ¥15,206 (15.4%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.60
+     盈亏: ¥-26,114 (-20.0%) | 模型预测: 42%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥84.85
+     盈亏: ¥-30,095 (-21.4%) | 模型预测: 35%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.10
+     盈亏: ¥-19,703 (-20.1%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.66
+     盈亏: ¥-143,220 (-24.8%) | 模型预测: 40%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.02 | 支撑- | 阻力-
+     当前盈利15.4%，不建议做T
+  🟢 保利发展: 现价¥5.60 | 支撑¥5.58 | 阻力¥5.81
+     下跌接近支撑位¥5.58，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.61 × 6100股
+     💵 建议卖出: ¥5.68 × 6100股
+  🔵 美团-W: 现价¥84.85 | 支撑¥78.21 | 阻力¥85.15
+     上涨接近阻力位¥85.15，可卖出400股锁定利润
+     💵 建议卖出: ¥84.72 × 400股
+  ❌ 爱尔眼科: 现价¥9.10 | 支撑- | 阻力-
+     日内波动仅1.4%，波动太小不适合做T
+  🔵 港股通互联网ETF: 现价¥0.66 | 支撑¥0.63 | 阻力¥0.66
+     上涨接近阻力位¥0.66，可卖出217800股锁定利润
+     💵 建议卖出: ¥0.66 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥129.90
+  👀 腾讯控股: ¥474.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-02 - 浮亏¥-203,926
+✓ 结果已保存
+2026-06-02 13:30:05 - 监控完成
+2026-06-02 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-02 14:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 76.72
+  保利发展(600048.SH)... done 5.59
+  美团-W(3690.HK)... done 84.85
+  爱尔眼科(300015.SZ)... done 9.08
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 129.70
+  腾讯控股(0700.HK)... done 473.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥840,407
+  浮动盈亏: ¥-204,554 (-19.6%)
+  可用现金: ¥150,000
+  总资产: ¥990,407
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.72
+     盈亏: ¥16,256 (16.4%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.59
+     盈亏: ¥-26,300 (-20.2%) | 模型预测: 41%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥84.85
+     盈亏: ¥-30,095 (-21.4%) | 模型预测: 36%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.08
+     盈亏: ¥-19,875 (-20.3%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.66
+     盈亏: ¥-144,540 (-25.0%) | 模型预测: 37%
+     ⚠️ 观望: 浮亏-25%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.72 | 支撑- | 阻力-
+     当前盈利16.4%，不建议做T
+  🟢 保利发展: 现价¥5.59 | 支撑¥5.57 | 阻力¥5.81
+     下跌接近支撑位¥5.57，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.60 × 6100股
+     💵 建议卖出: ¥5.67 × 6100股
+  🔵 美团-W: 现价¥84.85 | 支撑¥78.21 | 阻力¥85.15
+     上涨接近阻力位¥85.15，可卖出400股锁定利润
+     💵 建议卖出: ¥84.72 × 400股
+  ❌ 爱尔眼科: 现价¥9.08 | 支撑- | 阻力-
+     日内波动仅1.4%，波动太小不适合做T
+  🔵 港股通互联网ETF: 现价¥0.66 | 支撑¥0.63 | 阻力¥0.66
+     上涨接近阻力位¥0.66，可卖出217800股锁定利润
+     💵 建议卖出: ¥0.66 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥129.70
+  👀 腾讯控股: ¥473.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-02 - 浮亏¥-204,554
+✓ 结果已保存
+2026-06-02 14:00:04 - 监控完成
+2026-06-02 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-02 14:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.93
+  保利发展(600048.SH)... done 5.58
+  美团-W(3690.HK)... done 85.10
+  爱尔眼科(300015.SZ)... done 9.08
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 129.60
+  腾讯控股(0700.HK)... done 475.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥842,181
+  浮动盈亏: ¥-202,780 (-19.4%)
+  可用现金: ¥150,000
+  总资产: ¥992,181
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.93
+     盈亏: ¥16,571 (16.8%) | 模型预测: 43%
+     🔴 减仓: 浮盈17%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.58
+     盈亏: ¥-26,486 (-20.3%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥85.10
+     盈亏: ¥-29,770 (-21.2%) | 模型预测: 35%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.08
+     盈亏: ¥-19,875 (-20.3%) | 模型预测: 57%
+     🟢 补仓: 浮亏-20%，模型看涨57%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.66
+     盈亏: ¥-143,220 (-24.8%) | 模型预测: 35%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.93 | 支撑- | 阻力-
+     当前盈利16.8%，不建议做T
+  🟢 保利发展: 现价¥5.58 | 支撑¥5.56 | 阻力¥5.81
+     下跌接近支撑位¥5.56，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.59 × 6100股
+     💵 建议卖出: ¥5.66 × 6100股
+  🔵 美团-W: 现价¥85.10 | 支撑¥78.21 | 阻力¥85.15
+     上涨接近阻力位¥85.15，可卖出400股锁定利润
+     💵 建议卖出: ¥84.72 × 400股
+  ❌ 爱尔眼科: 现价¥9.08 | 支撑- | 阻力-
+     日内波动仅1.5%，波动太小不适合做T
+  🔵 港股通互联网ETF: 现价¥0.66 | 支撑¥0.63 | 阻力¥0.66
+     上涨接近阻力位¥0.66，可卖出217800股锁定利润
+     💵 建议卖出: ¥0.66 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥129.60
+  👀 腾讯控股: ¥475.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-02 - 浮亏¥-202,780
+✓ 结果已保存
+2026-06-02 14:30:05 - 监控完成
+2026-06-03 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-03 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.42
+  保利发展(600048.SH)... done 5.58
+  美团-W(3690.HK)... done 85.50
+  爱尔眼科(300015.SZ)... done 9.05
+  港股通互联网ETF(159792.SZ)... done 0.66
+  阿里巴巴-W(9988.HK)... done 133.80
+  腾讯控股(0700.HK)... done 499.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥841,678
+  浮动盈亏: ¥-203,284 (-19.5%)
+  可用现金: ¥150,000
+  总资产: ¥991,678
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.42
+     盈亏: ¥15,806 (16.0%) | 模型预测: 39%
+     🔴 减仓: 浮盈16%，模型看跌，可考虑减仓
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.58
+     盈亏: ¥-26,486 (-20.3%) | 模型预测: 67%
+     🟢 补仓: 浮亏-20%，模型看涨67%，建议补仓5500股
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥85.50
+     盈亏: ¥-29,250 (-20.8%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥9.05
+     盈亏: ¥-20,133 (-20.6%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.66
+     盈亏: ¥-143,220 (-24.8%) | 模型预测: 35%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.42 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.58 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥85.50 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥9.05 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.66 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥133.80
+  👀 腾讯控股: ¥499.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-03 - 浮亏¥-203,284
+✓ 结果已保存
+2026-06-03 09:30:05 - 监控完成
+2026-06-03 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-03 10:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.24
+  保利发展(600048.SH)... done 5.49
+  美团-W(3690.HK)... done 81.00
+  爱尔眼科(300015.SZ)... done 8.90
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 126.90
+  腾讯控股(0700.HK)... done 465.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥820,054
+  浮动盈亏: ¥-224,908 (-21.5%)
+  可用现金: ¥150,000
+  总资产: ¥970,054
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.24
+     盈亏: ¥15,535 (15.7%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.49
+     盈亏: ¥-28,160 (-21.6%) | 模型预测: 66%
+     🟢 补仓: 浮亏-22%，模型看涨66%，建议补仓5500股
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥81.00
+     盈亏: ¥-35,100 (-25.0%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.90
+     盈亏: ¥-21,423 (-21.9%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.64
+     盈亏: ¥-155,760 (-27.0%) | 模型预测: 37%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.24 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.49 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥81.00 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥8.90 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.64 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥126.90
+  👀 腾讯控股: ¥465.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-03 - 浮亏¥-224,908
+✓ 结果已保存
+2026-06-03 10:30:05 - 监控完成
+2026-06-03 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-03 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.66
+  保利发展(600048.SH)... done 5.45
+  美团-W(3690.HK)... done 80.20
+  爱尔眼科(300015.SZ)... done 8.89
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 126.70
+  腾讯控股(0700.HK)... done 463.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥815,514
+  浮动盈亏: ¥-229,448 (-22.0%)
+  可用现金: ¥150,000
+  总资产: ¥965,514
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.66
+     盈亏: ¥16,166 (16.4%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.45
+     盈亏: ¥-28,904 (-22.2%) | 模型预测: 61%
+     🟢 补仓: 浮亏-22%，模型看涨61%，建议补仓5500股
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥80.20
+     盈亏: ¥-36,140 (-25.7%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.89
+     盈亏: ¥-21,509 (-22.0%) | 模型预测: 55%
+     🟢 补仓: 浮亏-22%，模型看涨55%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-159,060 (-27.5%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.66 | 支撑- | 阻力-
+     当前盈利16.4%，不建议做T
+  🟢 保利发展: 现价¥5.45 | 支撑¥5.44 | 阻力¥5.61
+     下跌接近支撑位¥5.44，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.47 × 6100股
+     💵 建议卖出: ¥5.53 × 6100股
+  🟢 美团-W: 现价¥80.20 | 支撑¥79.25 | 阻力¥85.75
+     下跌接近支撑位¥79.25，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥79.65 × 400股
+     💵 建议卖出: ¥81.40 × 400股
+  🟢 爱尔眼科: 现价¥8.89 | 支撑¥8.86 | 阻力¥9.10
+     震荡走势，支撑¥8.86买入，阻力¥9.10卖出，预期利润1.6%
+     💰 建议买入: ¥8.90 × 2800股
+     💵 建议卖出: ¥9.05 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.63 | 支撑¥0.63 | 阻力¥0.66
+     下跌接近支撑位¥0.63，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.63 × 217800股
+     💵 建议卖出: ¥0.64 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥126.70
+  👀 腾讯控股: ¥463.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-03 - 浮亏¥-229,448
+✓ 结果已保存
+2026-06-03 11:30:05 - 监控完成
+2026-06-03 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-03 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 77.59
+  保利发展(600048.SH)... done 5.45
+  美团-W(3690.HK)... done 80.30
+  爱尔眼科(300015.SZ)... done 8.88
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 127.00
+  腾讯控股(0700.HK)... done 462.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥816,953
+  浮动盈亏: ¥-228,008 (-21.8%)
+  可用现金: ¥150,000
+  总资产: ¥966,953
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.59
+     盈亏: ¥17,561 (17.8%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.45
+     盈亏: ¥-28,904 (-22.2%) | 模型预测: 61%
+     🟢 补仓: 浮亏-22%，模型看涨61%，建议补仓5500股
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥80.30
+     盈亏: ¥-36,010 (-25.6%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.88
+     盈亏: ¥-21,595 (-22.0%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-159,060 (-27.5%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.59 | 支撑- | 阻力-
+     当前盈利17.8%，不建议做T
+  🟢 保利发展: 现价¥5.45 | 支撑¥5.44 | 阻力¥5.61
+     下跌接近支撑位¥5.44，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.47 × 6100股
+     💵 建议卖出: ¥5.53 × 6100股
+  🟢 美团-W: 现价¥80.30 | 支撑¥79.25 | 阻力¥85.75
+     下跌接近支撑位¥79.25，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥79.65 × 400股
+     💵 建议卖出: ¥81.50 × 400股
+  🟢 爱尔眼科: 现价¥8.88 | 支撑¥8.86 | 阻力¥9.10
+     震荡走势，支撑¥8.86买入，阻力¥9.10卖出，预期利润1.6%
+     💰 建议买入: ¥8.90 × 2800股
+     💵 建议卖出: ¥9.05 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.63 | 支撑¥0.63 | 阻力¥0.66
+     下跌接近支撑位¥0.63，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.63 × 217800股
+     💵 建议卖出: ¥0.64 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.00
+  👀 腾讯控股: ¥462.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-03 - 浮亏¥-228,008
+✓ 结果已保存
+2026-06-03 13:00:05 - 监控完成
+2026-06-03 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-03 13:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 77.58
+  保利发展(600048.SH)... done 5.48
+  美团-W(3690.HK)... done 80.55
+  爱尔眼科(300015.SZ)... done 8.87
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 128.10
+  腾讯控股(0700.HK)... done 465.60
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥818,395
+  浮动盈亏: ¥-226,566 (-21.7%)
+  可用现金: ¥150,000
+  总资产: ¥968,395
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥77.58
+     盈亏: ¥17,546 (17.8%) | 模型预测: 56%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.48
+     盈亏: ¥-28,346 (-21.8%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥80.55
+     盈亏: ¥-35,685 (-25.4%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.87
+     盈亏: ¥-21,681 (-22.1%) | 模型预测: 40%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.64
+     盈亏: ¥-158,400 (-27.4%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥77.58 | 支撑- | 阻力-
+     当前盈利17.8%，不建议做T
+  🟢 保利发展: 现价¥5.48 | 支撑¥5.43 | 阻力¥5.61
+     下跌接近支撑位¥5.43，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.46 × 6100股
+     💵 建议卖出: ¥5.56 × 6100股
+  ⚠️ 美团-W: 现价¥80.55 | 支撑¥79.25 | 阻力¥85.75
+     当前位置不适合做T，等待更好机会（支撑¥79.25，阻力¥85.75）
+  🟢 爱尔眼科: 现价¥8.87 | 支撑¥8.86 | 阻力¥9.10
+     震荡走势，支撑¥8.86买入，阻力¥9.10卖出，预期利润1.6%
+     💰 建议买入: ¥8.90 × 2800股
+     💵 建议卖出: ¥9.05 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.64 | 支撑¥0.63 | 阻力¥0.66
+     下跌接近支撑位¥0.63，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.63 × 217800股
+     💵 建议卖出: ¥0.64 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥128.10
+  👀 腾讯控股: ¥465.60
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-03 - 浮亏¥-226,566
+✓ 结果已保存
+2026-06-03 13:30:04 - 监控完成
+2026-06-03 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-03 14:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.65
+  保利发展(600048.SH)... done 5.53
+  美团-W(3690.HK)... done 80.45
+  爱尔眼科(300015.SZ)... done 8.85
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 127.30
+  腾讯控股(0700.HK)... done 464.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥817,628
+  浮动盈亏: ¥-227,334 (-21.8%)
+  可用现金: ¥150,000
+  总资产: ¥967,628
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.65
+     盈亏: ¥16,151 (16.3%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.53
+     盈亏: ¥-27,416 (-21.0%) | 模型预测: 57%
+     🟢 补仓: 浮亏-21%，模型看涨57%，建议补仓5500股
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥80.45
+     盈亏: ¥-35,815 (-25.5%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.85
+     盈亏: ¥-21,853 (-22.3%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.64
+     盈亏: ¥-158,400 (-27.4%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.65 | 支撑- | 阻力-
+     当前盈利16.3%，不建议做T
+  ⚠️ 保利发展: 现价¥5.53 | 支撑¥5.43 | 阻力¥5.61
+     当前位置不适合做T，等待更好机会（支撑¥5.43，阻力¥5.61）
+  🟢 美团-W: 现价¥80.45 | 支撑¥79.25 | 阻力¥85.75
+     下跌接近支撑位¥79.25，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥79.65 × 400股
+     💵 建议卖出: ¥81.66 × 400股
+  🟢 爱尔眼科: 现价¥8.85 | 支撑¥8.84 | 阻力¥9.10
+     震荡走势，支撑¥8.84买入，阻力¥9.10卖出，预期利润1.9%
+     💰 建议买入: ¥8.88 × 2800股
+     💵 建议卖出: ¥9.05 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.64 | 支撑¥0.63 | 阻力¥0.66
+     下跌接近支撑位¥0.63，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.63 × 217800股
+     💵 建议卖出: ¥0.64 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.30
+  👀 腾讯控股: ¥464.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-03 - 浮亏¥-227,334
+✓ 结果已保存
+2026-06-03 14:00:05 - 监控完成
+2026-06-03 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-03 14:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 76.34
+  保利发展(600048.SH)... done 5.51
+  美团-W(3690.HK)... done 80.15
+  爱尔眼科(300015.SZ)... done 8.83
+  港股通互联网ETF(159792.SZ)... done 0.64
+  阿里巴巴-W(9988.HK)... done 127.20
+  腾讯控股(0700.HK)... done 464.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥816,229
+  浮动盈亏: ¥-228,732 (-21.9%)
+  可用现金: ¥150,000
+  总资产: ¥966,229
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.34
+     盈亏: ¥15,686 (15.9%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.51
+     盈亏: ¥-27,788 (-21.3%) | 模型预测: 61%
+     🟢 补仓: 浮亏-21%，模型看涨61%，建议补仓5500股
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥80.15
+     盈亏: ¥-36,205 (-25.8%) | 模型预测: 56%
+     🟢 补仓: 浮亏-26%，模型看涨56%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.83
+     盈亏: ¥-22,025 (-22.5%) | 模型预测: 39%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.64
+     盈亏: ¥-158,400 (-27.4%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.34 | 支撑- | 阻力-
+     当前盈利15.9%，不建议做T
+  ⚠️ 保利发展: 现价¥5.51 | 支撑¥5.43 | 阻力¥5.61
+     当前位置不适合做T，等待更好机会（支撑¥5.43，阻力¥5.61）
+  🟢 美团-W: 现价¥80.15 | 支撑¥79.25 | 阻力¥85.75
+     下跌接近支撑位¥79.25，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥79.65 × 400股
+     💵 建议卖出: ¥81.35 × 400股
+  🟢 爱尔眼科: 现价¥8.83 | 支撑¥8.81 | 阻力¥9.10
+     震荡走势，支撑¥8.81买入，阻力¥9.10卖出，预期利润2.2%
+     💰 建议买入: ¥8.85 × 2800股
+     💵 建议卖出: ¥9.05 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.64 | 支撑¥0.63 | 阻力¥0.66
+     下跌接近支撑位¥0.63，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥0.63 × 217800股
+     💵 建议卖出: ¥0.64 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥127.20
+  👀 腾讯控股: ¥464.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-03 - 浮亏¥-228,732
+✓ 结果已保存
+2026-06-03 14:30:04 - 监控完成
+2026-06-04 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-04 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.66
+  保利发展(600048.SH)... done 5.48
+  美团-W(3690.HK)... done 78.35
+  爱尔眼科(300015.SZ)... done 8.78
+  港股通互联网ETF(159792.SZ)... done 0.63
+  阿里巴巴-W(9988.HK)... done 126.00
+  腾讯控股(0700.HK)... done 462.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥807,261
+  浮动盈亏: ¥-237,700 (-22.7%)
+  可用现金: ¥150,000
+  总资产: ¥957,261
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.66
+     盈亏: ¥14,666 (14.8%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.48
+     盈亏: ¥-28,346 (-21.8%) | 模型预测: 66%
+     🟢 补仓: 浮亏-22%，模型看涨66%，建议补仓5500股
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.35
+     盈亏: ¥-38,545 (-27.5%) | 模型预测: 45%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.78
+     盈亏: ¥-22,455 (-22.9%) | 模型预测: 54%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.63
+     盈亏: ¥-163,020 (-28.2%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.66 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.48 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥78.35 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥8.78 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.63 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥126.00
+  👀 腾讯控股: ¥462.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-04 - 浮亏¥-237,700
+✓ 结果已保存
+2026-06-04 09:30:05 - 监控完成
+2026-06-04 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-04 10:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.60
+  保利发展(600048.SH)... done 5.45
+  美团-W(3690.HK)... done 78.75
+  爱尔眼科(300015.SZ)... done 8.53
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 124.10
+  腾讯控股(0700.HK)... done 455.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥801,023
+  浮动盈亏: ¥-243,938 (-23.3%)
+  可用现金: ¥150,000
+  总资产: ¥951,023
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.60
+     盈亏: ¥14,575 (14.7%) | 模型预测: 58%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.45
+     盈亏: ¥-28,904 (-22.2%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.75
+     盈亏: ¥-38,025 (-27.1%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.53
+     盈亏: ¥-24,605 (-25.1%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-166,980 (-28.9%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.60 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.45 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥78.75 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥8.53 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.62 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥124.10
+  👀 腾讯控股: ¥455.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-04 - 浮亏¥-243,938
+✓ 结果已保存
+2026-06-04 10:30:05 - 监控完成
+2026-06-04 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-04 11:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 76.54
+  保利发展(600048.SH)... done 5.42
+  美团-W(3690.HK)... done 78.15
+  爱尔眼科(300015.SZ)... done 8.54
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.40
+  腾讯控股(0700.HK)... done 455.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥800,521
+  浮动盈亏: ¥-244,440 (-23.4%)
+  可用现金: ¥150,000
+  总资产: ¥950,521
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.54
+     盈亏: ¥15,986 (16.2%) | 模型预测: 58%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.42
+     盈亏: ¥-29,462 (-22.6%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.15
+     盈亏: ¥-38,805 (-27.6%) | 模型预测: 59%
+     🟢 补仓: 浮亏-28%，模型看涨59%，建议补仓300股
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.54
+     盈亏: ¥-24,519 (-25.0%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-167,640 (-29.0%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.54 | 支撑- | 阻力-
+     当前盈利16.2%，不建议做T
+  🟢 保利发展: 现价¥5.42 | 支撑¥5.40 | 阻力¥5.55
+     下跌接近支撑位¥5.40，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.43 × 6100股
+     💵 建议卖出: ¥5.50 × 6100股
+  🟢 美团-W: 现价¥78.15 | 支撑¥77.61 | 阻力¥80.40
+     震荡走势，支撑¥77.61买入，阻力¥80.40卖出，预期利润2.6%
+     💰 建议买入: ¥78.00 × 400股
+     💵 建议卖出: ¥80.00 × 400股
+  🟢 爱尔眼科: 现价¥8.54 | 支撑¥8.51 | 阻力¥8.82
+     震荡走势，支撑¥8.51买入，阻力¥8.82卖出，预期利润2.7%
+     💰 建议买入: ¥8.55 × 2800股
+     💵 建议卖出: ¥8.78 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     震荡走势，支撑¥0.62买入，阻力¥0.64卖出，预期利润2.1%
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.40
+  👀 腾讯控股: ¥455.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-04 - 浮亏¥-244,440
+✓ 结果已保存
+2026-06-04 11:30:04 - 监控完成
+2026-06-04 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-04 13:00:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.07
+  保利发展(600048.SH)... done 5.42
+  美团-W(3690.HK)... done 78.55
+  爱尔眼科(300015.SZ)... done 8.54
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.50
+  腾讯控股(0700.HK)... done 457.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥798,836
+  浮动盈亏: ¥-246,126 (-23.6%)
+  可用现金: ¥150,000
+  总资产: ¥948,836
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.07
+     盈亏: ¥13,780 (13.9%) | 模型预测: 58%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.42
+     盈亏: ¥-29,462 (-22.6%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.55
+     盈亏: ¥-38,285 (-27.3%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.54
+     盈亏: ¥-24,519 (-25.0%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-167,640 (-29.0%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.07 | 支撑- | 阻力-
+     当前盈利13.9%，不建议做T
+  🟢 保利发展: 现价¥5.42 | 支撑¥5.40 | 阻力¥5.55
+     下跌接近支撑位¥5.40，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.43 × 6100股
+     💵 建议卖出: ¥5.50 × 6100股
+  ⚠️ 美团-W: 现价¥78.55 | 支撑¥77.61 | 阻力¥80.40
+     当前位置不适合做T，等待更好机会（支撑¥77.61，阻力¥80.40）
+  🟢 爱尔眼科: 现价¥8.54 | 支撑¥8.51 | 阻力¥8.82
+     震荡走势，支撑¥8.51买入，阻力¥8.82卖出，预期利润2.7%
+     💰 建议买入: ¥8.55 × 2800股
+     💵 建议卖出: ¥8.78 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     震荡走势，支撑¥0.62买入，阻力¥0.64卖出，预期利润2.1%
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.50
+  👀 腾讯控股: ¥457.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-04 - 浮亏¥-246,126
+✓ 结果已保存
+2026-06-04 13:00:05 - 监控完成
+2026-06-04 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-04 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 75.07
+  保利发展(600048.SH)... done 5.38
+  美团-W(3690.HK)... done 78.30
+  爱尔眼科(300015.SZ)... done 8.53
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.40
+  腾讯控股(0700.HK)... done 458.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥799,001
+  浮动盈亏: ¥-245,960 (-23.5%)
+  可用现金: ¥150,000
+  总资产: ¥949,001
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥75.07
+     盈亏: ¥13,780 (13.9%) | 模型预测: 57%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.38
+     盈亏: ¥-30,206 (-23.2%) | 模型预测: 39%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.30
+     盈亏: ¥-38,610 (-27.5%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.53
+     盈亏: ¥-24,605 (-25.1%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-166,320 (-28.8%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥75.07 | 支撑- | 阻力-
+     当前盈利13.9%，不建议做T
+  🟢 保利发展: 现价¥5.38 | 支撑¥5.37 | 阻力¥5.55
+     下跌接近支撑位¥5.37，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.40 × 6100股
+     💵 建议卖出: ¥5.46 × 6100股
+  ⚠️ 美团-W: 现价¥78.30 | 支撑¥77.51 | 阻力¥80.40
+     当前位置不适合做T，等待更好机会（支撑¥77.51，阻力¥80.40）
+  🟢 爱尔眼科: 现价¥8.53 | 支撑¥8.51 | 阻力¥8.82
+     震荡走势，支撑¥8.51买入，阻力¥8.82卖出，预期利润2.7%
+     💰 建议买入: ¥8.55 × 2800股
+     💵 建议卖出: ¥8.78 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     震荡走势，支撑¥0.62买入，阻力¥0.64卖出，预期利润2.1%
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.40
+  👀 腾讯控股: ¥458.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-04 - 浮亏¥-245,960
+✓ 结果已保存
+2026-06-04 13:30:05 - 监控完成
+2026-06-04 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-04 14:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 74.35
+  保利发展(600048.SH)... done 5.35
+  美团-W(3690.HK)... done 78.65
+  爱尔眼科(300015.SZ)... done 8.51
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.40
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥795,666
+  浮动盈亏: ¥-249,296 (-23.9%)
+  可用现金: ¥150,000
+  总资产: ¥945,666
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.35
+     盈亏: ¥12,700 (12.9%) | 模型预测: 51%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.35
+     盈亏: ¥-30,764 (-23.6%) | 模型预测: 39%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.65
+     盈亏: ¥-38,155 (-27.2%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.51
+     盈亏: ¥-24,777 (-25.3%) | 模型预测: 57%
+     🟢 补仓: 浮亏-25%，模型看涨57%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-168,300 (-29.1%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.35 | 支撑- | 阻力-
+     当前盈利12.9%，不建议做T
+  🟢 保利发展: 现价¥5.35 | 支撑¥5.31 | 阻力¥5.55
+     下跌接近支撑位¥5.31，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.34 × 6100股
+     💵 建议卖出: ¥5.43 × 6100股
+  ⚠️ 美团-W: 现价¥78.65 | 支撑¥77.51 | 阻力¥80.40
+     当前位置不适合做T，等待更好机会（支撑¥77.51，阻力¥80.40）
+  🟢 爱尔眼科: 现价¥8.51 | 支撑¥8.50 | 阻力¥8.82
+     下跌接近支撑位¥8.50，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥8.54 × 2800股
+     💵 建议卖出: ¥8.64 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     震荡走势，支撑¥0.62买入，阻力¥0.64卖出，预期利润2.1%
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.40
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-04 - 浮亏¥-249,296
+✓ 结果已保存
+2026-06-04 14:00:04 - 监控完成
+2026-06-04 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-04 14:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 74.73
+  保利发展(600048.SH)... done 5.35
+  美团-W(3690.HK)... done 78.35
+  爱尔眼科(300015.SZ)... done 8.47
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.00
+  腾讯控股(0700.HK)... done 456.60
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥796,162
+  浮动盈亏: ¥-248,800 (-23.8%)
+  可用现金: ¥150,000
+  总资产: ¥946,162
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.73
+     盈亏: ¥13,271 (13.4%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.35
+     盈亏: ¥-30,764 (-23.6%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.35
+     盈亏: ¥-38,545 (-27.5%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.47
+     盈亏: ¥-25,121 (-25.6%) | 模型预测: 56%
+     🟢 补仓: 浮亏-26%，模型看涨56%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-167,640 (-29.0%) | 模型预测: 49%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.73 | 支撑- | 阻力-
+     当前盈利13.4%，不建议做T
+  🟢 保利发展: 现价¥5.35 | 支撑¥5.31 | 阻力¥5.55
+     下跌接近支撑位¥5.31，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.34 × 6100股
+     💵 建议卖出: ¥5.43 × 6100股
+  ⚠️ 美团-W: 现价¥78.35 | 支撑¥77.51 | 阻力¥80.40
+     当前位置不适合做T，等待更好机会（支撑¥77.51，阻力¥80.40）
+  🟢 爱尔眼科: 现价¥8.47 | 支撑¥8.43 | 阻力¥8.82
+     下跌接近支撑位¥8.43，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥8.47 × 2800股
+     💵 建议卖出: ¥8.60 × 2800股
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.62 | 阻力¥0.64
+     震荡走势，支撑¥0.62买入，阻力¥0.64卖出，预期利润2.3%
+     💰 建议买入: ¥0.62 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.00
+  👀 腾讯控股: ¥456.60
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-04 - 浮亏¥-248,800
+✓ 结果已保存
+2026-06-04 14:30:05 - 监控完成
+2026-06-05 09:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-05 09:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 74.23
+  保利发展(600048.SH)... done 5.40
+  美团-W(3690.HK)... done 80.10
+  爱尔眼科(300015.SZ)... done 8.60
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 126.00
+  腾讯控股(0700.HK)... done 464.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥801,055
+  浮动盈亏: ¥-243,906 (-23.3%)
+  可用现金: ¥150,000
+  总资产: ¥951,055
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.23
+     盈亏: ¥12,521 (12.7%) | 模型预测: 66%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.40
+     盈亏: ¥-29,834 (-22.9%) | 模型预测: 65%
+     🟢 补仓: 浮亏-23%，模型看涨65%，建议补仓5500股
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥80.10
+     盈亏: ¥-36,270 (-25.8%) | 模型预测: 40%
+     ⚠️ 观望: 浮亏-26%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.60
+     盈亏: ¥-24,003 (-24.5%) | 模型预测: 64%
+     🟢 补仓: 浮亏-25%，模型看涨64%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-166,320 (-28.8%) | 模型预测: 63%
+     🟢 补仓: 浮亏-29%，模型看涨63%，建议补仓198000股
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.23 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.40 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥80.10 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥8.60 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.62 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥126.00
+  👀 腾讯控股: ¥464.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-05 - 浮亏¥-243,906
+✓ 结果已保存
+2026-06-05 09:30:05 - 监控完成
+2026-06-05 10:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-05 10:30:02
+======================================================================
+  汇川技术(300124.SZ)... done 74.48
+  保利发展(600048.SH)... done 5.43
+  美团-W(3690.HK)... done 78.20
+  爱尔眼科(300015.SZ)... done 8.57
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 124.40
+  腾讯控股(0700.HK)... done 462.40
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥796,620
+  浮动盈亏: ¥-248,342 (-23.8%)
+  可用现金: ¥150,000
+  总资产: ¥946,620
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥74.48
+     盈亏: ¥12,896 (13.0%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.43
+     盈亏: ¥-29,276 (-22.5%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.20
+     盈亏: ¥-38,740 (-27.6%) | 模型预测: 37%
+     ⚠️ 观望: 浮亏-28%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.57
+     盈亏: ¥-24,261 (-24.8%) | 模型预测: 45%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-168,960 (-29.3%) | 模型预测: 50%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥74.48 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 保利发展: 现价¥5.43 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 美团-W: 现价¥78.20 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 爱尔眼科: 现价¥8.57 | 支撑- | 阻力-
+     今日数据不足
+  ❌ 港股通互联网ETF: 现价¥0.62 | 支撑- | 阻力-
+     今日数据不足
+
+【关注股票】
+  👀 阿里巴巴-W: ¥124.40
+  👀 腾讯控股: ¥462.40
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-05 - 浮亏¥-248,342
+✓ 结果已保存
+2026-06-05 10:30:04 - 监控完成
+2026-06-05 11:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-05 11:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 72.94
+  保利发展(600048.SH)... done 5.43
+  美团-W(3690.HK)... done 78.35
+  爱尔眼科(300015.SZ)... done 8.61
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.10
+  腾讯控股(0700.HK)... done 458.20
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥794,849
+  浮动盈亏: ¥-250,112 (-23.9%)
+  可用现金: ¥150,000
+  总资产: ¥944,849
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥72.94
+     盈亏: ¥10,586 (10.7%) | 模型预测: 59%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.43
+     盈亏: ¥-29,276 (-22.5%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.35
+     盈亏: ¥-38,545 (-27.5%) | 模型预测: 43%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.61
+     盈亏: ¥-23,917 (-24.4%) | 模型预测: 63%
+     🟢 补仓: 浮亏-24%，模型看涨63%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-168,960 (-29.3%) | 模型预测: 52%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥72.94 | 支撑- | 阻力-
+     当前盈利10.7%，不建议做T
+  🟢 保利发展: 现价¥5.43 | 支撑¥5.39 | 阻力¥5.54
+     震荡走势，支撑¥5.39买入，阻力¥5.54卖出，预期利润1.7%
+     💰 建议买入: ¥5.42 × 6100股
+     💵 建议卖出: ¥5.51 × 6100股
+  🟢 美团-W: 现价¥78.35 | 支撑¥77.31 | 阻力¥80.50
+     下跌接近支撑位¥77.31，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥77.70 × 400股
+     💵 建议卖出: ¥79.53 × 400股
+  ❌ 爱尔眼科: 现价¥8.61 | 支撑- | 阻力-
+     日内波动仅1.8%，波动太小不适合做T
+  ❌ 港股通互联网ETF: 现价¥0.62 | 支撑- | 阻力-
+     日内波动仅1.8%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.10
+  👀 腾讯控股: ¥458.20
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-05 - 浮亏¥-250,112
+✓ 结果已保存
+2026-06-05 11:30:05 - 监控完成
+2026-06-05 13:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-05 13:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 73.86
+  保利发展(600048.SH)... done 5.42
+  美团-W(3690.HK)... done 78.90
+  爱尔眼科(300015.SZ)... done 8.61
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.40
+  腾讯控股(0700.HK)... done 458.80
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥798,078
+  浮动盈亏: ¥-246,884 (-23.6%)
+  可用现金: ¥150,000
+  总资产: ¥948,078
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥73.86
+     盈亏: ¥11,966 (12.1%) | 模型预测: 59%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.42
+     盈亏: ¥-29,462 (-22.6%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.90
+     盈亏: ¥-37,830 (-26.9%) | 模型预测: 37%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.61
+     盈亏: ¥-23,917 (-24.4%) | 模型预测: 63%
+     🟢 补仓: 浮亏-24%，模型看涨63%，建议补仓2500股
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-167,640 (-29.0%) | 模型预测: 44%
+     ⚠️ 观望: 浮亏-29%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥73.86 | 支撑- | 阻力-
+     当前盈利12.1%，不建议做T
+  🟢 保利发展: 现价¥5.42 | 支撑¥5.39 | 阻力¥5.54
+     震荡走势，支撑¥5.39买入，阻力¥5.54卖出，预期利润1.7%
+     💰 建议买入: ¥5.42 × 6100股
+     💵 建议卖出: ¥5.51 × 6100股
+  ⚠️ 美团-W: 现价¥78.90 | 支撑¥77.31 | 阻力¥80.50
+     当前位置不适合做T，等待更好机会（支撑¥77.31，阻力¥80.50）
+  ❌ 爱尔眼科: 现价¥8.61 | 支撑- | 阻力-
+     日内波动仅1.8%，波动太小不适合做T
+  ❌ 港股通互联网ETF: 现价¥0.62 | 支撑- | 阻力-
+     日内波动仅1.8%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.40
+  👀 腾讯控股: ¥458.80
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-05 - 浮亏¥-246,884
+✓ 结果已保存
+2026-06-05 13:00:04 - 监控完成
+2026-06-05 13:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-05 13:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 73.86
+  保利发展(600048.SH)... done 5.40
+  美团-W(3690.HK)... done 79.35
+  爱尔眼科(300015.SZ)... done 8.60
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.00
+  腾讯控股(0700.HK)... done 456.60
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥797,545
+  浮动盈亏: ¥-247,416 (-23.7%)
+  可用现金: ¥150,000
+  总资产: ¥947,545
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥73.86
+     盈亏: ¥11,966 (12.1%) | 模型预测: 47%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.40
+     盈亏: ¥-29,834 (-22.9%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥79.35
+     盈亏: ¥-37,245 (-26.5%) | 模型预测: 40%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.60
+     盈亏: ¥-24,003 (-24.5%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-168,300 (-29.1%) | 模型预测: 48%
+     ⚪ 持有: 持有观望，等待机会
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥73.86 | 支撑- | 阻力-
+     当前盈利12.1%，不建议做T
+  🟢 保利发展: 现价¥5.40 | 支撑¥5.39 | 阻力¥5.54
+     下跌接近支撑位¥5.39，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.42 × 6100股
+     💵 建议卖出: ¥5.48 × 6100股
+  ⚠️ 美团-W: 现价¥79.35 | 支撑¥77.31 | 阻力¥80.50
+     当前位置不适合做T，等待更好机会（支撑¥77.31，阻力¥80.50）
+  ❌ 爱尔眼科: 现价¥8.60 | 支撑- | 阻力-
+     日内波动仅1.8%，波动太小不适合做T
+  ❌ 港股通互联网ETF: 现价¥0.62 | 支撑- | 阻力-
+     日内波动仅1.8%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.00
+  👀 腾讯控股: ¥456.60
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-05 - 浮亏¥-247,416
+✓ 结果已保存
+2026-06-05 13:30:05 - 监控完成
+2026-06-05 14:00:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-05 14:00:02
+======================================================================
+  汇川技术(300124.SZ)... done 76.20
+  保利发展(600048.SH)... done 5.38
+  美团-W(3690.HK)... done 79.30
+  爱尔眼科(300015.SZ)... done 8.56
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 123.00
+  腾讯控股(0700.HK)... done 455.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥798,954
+  浮动盈亏: ¥-246,008 (-23.5%)
+  可用现金: ¥150,000
+  总资产: ¥948,954
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.20
+     盈亏: ¥15,476 (15.7%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.38
+     盈亏: ¥-30,206 (-23.2%) | 模型预测: 41%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥79.30
+     盈亏: ¥-37,310 (-26.6%) | 模型预测: 43%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.56
+     盈亏: ¥-24,347 (-24.9%) | 模型预测: 53%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-169,620 (-29.4%) | 模型预测: 43%
+     ⚠️ 观望: 浮亏-29%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.20 | 支撑- | 阻力-
+     当前盈利15.7%，不建议做T
+  🟢 保利发展: 现价¥5.38 | 支撑¥5.38 | 阻力¥5.54
+     下跌接近支撑位¥5.38，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.41 × 6100股
+     💵 建议卖出: ¥5.46 × 6100股
+  ⚠️ 美团-W: 现价¥79.30 | 支撑¥77.31 | 阻力¥80.50
+     当前位置不适合做T，等待更好机会（支撑¥77.31，阻力¥80.50）
+  ❌ 爱尔眼科: 现价¥8.56 | 支撑- | 阻力-
+     日内波动仅1.8%，波动太小不适合做T
+  ❌ 港股通互联网ETF: 现价¥0.62 | 支撑- | 阻力-
+     日内波动仅1.9%，波动太小不适合做T
+
+【关注股票】
+  👀 阿里巴巴-W: ¥123.00
+  👀 腾讯控股: ¥455.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-05 - 浮亏¥-246,008
+✓ 结果已保存
+2026-06-05 14:00:04 - 监控完成
+2026-06-05 14:30:01 - 开始监控
+✓ 加载v3集成模型 (3个子模型)
+
+======================================================================
+交易监控 - 2026-06-05 14:30:03
+======================================================================
+  汇川技术(300124.SZ)... done 76.01
+  保利发展(600048.SH)... done 5.37
+  美团-W(3690.HK)... done 78.85
+  爱尔眼科(300015.SZ)... done 8.53
+  港股通互联网ETF(159792.SZ)... done 0.62
+  阿里巴巴-W(9988.HK)... done 122.20
+  腾讯控股(0700.HK)... done 453.00
+
+【账户汇总】
+  投入本金: ¥1,044,962
+  持仓市值: ¥796,320
+  浮动盈亏: ¥-248,642 (-23.8%)
+  可用现金: ¥150,000
+  总资产: ¥946,320
+
+【持仓分析】
+  ✅ 汇川技术: 1500股 @ ¥65.88 → ¥76.01
+     盈亏: ¥15,191 (15.4%) | 模型预测: 55%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 保利发展: 18600股 @ ¥7.00 → ¥5.37
+     盈亏: ¥-30,392 (-23.3%) | 模型预测: 38%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 美团-W: 1300股 @ ¥108.00 → ¥78.85
+     盈亏: ¥-37,895 (-27.0%) | 模型预测: 44%
+     ⚠️ 观望: 浮亏-27%，但模型看跌，暂不补仓
+  ❌ 爱尔眼科: 8600股 @ ¥11.39 → ¥8.53
+     盈亏: ¥-24,605 (-25.1%) | 模型预测: 46%
+     ⚪ 持有: 持有观望，等待机会
+  ❌ 港股通互联网ETF: 660000股 @ ¥0.88 → ¥0.62
+     盈亏: ¥-170,940 (-29.6%) | 模型预测: 40%
+     ⚠️ 观望: 浮亏-30%，但模型看跌，暂不补仓
+
+【做T操作建议】
+  ❌ 汇川技术: 现价¥76.01 | 支撑- | 阻力-
+     当前盈利15.4%，不建议做T
+  🟢 保利发展: 现价¥5.37 | 支撑¥5.36 | 阻力¥5.54
+     下跌接近支撑位¥5.36，可在此处买入，反弹1.5%后卖出
+     💰 建议买入: ¥5.39 × 6100股
+     💵 建议卖出: ¥5.45 × 6100股
+  ⚠️ 美团-W: 现价¥78.85 | 支撑¥77.31 | 阻力¥80.50
+     当前位置不适合做T，等待更好机会（支撑¥77.31，阻力¥80.50）
+  ❌ 爱尔眼科: 现价¥8.53 | 支撑- | 阻力-
+     日内波动仅1.9%，波动太小不适合做T
+  🟢 港股通互联网ETF: 现价¥0.62 | 支撑¥0.61 | 阻力¥0.63
+     震荡走势，支撑¥0.61买入，阻力¥0.63卖出，预期利润2.3%
+     💰 建议买入: ¥0.61 × 217800股
+     💵 建议卖出: ¥0.63 × 217800股
+
+【关注股票】
+  👀 阿里巴巴-W: ¥122.20
+  👀 腾讯控股: ¥453.00
+  发送邮件... (尝试 1/3)
+✓ 邮件已发送：【持仓日报】06-05 - 浮亏¥-248,642
+✓ 结果已保存
+2026-06-05 14:30:05 - 监控完成

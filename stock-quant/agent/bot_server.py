@@ -26,6 +26,7 @@ from data_fetcher import (
     get_money_flow, get_stock_deep_data, get_north_flow,
 )
 from technical_indicators import get_technical_analysis, get_smart_alerts
+from advanced_analysis import get_smart_t_strategy, get_portfolio_risk, search_stock_news, get_action_recommendations, get_valuation_judge
 from card_templates import (
     make_position_card, make_stock_card, make_signal_card,
     make_backtest_card, make_daily_summary_card, make_help_card,
@@ -33,6 +34,8 @@ from card_templates import (
     make_sector_card, make_compare_card,
     make_technical_card, make_alert_card_v2,
     make_money_flow_card, make_deep_data_card, make_compare_deep_card,
+    make_t_strategy_card, make_risk_card, make_recommend_card,
+    make_news_card, make_valuation_card,
 )
 from llm_client import is_available, chat_response
 
@@ -66,14 +69,10 @@ def process_message(text: str) -> dict:
                 return make_text_card(f"获取行情失败: {data['error']}")
             return make_stock_card(data)
         elif intent == 't_strategy':
-            t_data = get_t_suggestions()
+            t_data = get_smart_t_strategy()
             if not t_data:
-                return make_text_card("当前没有持仓,无法给出做T建议")
-            return make_signal_card([
-                {'stock_name': t['stock_name'], 'symbol': t['symbol'],
-                 'current_price': t['current_price'], 'signal': t.get('action', '观望'),
-                 'up_prob': 0, 'reason': t.get('reason', '')}
-                for t in t_data])
+                return make_text_card("当前没有持仓，无法给出做T建议")
+            return make_t_strategy_card(t_data)
         elif intent == 'signals':
             data = get_signals_data()
             if not data.get('signals'):
@@ -180,6 +179,28 @@ def process_message(text: str) -> dict:
             if 'error' in data:
                 return make_text_card(data['error'])
             return make_compare_card(data)
+        elif intent == 'risk':
+            data = get_portfolio_risk()
+            if 'error' in data:
+                return make_text_card(f"风控评分失败: {data['error']}")
+            return make_risk_card(data)
+        elif intent == 'recommend':
+            data = get_action_recommendations()
+            if 'error' in data:
+                return make_text_card(f"操作建议获取失败: {data['error']}")
+            return make_recommend_card(data)
+        elif intent == 'news':
+            keyword = params.get('keyword')
+            data = search_stock_news(keyword)
+            return make_news_card(data)
+        elif intent == 'valuation':
+            symbol = params.get('symbol')
+            if not symbol:
+                return make_text_card("请提供股票代码，如：`估值 茅台`")
+            data = get_valuation_judge(symbol)
+            if 'error' in data:
+                return make_text_card(f"估值分析失败: {data['error']}")
+            return make_valuation_card(data)
         elif intent == 'chat':
             if is_available():
                 context = {}
