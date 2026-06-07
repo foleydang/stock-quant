@@ -1,6 +1,10 @@
 #!/bin/bash
 # 股票量化系统启动脚本
 
+# 防止重复运行：用 flock 文件锁
+LOCK_DIR="/tmp/stock-quant-locks"
+mkdir -p "$LOCK_DIR"
+
 # 使用 miniconda Python
 PYTHON="/root/miniconda3/bin/python"
 # 用法: ./start.sh [command]
@@ -48,6 +52,12 @@ start_server() {
 
 # 运行交易监控
 run_monitor() {
+    LOCK_FILE="$LOCK_DIR/monitor.lock"
+    exec 200>$LOCK_FILE
+    if ! flock -n 200; then
+        echo "⚠️ monitor 正在运行，跳过本次"
+        return 0
+    fi
     echo "运行交易监控..."
     cd "$PYTHON_DIR"
     LOG_FILE="$LOG_DIR/monitor.log"
@@ -68,6 +78,12 @@ run_full() {
 
 # 更新数据
 run_update() {
+    LOCK_FILE="$LOCK_DIR/update.lock"
+    exec 201>$LOCK_FILE
+    if ! flock -n 201; then
+        echo "⚠️ update 正在运行，跳过本次"
+        return 0
+    fi
     echo "更新沪深300数据..."
     cd "$PYTHON_DIR"
     LOG_FILE="$LOG_DIR/hs300_update.log"
