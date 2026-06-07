@@ -223,10 +223,10 @@ def make_help_card():
     """帮助"""
     return {
         "config": {"wide_screen_mode": True},
-        "header": {"title": {"tag": "plain_text", "content": "📘 金融小助手使用指南"}, "template": "blue"},
+        "header": {"title": {"tag": "plain_text", "content": "📘 金融小助手"}, "template": "blue"},
         "elements": [
-            {"tag": "markdown", "content": "**🔍 查询类**\n- `持仓` → 查看持仓和做T建议\n- `行情 茅台` → 查看个股行情\n- `大盘` / `指数` → 大盘指数\n- `板块` → 热门板块\n- `对比 茅台 五粮液` → **深度对比（价格+PE+ROE）**\n\n**📊 分析类**\n- `指标 茅台` → 技术分析（均线/MACD/RSI/KDJ/布林带/支撑压力位）\n- `异动` → 智能异动检测（动态阈值+量价联合）\n- `深度 茅台` → **深度数据（PE/PB/ROE/营收增速）**\n- `资金 茅台` → **资金流向（主力净流入/大单/小单）**\n- `北向` → **北向资金十大成交股**\n- `回测 茅台` → LGBM回测\n- `总结` → 盘后总结\n\n**⚠️ 风控类**\n- `止损 茅台 1200` → 止损提醒\n\n**⚙️ 配置类**\n- `自选 阿里` → 添加自选股（自动持久化）\n- `帮助` → 显示此指南\n\n**💬 闲聊**\n- 直接发任何问题，AI回答"},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "LGBM + 百炼 | ⚠️ 不构成投资建议"}]}
+            {"tag": "markdown", "content": "**🔍 查询** 行情/大盘/板块/对比/北向\n\n**📊 分析** 指标/异动/深度/资金/估值\n\n**🔄 策略** 做T(具体买卖价)/建议(综合操作)/风控(评分)\n\n**📰 信息** 新闻/总结\n\n**⚙️ 配置** 自选(添加)/止损\n\n**💬 闲聊** 直接发问题，AI回答"},
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": "波动率+支撑压力+量比+风控评分 | ⚠️ 不构成投资建议"}]}
         ]
     }
 
@@ -599,3 +599,202 @@ def make_compare_deep_card(data: dict) -> dict:
     elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "价格+估值+盈利对比 | ⚠️ 仅供参考"}]})
     
     return {"config": {"wide_screen_mode": True}, "header": {"title": {"tag": "plain_text", "content": f"📊 深度对比 ({count}只)"}, "template": "blue"}, "elements": elements}
+
+
+
+
+def make_t_strategy_card(suggestions: list) -> dict:
+    """智能做T策略卡片 - 给出具体买卖价位"""
+    if not suggestions:
+        return make_text_card("暂无做T建议")
+    
+    lines = ""
+    for s in suggestions[:5]:
+        action = s.get('action', '观望')
+        action_emoji = {"适合做T": "🔄", "考虑止盈": "🎯", "持有观察": "✅", "观望": "⚪", "减仓": "🔻"}
+        emoji = action_emoji.get(action, "⚪")
+        
+        current = s.get('current_price', 0)
+        profit_pct = s.get('profit_pct', 0)
+        avg_range = s.get('avg_range', 0)
+        vol_ratio = s.get('vol_ratio', 0)
+        
+        profit_sign = "+" if profit_pct >= 0 else ""
+        profit_color = "red" if profit_pct > 0 else "green"
+        
+        lines += emoji + " **" + s['name'] + "** <font color='" + profit_color + "'>" + profit_sign + f"{profit_pct:.1f}" + "%</font>" + chr(10)
+        lines += "  现价¥" + f"{current:.2f}" + " | 日均振幅" + f"{avg_range:.1f}" + "% | 量比" + f"{vol_ratio:.1f}" + chr(10)
+        
+        if s.get('buy_price') and s.get('sell_price'):
+            lines += "  🔄 **低买** ¥" + f"{s['buy_price']:.2f}" + " | **高卖** ¥" + f"{s['sell_price']:.2f}" + chr(10)
+            if s.get('t_shares') and s.get('expected_profit'):
+                lines += "  💰 做T" + str(int(s['t_shares'])) + "股，预期收益¥" + f"{s['expected_profit']:.0f}" + chr(10)
+            if s.get('cost_reduction'):
+                lines += "  📉 可降成本" + f"{s['cost_reduction']:.2f}" + "%" + chr(10)
+        
+        if s.get('reason'):
+            lines += "  📝 " + s['reason'] + chr(10)
+        
+        if s.get('risk_notes'):
+            for note in s['risk_notes']:
+                lines += "  ⚠️ " + note + chr(10)
+        
+        if s.get('key_signals'):
+            for sig in s['key_signals'][:2]:
+                lines += "  🔔 " + sig + chr(10)
+        
+        lines += chr(10)
+    
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {"title": {"tag": "plain_text", "content": "🔄 智能做T策略"}, "template": "blue"},
+        "elements": [
+            {"tag": "markdown", "content": lines},
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": "基于波动率+支撑压力位+量比 | ⚠️ 不构成投资建议"}]}
+        ]
+    }
+
+
+def make_risk_card(data: dict) -> dict:
+    """风控评分卡片"""
+    stocks = data.get('stocks', [])
+    avg_score = data.get('avg_score', 0)
+    portfolio_risk = data.get('portfolio_risk', '未知')
+    
+    NL = chr(10)
+    lines = "**组合风险**: " + portfolio_risk + " | 平均评分: " + f"{avg_score:.0f}" + "/100" + NL + NL
+    
+    for s in stocks:
+        level = s.get('risk_level', '未知')
+        score = s.get('total_score', 0)
+        profit_pct = s.get('profit_pct', 0)
+        suggestion = s.get('suggestion', '')
+        profit_sign = "+" if profit_pct >= 0 else ""
+        
+        lines += "**" + level + " " + s['name'] + "** | 评分" + str(score) + "/100 | " + profit_sign + f"{profit_pct:.1f}" + "%" + NL
+        lines += "  技术" + str(s['tech_score']) + " | 资金" + str(s['fund_score']) + " | 基本面" + str(s['basic_score']) + " → " + suggestion + NL + NL
+    
+    template = "blue" if avg_score >= 60 else "orange" if avg_score >= 40 else "red"
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {"title": {"tag": "plain_text", "content": "🛡️ 风控评分 | " + portfolio_risk}, "template": template},
+        "elements": [
+            {"tag": "markdown", "content": lines},
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": "技术40+资金30+基本面30=100 | ⚠️ 仅供参考"}]}
+        ]
+    }
+
+
+def make_recommend_card(data: dict) -> dict:
+    """综合操作建议卡片"""
+    recs = data.get('recommendations', [])
+    sentiment = data.get('market_sentiment', '未知')
+    
+    NL = chr(10)
+    lines = "**大盘情绪**: " + sentiment + NL + NL
+    
+    for r in recs:
+        action = r.get('action', '持有')
+        priority = r.get('priority', '✅')
+        profit_pct = r.get('profit_pct', 0)
+        profit_sign = "+" if profit_pct >= 0 else ""
+        profit_color = "red" if profit_pct > 0 else "green"
+        confidence = r.get('confidence', '中')
+        
+        lines += priority + " **" + r['name'] + "** → " + action + "（置信度" + confidence + "）" + NL
+        lines += "  <font color='" + profit_color + "'>" + profit_sign + f"{profit_pct:.1f}" + "%</font> | " + r['reason'] + NL
+        
+        if r.get('price_target'):
+            lines += "  🎯 目标价: ¥" + f"{r['price_target']:.2f}" + NL
+        
+        if r.get('key_signals'):
+            for sig in r['key_signals'][:2]:
+                lines += "  🔔 " + sig + NL
+        
+        lines += NL
+    
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {"title": {"tag": "plain_text", "content": "💡 综合操作建议"}, "template": "blue"},
+        "elements": [
+            {"tag": "markdown", "content": lines},
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": "风控+技术+资金综合判断 | ⚠️ 不构成投资建议"}]}
+        ]
+    }
+
+
+def make_news_card(data: dict) -> dict:
+    """财经要闻卡片"""
+    news = data.get('news', [])
+    sentiment = data.get('sentiment', {})
+    keyword = data.get('keyword', '')
+    
+    if not news:
+        return make_text_card("暂无相关财经新闻")
+    
+    sentiment_text = sentiment.get('summary', '中性')
+    sentiment_score = sentiment.get('score', 0.5)
+    sentiment_emoji = "🟢" if sentiment_score > 0.6 else "🔴" if sentiment_score < 0.4 else "🟡"
+    
+    NL = chr(10)
+    lines = "**新闻情绪**: " + sentiment_emoji + " " + sentiment_text + NL + NL
+    
+    for n in news[:8]:
+        title = n.get('title', '')
+        lines += "- 📰 **" + title + "**" + NL
+        if n.get('snippet'):
+            lines += "  " + n['snippet'][:80] + NL
+    
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {"title": {"tag": "plain_text", "content": "📰 财经要闻 | " + keyword[:20]}, "template": "blue"},
+        "elements": [
+            {"tag": "markdown", "content": lines},
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": "DuckDuckGo搜索 + LLM情绪分析"}]}
+        ]
+    }
+
+
+def make_valuation_card(data: dict) -> dict:
+    """估值判断卡片"""
+    if 'error' in data:
+        return make_text_card(data['error'])
+    
+    name = data.get('name', '')
+    symbol = data.get('symbol', '')
+    current = data.get('current_price', 0)
+    pe = data.get('pe')
+    pb = data.get('pb')
+    level = data.get('valuation_level', '未知')
+    color_emoji = data.get('valuation_color', '🟡')
+    total_mv = data.get('total_mv')
+    turnover = data.get('turnover_rate')
+    signals = data.get('signals', [])
+    
+    NL = chr(10)
+    
+    val_items = []
+    if pe: val_items.append("PE " + f"{pe:.1f}")
+    if pb: val_items.append("PB " + f"{pb:.2f}")
+    if total_mv: val_items.append("市值" + f"{total_mv/10000:.0f}" + "亿")
+    if turnover: val_items.append("换手率" + f"{turnover:.2f}" + "%")
+    
+    val_line = " | ".join(val_items)
+    
+    signal_line = ""
+    if signals:
+        signal_line = NL + "**技术信号**" + NL
+        for s in signals:
+            signal_line += "- 🔔 " + s + NL
+    
+    val_content = "**当前** ¥" + f"{current:.2f}" + NL + val_line + NL + NL + "**估值判断**: " + color_emoji + " " + level
+    
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {"title": {"tag": "plain_text", "content": color_emoji + " " + name + " 估值: " + level}, "template": "blue"},
+        "elements": [
+            {"tag": "markdown", "content": val_content},
+            {"tag": "markdown", "content": signal_line},
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": "PE/PB对比行业 | ⚠️ 仅供参考"}]}
+        ]
+    }

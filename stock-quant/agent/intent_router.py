@@ -125,13 +125,31 @@ def classify_intent(text: str) -> Tuple[str, Dict]:
     if any(k in text_lower for k in ['持仓', '仓位', '持仓概览', '我的股票', '持有']):
         return 'positions', {}
 
-    if any(k in text_lower for k in ['做t', 't操作', '做t建议', '日内', '做T']):
+    if any(k in text_lower for k in ['做t', 't操作', '做t建议', '日内', '做T', '怎么操作']):
         return 't_strategy', {}
+
+    # 风控评分
+    if any(k in text_lower for k in ['风险', '风控', '评分', '危险', '安全']):
+        return 'risk', {}
+
+    # 综合操作建议
+    if any(k in text_lower for k in ['建议', '操作建议', '该怎么办', '综合建议']):
+        return 'recommend', {}
+
+    # 财经要闻
+    if any(k in text_lower for k in ['新闻', '要闻', '资讯']):
+        keyword = text.replace('新闻', '').replace('要闻', '').replace('资讯', '').strip()
+        return 'news', {'keyword': keyword}
+
+    # 估值判断
+    if text_lower.strip() in ['估值', '估值判断', '贵不贵', '便宜吗'] or (any(k in text_lower for k in ['估值', '贵不贵', '值不值']) and not any(k in text_lower for k in ['深度', '分析', 'pe', 'pb', 'roe', '基本面'])):
+        symbol = extract_symbol(text)
+        return 'valuation', {'symbol': symbol}
 
     if any(k in text_lower for k in ['回测', '测试策略', '策略测试']):
         return 'backtest', {'symbol': extract_symbol(text)}
 
-    if any(k in text_lower for k in ['信号', '交易信号', '买卖信号', '操作建议']):
+    if any(k in text_lower for k in ['信号', '交易信号', '买卖信号']):
         return 'signals', {}
 
     if any(k in text_lower for k in ['总结', '日报', '盘后', '今日总结', '今日行情']):
@@ -151,7 +169,7 @@ def classify_intent(text: str) -> Tuple[str, Dict]:
         return 'money_flow', {'symbol': extract_symbol(text)}
 
     # 深度数据
-    if any(k in text_lower for k in ['深度', '深度分析', '估值', 'pe', 'pb', 'roe', '基本面', '财报']):
+    if any(k in text_lower for k in ['深度', '深度分析', 'pe', 'pb', 'roe', '基本面', '财报']):
         return 'deep', {'symbol': extract_symbol(text)}
 
     # 北向资金
