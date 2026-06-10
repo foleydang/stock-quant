@@ -1,0 +1,69 @@
+# 量化监控系统配置文件
+
+# 基础路径
+base:
+  dir: /root/github/stock-quant/python
+  data_dir: /root/github/stock-quant/python/data
+  log_dir: /root/github/stock-quant/logs
+  model_dir: /root/github/stock-quant/python/models
+
+# 数据库
+database:
+  path: /root/github/stock-quant/python/data/stock_data.db
+  backup_dir: /root/github/stock-quant/python/data/backup
+
+# API配置
+api:
+  tushare_token: 7a9014b18909e8cbce5109d7175f7b21ce37354eaff2371db0da2c58
+  sina_kline_url: https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketDataService.getKLineData
+  tencent_quote_url: http://qt.gtimg.cn/q=
+
+# 账户配置
+account:
+  available_cash: 150000
+  total_investment: 1044962
+
+# 策略参数
+strategy:
+  # 补仓参数
+  add_position_threshold: -0.20  # 浮亏20%触发补仓评估
+  add_position_prob: 0.55        # 要求上涨概率55%
+  max_add_ratio: 0.30            # 单次补仓不超过原持仓30%
+  
+  # 做T参数
+  min_intraday_range: 2.0        # 最小日内波动(%)才考虑做T
+  t_profit_target: 1.5           # 做T目标利润(%)
+  max_t_ratio: 0.33              # 单次做T不超过持仓1/3
+  
+  # 止损参数
+  deep_loss_threshold: -0.15     # 深套阈值(浮亏15%)
+
+# 关注股票列表
+watchlist:
+  - symbol: 9988.HK
+    name: 阿里巴巴-W
+  - symbol: 0700.HK
+    name: 腾讯控股
+  - symbol: 300124.SZ
+    name: 汇川技术
+  - symbol: 300015.SZ
+    name: 爱尔眼科
+  - symbol: 600048.SH
+    name: 保利发展
+  - symbol: 159792.SZ
+    name: 港股通互联网ETF
+
+# 邮件配置 (从环境变量读取)
+email:
+  smtp_server: smtp.qq.com
+  smtp_port: 465
+  sender: 719312518@qq.com
+  password: bxmkrxlrulgxbcha
+  receivers:
+    - 21725056@zju.edu.cn
+
+# 定时任务
+schedule:
+  kline_accumulate: '*/30 9-15 * * 1-5'
+  monitor: '*/30 9-15 * * 1-5'
+  daily_update: '0 20 * * 1-5'
