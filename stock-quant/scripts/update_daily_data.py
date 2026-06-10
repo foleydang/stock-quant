@@ -125,5 +125,67 @@ except Exception as e:
     print(f"✗ positions 更新失败: {e}")
 
 # 关闭
+conn.commit()
+
+# 4. 更新北向资金（从东方财富API）
+print(f"\n更新北向资金数据...")
+try:
+    import requests
+    url = "https://push2his.eastmoney.com/api/qt/kamt.kline/get"
+    params = {
+        "fields1": "f1,f3,f5",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63",
+        "klt": "101", "lmt": "30",
+        "ut": "7eea3ed2ced24c2974d3210a0be1e25",
+    }
+    r = requests.get(url, params=params, timeout=15)
+    data = r.json().get("data", {})
+    hk2sh = data.get("hk2sh", [])
+    hk2sz = data.get("hk2sz", [])
+    
+    north_count = 0
+    for line in hk2sh[-5:]:
+        parts = line.split(",")
+        if len(parts) >= 4:
+            date, net, buy, cum = parts[0], float(parts[1]), float(parts[2]), float(parts[3])
+            # 找同日深股通
+            sz_line = [l for l in hk2sz if l.startswith(date)]
+            if sz_line:
+                sz_parts = sz_line[0].split(",")
+                sz_net, sz_buy, sz_cum = float(sz_parts[1]), float(sz_parts[2]), float(sz_parts[3])
+                total_net = net + sz_net
+                total_buy = buy + sz_buy
+                cursor.execute("INSERT OR REPLACE INTO north_flow (trade_date, north_net, north_buy, north_cum, sz_net, sz_buy, sz_cum, total_net, total_buy, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (date, net, buy, cum, sz_net, sz_buy, sz_cum, total_net, total_buy, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                north_count += 1
+    conn.commit()
+    print(f"✓ 北向资金更新: {north_count} 条")
+except Exception as e:
+    print(f"✗ 北向资金更新失败: {e}")
+
+# 5. 更新大盘日线指标（从kline_30m聚合）
+print(f"\n更新大盘指标...")
+try:
+    df_30m = pd.read_sql("SELECT symbol, date, close, volume FROM kline_30m WHERE date >= ?", conn, params=[(today - timedelta(days=3)).strftime('%Y-%m-%d')])
+    df_30m['trade_date'] = df_30m['date'].str[:10]
+    
+    daily = df_30m.groupby(['symbol', 'trade_date']).agg(
+        first_close=('close', 'first'), last_close=('close', 'last'), total_volume=('volume', 'sum')
+    ).reset_index()
+    daily['pct_chg'] = (daily['last_close'] - daily['first_close']) / daily['first_close'] * 100
+    
+    market = daily.groupby('trade_date').agg(
+        avg_pct=('pct_chg', 'mean'), up=('pct_chg', lambda x: int((x > 0).sum())), down=('pct_chg', lambda x: int((x < 0).sum())), stocks=('symbol', 'count'), vol=('total_volume', 'sum')
+    ).reset_index()
+    
+    for _, row in market.iterrows():
+        cursor.execute("INSERT OR REPLACE INTO hs300_daily (trade_date, avg_pct_chg, up_count, down_count, stock_count, volume) VALUES (?, ?, ?, ?, ?, ?)",
+            (row['trade_date'], row['avg_pct'], row['up'], row['down'], row['stocks'], row['vol']))
+    conn.commit()
+    print(f"✓ 大盘指标更新: {len(market)} 天")
+except Exception as e:
+    print(f"✗ 大盘指标更新失败: {e}")
+
+# 关闭
 conn.close()
 print(f"[{datetime.now()}] 每日数据更新完成")

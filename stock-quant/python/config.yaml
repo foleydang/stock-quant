@@ -44,6 +44,14 @@ watchlist:
     name: 阿里巴巴-W
   - symbol: 0700.HK
     name: 腾讯控股
+  - symbol: 300124.SZ
+    name: 汇川技术
+  - symbol: 300015.SZ
+    name: 爱尔眼科
+  - symbol: 600048.SH
+    name: 保利发展
+  - symbol: 159792.SZ
+    name: 港股通互联网ETF
 
 # 邮件配置 (从环境变量读取)
 email:

@@ -20,7 +20,7 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from collections import Counter
 
-from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+from strategy.train_lgb_enhanced import EnhancedFeatureEngineer, MarketFeatureEngineer
 from strategy.train_lgb_v3 import AdvancedFeatureEngineer, ZERO_IMP_FEATURES, TIME_FEATURES
 
 # 配置日志
@@ -202,14 +202,7 @@ class LGBMBacktesterOptimized:
             except Exception as e:
                 logger.warning(f"数据库读取失败: {e}")
         
-        # Fallback: CSV缓存
-        cache_path = os.path.join(os.path.dirname(__file__), f'data/{symbol}_30m.csv')
-        if os.path.exists(cache_path):
-            df = pd.read_csv(cache_path)
-            df['date'] = pd.to_datetime(df['date'])
-            df = df.sort_values('date').reset_index(drop=True)
-            return df
-        
+        # DB读取失败，无其他数据源
         return None
 
     def preload_features(self, all_data: Dict[str, pd.DataFrame]):
@@ -220,7 +213,8 @@ class LGBMBacktesterOptimized:
             # 使用 v3 的组合特征 (基础+高级，过滤时间和零重要性)
             base_features = EnhancedFeatureEngineer.calculate_features(df)
             adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
-            all_features = pd.concat([base_features, adv_features], axis=1)
+            market_features = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
+            all_features = pd.concat([base_features, adv_features, market_features], axis=1)
             drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
             keep_cols = [c for c in all_features.columns if c not in drop_cols]
             all_features = all_features[keep_cols]

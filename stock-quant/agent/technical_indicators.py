@@ -30,8 +30,67 @@ from config import DB_PATH
 logger = logging.getLogger("feishu_bot")
 
 
+def _hk_to_eastmoney_secid(symbol: str) -> Optional[str]:
+    """港股代码转东方财富 secid 格式
+    0700.HK -> 116.00700
+    9988.HK -> 116.09988
+    """
+    if not symbol.endswith('.HK'):
+        return None
+    code = symbol.replace('.HK', '')
+    # 港股代码补齐5位
+    padded = code.zfill(5)
+    return f'116.{padded}'
+
+
+def _fetch_hk_kline_from_eastmoney(symbol: str, days: int = 120) -> Optional[List[Dict]]:
+    """从东方财富获取港股K线数据"""
+    secid = _hk_to_eastmoney_secid(symbol)
+    if not secid:
+        return None
+
+    try:
+        import requests
+        url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get'
+        params = {
+            'secid': secid,
+            'fields1': 'f1,f2,f3,f4,f5,f6',
+            'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
+            'klt': '101',  # 日K
+            'fqt': '1',    # 前复权
+            'beg': '0',
+            'end': '20500101',
+            'lmt': str(days),
+        }
+        r = requests.get(url, params=params, timeout=10)
+        data = r.json()
+        klines = data.get('data', {}).get('klines', [])
+        if not klines:
+            return None
+
+        # 东方财富K线格式: date,open,close,high,low,volume,amount,amplitude,change_pct,change,turnover
+        result = []
+        for line in klines:
+            parts = line.split(',')
+            if len(parts) >= 6:
+                result.append({
+                    'date': parts[0],
+                    'open': float(parts[1]),
+                    'close': float(parts[2]),
+                    'high': float(parts[3]),
+                    'low': float(parts[4]),
+                    'volume': float(parts[5]),
+                })
+        # 取最近days条
+        result = result[-days:]
+        return result
+    except Exception as e:
+        logger.warning(f"东方财富港股K线获取失败 {symbol}: {e}")
+        return None
+
+
 def _get_kline(symbol: str, days: int = 120) -> Optional[List[Dict]]:
-    """获取K线数据（优先数据库，不足时用 DataHandler 从 Tushare 补充）"""
+    """获取K线数据（优先数据库，港股用东方财富，A股用 DataHandler）"""
     # 先从数据库取
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -51,7 +110,28 @@ def _get_kline(symbol: str, days: int = 120) -> Optional[List[Dict]]:
             for r in rows
         ]
 
-    # 数据库不够，用 DataHandler 从 Tushare 获取
+    # 港股：从东方财富获取
+    if symbol.endswith('.HK'):
+        hk_data = _fetch_hk_kline_from_eastmoney(symbol, days)
+        if hk_data and len(hk_data) >= 30:
+            # 同步写入数据库供下次使用
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                for k in hk_data:
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO kline_daily (symbol, date, open, high, low, close, volume) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (symbol, k['date'], k['open'], k['high'], k['low'], k['close'], k['volume'])
+                    )
+                conn.commit()
+                conn.close()
+                logger.info(f"港股K线同步入库 {symbol}: {len(hk_data)} 条")
+            except Exception as e:
+                logger.warning(f"港股K线入库失败 {symbol}: {e}")
+            return hk_data
+
+    # A股：用 DataHandler 从 Tushare 获取
     try:
         from data.data_handler import DataHandler
         dh = DataHandler(force_refresh=True)
@@ -227,7 +307,10 @@ def calc_volume_ratio(kline: List[Dict], period: int = 5) -> float:
 # ========== 支撑压力位 ==========
 
 def calc_support_resistance(kline: List[Dict], levels: int = 3) -> Dict:
-    """计算支撑位和压力位（基于局部极值法）"""
+    """计算支撑位和压力位（基于局部极值法 + 均线支撑）
+
+    规则：支撑位必须明显低于当前价（差距>1%），压力位必须明显高于当前价（差距>1%）
+    """
     if len(kline) < 20:
         return {'supports': [], 'resistances': []}
 
@@ -237,7 +320,7 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3) -> Dict:
     lows = [k['low'] for k in recent]
     current = closes[-1]
 
-    # 找局部极值（高点=压力，低点=支撑）
+    # 1. 找局部极值（高点=压力候选，低点=支撑候选）
     local_highs = []
     local_lows = []
 
@@ -247,25 +330,54 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3) -> Dict:
         if lows[i] <= lows[i - 1] and lows[i] <= lows[i - 2] and lows[i] <= lows[i + 1] and lows[i] <= lows[i + 2]:
             local_lows.append(lows[i])
 
-    # 排序并取最近的几个
-    supports = sorted([s for s in local_lows if s < current], reverse=True)[:levels]
-    resistances = sorted([r for r in local_highs if r > current])[:levels]
+    # 2. 均线作为支撑压力候选（更有意义的技术位）
+    ma_candidates = []
+    for period in [5, 10, 20, 60]:
+        ma_vals = calc_ma(closes, period)
+        if ma_vals:
+            ma_candidates.append((period, ma_vals[-1]))
 
-    # 如果没有足够的极值，用统计方法补充
+    # 支撑位：低于当前价的均线 + 局部低点，差距>1%
+    min_gap_pct = 0.01  # 至少1%的距离才算有效支撑/压力
+    support_candidates = []
+    for s in local_lows:
+        if s < current and (current - s) / current >= min_gap_pct:
+            support_candidates.append(s)
+    for period, ma_val in ma_candidates:
+        if ma_val < current and (current - ma_val) / current >= min_gap_pct:
+            support_candidates.append(ma_val)
+
+    # 压力位：高于当前价的均线 + 局部高点，差距>1%
+    resistance_candidates = []
+    for r in local_highs:
+        if r > current and (r - current) / current >= min_gap_pct:
+            resistance_candidates.append(r)
+    for period, ma_val in ma_candidates:
+        if ma_val > current and (ma_val - current) / current >= min_gap_pct:
+            resistance_candidates.append(ma_val)
+
+    # 去重、排序、取最近的几个
+    # 支撑位：离当前价越近的越重要（但必须低于当前价>1%）
+    supports = sorted(set(support_candidates), reverse=True)[:levels]
+    # 压力位：离当前价越近的越重要（但必须高于当前价>1%）
+    resistances = sorted(set(resistance_candidates))[:levels]
+
+    # 如果还不够，用标准差补充（但确保差距至少2%以上，有实际参考意义）
     if len(supports) < levels:
         std = math.sqrt(sum((x - sum(closes) / len(closes)) ** 2 for x in closes) / len(closes))
-        avg = sum(closes) / len(closes)
+        # 用至少2%或2倍标准差作为间距，取较大值保证有意义
+        step = max(current * 0.02, 2 * std)
         for i in range(1, levels + 1):
-            s = current - i * std
-            if s not in supports and s > 0:
+            s = current - i * step
+            if s > 0 and s not in supports:
                 supports.append(round(s, 2))
         supports.sort(reverse=True)
 
     if len(resistances) < levels:
         std = math.sqrt(sum((x - sum(closes) / len(closes)) ** 2 for x in closes) / len(closes))
-        avg = sum(closes) / len(closes)
+        step = max(current * 0.02, 2 * std)
         for i in range(1, levels + 1):
-            r = current + i * std
+            r = current + i * step
             if r not in resistances:
                 resistances.append(round(r, 2))
         resistances.sort()
@@ -355,8 +467,53 @@ def get_technical_analysis(symbol: str) -> Dict:
     # 量比
     vol_ratio = calc_volume_ratio(kline)
 
-    # 支撑压力位
+    # 用实时行情覆盖当前价（盘中K线可能缺少今天的数据）
+    rt_current = None
+    rt_change_pct = None
+    rt_data = None
+    try:
+        from data_fetcher import get_stock_data
+        rt_data = get_stock_data(symbol)
+        if 'error' not in rt_data:
+            rt_current = rt_data['current_price']
+            rt_change_pct = rt_data['change_pct']
+    except Exception as e:
+        logger.warning(f"实时行情获取失败 {symbol}: {e}")
+
+    final_current = rt_current if rt_current is not None else current
+    final_change_pct = rt_change_pct if rt_change_pct is not None else ((kline[-1]['close'] - kline[-2]['close']) / kline[-2]['close'] * 100 if len(kline) > 1 else 0)
+
+    # 支撑压力位（基于K线计算，再用实时价校验）
     sr = calc_support_resistance(kline)
+    sr['current'] = final_current
+
+    # 如果实时价明显高于K线收盘价（盘中缺今天数据），局部高点可能低于实时价
+    # 需要重新校验：确保支撑位低于实时价，压力位高于实时价
+    if rt_current is not None and abs(rt_current - current) / current > 0.005:
+        # 实时价和K线收盘价差距>0.5%，说明盘中数据缺失
+        sr['supports'] = [s for s in sr.get('supports', []) if s < final_current]
+        sr['resistances'] = [r for r in sr.get('resistances', []) if r > final_current]
+
+        # 用实时数据补充压力位（今天的最高价等）
+        if rt_data and rt_data.get('high') and rt_data['high'] > final_current:
+            sr['resistances'] = sorted(set(sr['resistances'] + [rt_data['high']]))
+
+        # 补充不足的位置
+        closes_all = [k['close'] for k in kline]
+        std = math.sqrt(sum((x - sum(closes_all) / len(closes_all)) ** 2 for x in closes_all) / len(closes_all))
+        step = max(final_current * 0.02, 2 * std)
+
+        for i in range(1, 4):
+            s = final_current - i * step
+            if s > 0 and len(sr['supports']) < 3:
+                sr['supports'].append(round(s, 2))
+        sr['supports'] = sorted(sr['supports'], reverse=True)[:3]
+
+        for i in range(1, 4):
+            r = final_current + i * step
+            if len(sr['resistances']) < 3:
+                sr['resistances'].append(round(r, 2))
+        sr['resistances'] = sorted(sr['resistances'])[:3]
 
     # 动态阈值
     threshold = calc_dynamic_threshold(kline)
@@ -383,9 +540,9 @@ def get_technical_analysis(symbol: str) -> Dict:
 
     # 均线排列
     if ma5 and ma10 and ma20 and len(ma5) >= 2:
-        if ma5[-1] > ma10[-1] > ma20[-1] and current > ma5[-1]:
+        if ma5[-1] > ma10[-1] > ma20[-1] and final_current > ma5[-1]:
             signals.append('多头排列（看涨）')
-        elif ma5[-1] < ma10[-1] < ma20[-1] and current < ma5[-1]:
+        elif ma5[-1] < ma10[-1] < ma20[-1] and final_current < ma5[-1]:
             signals.append('空头排列（看跌）')
 
     # MACD信号
@@ -423,9 +580,9 @@ def get_technical_analysis(symbol: str) -> Dict:
 
     # 布林带信号
     if boll['upper']:
-        if current > boll['upper'][-1]:
+        if final_current > boll['upper'][-1]:
             signals.append('突破布林带上轨')
-        elif current < boll['lower'][-1]:
+        elif final_current < boll['lower'][-1]:
             signals.append('跌破布林带下轨')
 
     # 新高/新低
@@ -454,11 +611,11 @@ def get_technical_analysis(symbol: str) -> Dict:
 
     # 接近支撑压力位
     for s in sr.get('supports', []):
-        if abs(current - s) / current < 0.02 and current > s:
+        if abs(final_current - s) / final_current < 0.02 and final_current > s:
             signals.append(f'接近支撑位¥{s:.2f}')
             break
     for r in sr.get('resistances', []):
-        if abs(current - r) / current < 0.02 and current < r:
+        if abs(final_current - r) / final_current < 0.02 and final_current < r:
             signals.append(f'接近压力位¥{r:.2f}')
             break
 
@@ -471,7 +628,7 @@ def get_technical_analysis(symbol: str) -> Dict:
     conn.close()
 
     return {
-        'symbol': symbol, 'name': name, 'current': current,
+        'symbol': symbol, 'name': name, 'current': final_current,
         'ma5': ma5[-1] if ma5 else None, 'ma10': ma10[-1] if ma10 else None,
         'ma20': ma20[-1] if ma20 else None, 'ma60': ma60[-1] if ma60 else None,
         'macd_dif': macd['dif'][-1] if macd['dif'] else None,
@@ -489,7 +646,7 @@ def get_technical_analysis(symbol: str) -> Dict:
         'resistances': sr.get('resistances', []),
         'dynamic_threshold': threshold,
         'signals': signals,
-        'change_pct': (kline[-1]['close'] - kline[-2]['close']) / kline[-2]['close'] * 100 if len(kline) > 1 else 0,
+        'change_pct': final_change_pct,
         'new_high_20': new_hl_20['new_high'],
         'new_low_20': new_hl_20['new_low'],
     }
@@ -515,10 +672,12 @@ def get_smart_alerts(symbols: Optional[List[str]] = None) -> List[Dict]:
                 symbols.append(w.get('symbol'))
 
     alerts = []
+    skipped = []  # 记录数据不足的股票
     for symbol in symbols:
         try:
             analysis = get_technical_analysis(symbol)
             if 'error' in analysis:
+                skipped.append(f"{symbol}: {analysis['error']}")
                 continue
 
             change_pct = analysis.get('change_pct', 0)
@@ -533,43 +692,61 @@ def get_smart_alerts(symbols: Optional[List[str]] = None) -> List[Dict]:
                     alert_type = f'放量{alert_type}'
                 elif vol_ratio < 0.7:
                     alert_type = f'缩量{alert_type}'
+                is_etf = symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50') or 'ETF' in analysis.get('name', '')
                 alerts.append({
                     'symbol': symbol, 'name': analysis['name'],
                     'type': alert_type, 'change_pct': change_pct,
                     'volume_ratio': vol_ratio,
                     'details': f'{change_pct:+.2f}% 量比{vol_ratio:.1f} 阈值{threshold:.1f}%',
                     'signals': analysis.get('signals', []),
+                    'is_etf': is_etf,
                 })
 
             # 2. 重要技术信号（金叉/死叉/超买超卖）
             important_signals = [s for s in analysis.get('signals', [])
                                  if any(kw in s for kw in ['金叉', '死叉', '超买', '超卖', '突破', '跌破', '新高', '新低'])]
             if important_signals:
+                is_etf = symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50') or 'ETF' in analysis.get('name', '')
                 alerts.append({
                     'symbol': symbol, 'name': analysis['name'],
                     'type': '技术信号', 'change_pct': change_pct,
                     'details': ' | '.join(important_signals),
                     'signals': analysis.get('signals', []),
+                    'is_etf': is_etf,
                 })
 
-            # 3. 接近支撑/压力位
-            for s in analysis.get('supports', []):
-                if abs(analysis['current'] - s) / analysis['current'] < 0.015 and analysis['current'] > s:
-                    alerts.append({
-                        'symbol': symbol, 'name': analysis['name'],
-                        'type': '接近支撑位', 'change_pct': change_pct,
-                        'details': f'当前¥{analysis["current"]:.2f} 接近支撑¥{s:.2f}',
-                        'signals': [],
-                    })
-            for r in analysis.get('resistances', []):
-                if abs(analysis['current'] - r) / analysis['current'] < 0.015 and analysis['current'] < r:
-                    alerts.append({
-                        'symbol': symbol, 'name': analysis['name'],
-                        'type': '接近压力位', 'change_pct': change_pct,
-                        'details': f'当前¥{analysis["current"]:.2f} 接近压力¥{r:.2f}',
-                        'signals': [],
-                    })
+            # 3. 接近支撑/压力位（合并同一只股票的多个价位，避免重复推送）
+            is_etf = symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50') or 'ETF' in analysis.get('name', '')
+
+            # 合并所有接近的支撑位
+            near_supports = [s for s in analysis.get('supports', [])
+                             if abs(analysis['current'] - s) / analysis['current'] < 0.015 and analysis['current'] > s]
+            if near_supports:
+                supports_str = '、'.join([f'¥{s:.2f}' for s in near_supports])
+                alerts.append({
+                    'symbol': symbol, 'name': analysis['name'],
+                    'type': '接近支撑位', 'change_pct': change_pct,
+                    'details': f'当前¥{analysis["current"]:.2f} 接近支撑 {supports_str}',
+                    'signals': [],
+                    'is_etf': is_etf,
+                })
+
+            # 合并所有接近的压力位
+            near_resistances = [r for r in analysis.get('resistances', [])
+                                if abs(analysis['current'] - r) / analysis['current'] < 0.015 and analysis['current'] < r]
+            if near_resistances:
+                resistances_str = '、'.join([f'¥{r:.2f}' for r in near_resistances])
+                alerts.append({
+                    'symbol': symbol, 'name': analysis['name'],
+                    'type': '接近压力位', 'change_pct': change_pct,
+                    'details': f'当前¥{analysis["current"]:.2f} 接近压力 {resistances_str}',
+                    'signals': [],
+                    'is_etf': is_etf,
+                })
         except Exception as e:
             logger.warning(f"异动检测 {symbol} 失败: {e}")
+
+    if skipped:
+        logger.info(f"异动检测跳过（数据不足）: {skipped}")
 
     return alerts
