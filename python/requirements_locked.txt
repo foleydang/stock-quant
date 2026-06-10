@@ -1,6 +1,0 @@
-flask-cors==6.0.2
-lightgbm==4.6.0
-numpy==2.4.4
-pandas==3.0.2
-requests @ file:///home/task_177506603358355/croot/requests_1775066075144/work
-scikit-learn==1.8.0
