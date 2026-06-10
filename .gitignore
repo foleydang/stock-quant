@@ -20,7 +20,7 @@ python/logs/*.log
 python/logs/*.json
 
 # 数据文件（CSV）
-python/data/*.csv
+python/data/**/*.csv
 
 # IDE
 .idea/
