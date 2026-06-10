@@ -450,15 +450,44 @@ def _search_news_via_api(keyword: str) -> Dict:
 
 # ========== 4. 综合操作建议 ==========
 
-def get_action_recommendations() -> Dict:
+def get_action_recommendations(symbol: str = None) -> Dict:
     """综合操作建议 - 结合技术面+资金面+风控评分
-    
+
+    Args:
+        symbol: 指定分析的股票代码，为None时分析全部持仓
+
     输出: 每只持仓的具体操作建议（买/卖/做T/持有/止损）
     附带: 建议价位、理由、风险等级
     """
     positions_data = get_positions_data()
     if 'error' in positions_data:
         return {'error': positions_data['error']}
+
+    # 如果指定了symbol，只分析那只（含ETF）
+    if symbol:
+        # 检查是否在持仓中
+        pos_list = positions_data['positions']
+        target_pos = next((p for p in pos_list if p['symbol'] == symbol), None)
+        if not target_pos:
+            # 不在持仓中也分析——用实时数据构造
+            try:
+                from data_fetcher import get_stock_data
+                stock_data = get_stock_data(symbol)
+                if 'error' in stock_data:
+                    return {'error': f'无法获取 {symbol} 数据'}
+                target_pos = {
+                    'symbol': symbol,
+                    'stock_name': stock_data['name'],
+                    'current_price': stock_data['current_price'],
+                    'cost_price': stock_data['current_price'],  # 无持仓成本，用现价
+                    'profit_pct': 0,
+                    'shares': 0,
+                }
+            except Exception as e:
+                return {'error': f'无法获取 {symbol}: {e}'}
+        pos_list = [target_pos]
+    else:
+        pos_list = positions_data['positions']
 
     # Get t_data and risk_data with error handling
     try:
@@ -480,7 +509,7 @@ def get_action_recommendations() -> Dict:
     market_sentiment = market_data.get('sentiment', '震荡')
     avg_market_pct = sum(i.get('change_pct', 0) for i in market_data.get('indices', [])) / max(len(market_data.get('indices', [])), 1)
 
-    for pos in positions_data['positions']:
+    for pos in pos_list:
         symbol = pos['symbol']
         name = pos['stock_name']
         current = pos['current_price']
@@ -494,6 +523,64 @@ def get_action_recommendations() -> Dict:
         # 技术分析
         tech = get_technical_analysis(symbol)
         tech_signals = tech.get('signals', []) if 'error' not in tech else []
+        
+        # === 新增：消息面 ===
+        news_data = None
+        news_sentiment = None
+        try:
+            from scheduler import _search_stock_news_brief
+            news_data = _search_stock_news_brief(symbol, name)
+            if news_data and news_data.get('headlines'):
+                try:
+                    from llm_client import analyze_news_sentiment
+                    news_items = [{'title': h['title'], 'content': h.get('snippet', ''), 'time': ''} for h in news_data['headlines'][:5]]
+                    news_sentiment = analyze_news_sentiment(news_items)
+                except Exception:
+                    news_sentiment = {'summary': '无法分析', 'score': 0.5}
+        except Exception as e:
+            logger.warning(f"新闻搜索失败 {name}: {e}")
+        
+        # 搜索不到新闻时，用LLM直接生成消息面分析
+        if not news_data and not news_sentiment:
+            try:
+                from llm_client import _call_dashscope_chat, is_available
+                import json as _json
+                if is_available():
+                    market_desc = f"大盘涨跌{avg_market_pct:.2f}%"
+                    tech_summary = ' | '.join(tech_signals[:5]) if tech_signals else '无重要信号'
+                    today_str = datetime.now().strftime('%Y-%m-%d')
+                    messages = [
+                        {"role": "system", "content": "你是金融分析助手，根据今日技术面和大盘情况推断消息面因素。只返回JSON: {\"summary\": \"一句话概括(必须标注：基于今日行情推断)\", \"score\": 0-1分数(利好>0.5,利空<0.5), \"sentiment_label\": \"偏利好/偏利空/中性\", \"factors\": [\"1-2个可能的消息面因素\"]}"},
+                        {"role": "user", "content": f"股票: {name}({symbol}) 当前¥{current:.2f} 涨跌{tech.get('change_pct',0):.2f}% 信号: {tech_summary} 大盘: {market_desc} 今日日期: {today_str}"}
+                    ]
+                    result = _call_dashscope_chat(messages, max_tokens=150, temperature=0.3)
+                    if result and '{' in result:
+                        start = result.index('{')
+                        end = result.rindex('}') + 1
+                        llm_sentiment = _json.loads(result[start:end])
+                        news_sentiment = llm_sentiment
+                        # 把LLM推断的因素当新闻标题展示，标注[推断]
+                        factors = llm_sentiment.get('factors', [])
+                        if factors:
+                            news_data = {'headlines': [{'title': f'[推断] {factor}', 'snippet': '', 'url': ''} for factor in factors[:3]], 'keyword': name}
+            except Exception as e:
+                logger.warning(f"LLM消息面分析失败: {e}")
+        
+        # === 新增：LGBM预测 ===
+        lgbm_pred = None
+        try:
+            from lgbm_backtest import LGBMBacktesterOptimized
+            bt = LGBMBacktesterOptimized()
+            result = bt.run_backtest(symbol)
+            if result and result.get('predictions'):
+                last_pred = result['predictions'][-1]
+                lgbm_pred = {
+                    'up_prob': last_pred.get('up_probability', 0),
+                    'signal': '买入' if last_pred.get('up_probability', 0) > 0.52 else '卖出' if last_pred.get('up_probability', 0) < 0.48 else '持有',
+                    'win_rate': result.get('summary', {}).get('winRate', 0),
+                }
+        except Exception as e:
+            logger.warning(f"LGBM预测失败 {symbol}: {e}")
 
         # 综合判断
         action = "持有"
@@ -513,13 +600,23 @@ def get_action_recommendations() -> Dict:
                 reason_parts.append(f"风险评分{score}分")
 
         # 基于盈亏
+        # 基于盈亏（区分ETF和个股）
+        is_etf = symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50') or 'ETF' in name
+
         if profit_pct < -20:
-            if action != "减仓":
-                action = "止损"
-                confidence = "高"
-            reason_parts.append(f"亏损{profit_pct:.1f}%")
-            # 止损目标价
-            price_target = current * 1.03  # 反弹3%止损
+            if is_etf:
+                # ETF不建议止损，建议定投补仓摊低成本
+                if action == "持有" or action == "谨慎持有":
+                    action = "逢低定投加仓"
+                confidence = "中"
+                reason_parts.append(f"亏损{profit_pct:.1f}%，ETF适合定投摊低成本")
+                price_target = None  # ETF无止损目标价
+            else:
+                if action != "减仓":
+                    action = "止损"
+                    confidence = "高"
+                reason_parts.append(f"亏损{profit_pct:.1f}%")
+                price_target = current * 1.03  # 反弹3%止损
         elif profit_pct > 20:
             if action == "持有":
                 action = "考虑止盈"
@@ -535,6 +632,36 @@ def get_action_recommendations() -> Dict:
                 sell_target = t_sugg.get('sell_price')
                 reason_parts.append(f"低买¥{buy_target:.2f} 高卖¥{sell_target:.2f}")
                 price_target = sell_target
+
+        # 基于新闻面
+        if news_sentiment:
+            ns_score = news_sentiment.get('score', 0.5)
+            ns_summary = news_sentiment.get('summary', '')
+            if ns_score > 0.6:
+                reason_parts.append(f"消息面偏利好({ns_summary})")
+                if action == "持有" and is_etf:
+                    action = "逢低定投加仓"
+            elif ns_score < 0.4:
+                reason_parts.append(f"消息面偏利空({ns_summary})")
+                if action == "持有":
+                    action = "谨慎持有"
+                    confidence = "中"
+
+        # 基于LGBM预测
+        if lgbm_pred:
+            up_prob = lgbm_pred['up_prob']
+            if up_prob > 0.55:
+                reason_parts.append(f"AI预测看涨{up_prob:.0%}")
+                if action == "持有":
+                    action = "可加仓" if not is_etf else "逢低定投加仓"
+                    confidence = "中"
+            elif up_prob < 0.45:
+                reason_parts.append(f"AI预测看跌{up_prob:.0%}")
+                if action == "持有":
+                    action = "注意风险"
+                    confidence = "中"
+            else:
+                reason_parts.append(f"AI预测中性{up_prob:.0%}")
 
         # 基于技术信号
         key_tech = [s for s in tech_signals if any(kw in s for kw in ['金叉', '死叉', '超买', '超卖', '多头', '空头', '支撑', '压力'])]
@@ -567,6 +694,24 @@ def get_action_recommendations() -> Dict:
             'confidence': confidence, 'reason': reason,
             'priority': priority, 'score': risk.get('total_score', 50) if risk else 50,
             'key_signals': key_tech[:3],
+            # 新增详细数据
+            'is_etf': is_etf,
+            'tech_detail': {
+                'rsi': tech.get('rsi'),
+                'volume_ratio': tech.get('volume_ratio'),
+                'supports': tech.get('supports', [])[:2],
+                'resistances': tech.get('resistances', [])[:2],
+                'ma5': tech.get('ma5'),
+                'ma10': tech.get('ma10'),
+                'ma20': tech.get('ma20'),
+                'macd_dif': tech.get('macd_dif'),
+                'macd_dea': tech.get('macd_dea'),
+                'change_pct': tech.get('change_pct'),
+            } if 'error' not in tech else {},
+            'news': [{'title': h['title'][:50]} for h in (news_data.get('headlines', [])[:3])] if news_data else [],
+            'news_sentiment': news_sentiment,
+            'lgbm': lgbm_pred,
+            't_suggestion': {'buy_price': t_sugg.get('buy_price'), 'sell_price': t_sugg.get('sell_price')} if t_sugg else None,
         })
 
     # 按风险排序（高风险优先展示）

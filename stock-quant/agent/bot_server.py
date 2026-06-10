@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime
 
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PYTHON_DIR = os.path.join(os.path.dirname(AGENT_DIR), 'python')
@@ -139,6 +140,85 @@ def process_message(text: str) -> dict:
             data = get_technical_analysis(symbol)
             if 'error' in data:
                 return make_text_card(f"技术分析失败: {data['error']}")
+            # 注入消息面
+            try:
+                from scheduler import _search_stock_news_brief
+                name = data.get('name', symbol)
+                news_data = _search_stock_news_brief(symbol, name)
+                if news_data and news_data.get('headlines'):
+                    headlines = news_data['headlines'][:3]
+                    news_line = "**📰 消息面**\n"
+                    for h in headlines:
+                        title = h.get('title', '')
+                        if title:
+                            news_line += f"- {title}\n"
+                    # 尝试LLM情绪分析
+                    try:
+                        from llm_client import analyze_news_sentiment
+                        items = [{'title': h.get('title', ''), 'content': h.get('snippet', ''), 'time': ''} for h in headlines]
+                        sentiment = analyze_news_sentiment(items)
+                        s_label = sentiment.get('sentiment_label', '中性')
+                        s_score = sentiment.get('score', 0.5)
+                        s_summary = sentiment.get('summary', '')
+                        s_color = 'red' if s_score > 0.5 else 'green' if s_score < 0.5 else 'default'
+                        news_line += f"\n**情绪**: <font color='{s_color}'>{s_label}（{s_score:.1f}）</font> — {s_summary}"
+                    except Exception:
+                        pass
+                    data['news_hint'] = news_line
+            except Exception as e:
+                logger.warning(f"消息面注入失败 {symbol}: {e}")
+            # 注入LLM推断消息面（新闻搜不到时）
+            if not data.get('news_hint'):
+                try:
+                    from llm_client import _call_dashscope_chat, is_available
+                    import json as _json
+                    if is_available():
+                        tech_summary = ' | '.join(data.get('signals', [])[:5]) if data.get('signals') else '无重要信号'
+                        today_str = datetime.now().strftime('%Y-%m-%d')
+                        msgs = [
+                            {"role": "system", "content": "你是金融分析助手，根据今日技术面推断消息面因素。只返回JSON: {\"summary\": \"一句话概括(标注：基于行情推断)\", \"score\": 0-1分数, \"sentiment_label\": \"偏利好/偏利空/中性\", \"factors\": [\"1-2个可能的消息面因素\"]}"},
+                            {"role": "user", "content": f"股票: {data.get('name', '')}({symbol}) 当前¥{data.get('current', 0):.2f} 涨跌{data.get('change_pct', 0):.2f}% 信号: {tech_summary} 今日: {today_str}"}
+                        ]
+                        result = _call_dashscope_chat(msgs, max_tokens=150, temperature=0.3)
+                        if result and '{' in result:
+                            start = result.index('{')
+                            end = result.rindex('}') + 1
+                            llm_s = _json.loads(result[start:end])
+                            s_color = 'red' if llm_s.get('score', 0.5) > 0.5 else 'green' if llm_s.get('score', 0.5) < 0.5 else 'default'
+                            factors_text = '\n'.join([f"- [推断] {f}" for f in llm_s.get('factors', [])[:3]])
+                            data['news_hint'] = f"**📰 消息面**\n{factors_text}\n**情绪**: <font color='{s_color}'>{llm_s.get('sentiment_label', '中性')}（{llm_s.get('score', 0.5):.1f}）</font> — {llm_s.get('summary', '')}"
+                except Exception as e:
+                    logger.warning(f"LLM消息面推断失败: {e}")
+            # 注入LGBM预测
+            try:
+                from lgbm_backtest import LGBMBacktesterOptimized
+                bt = LGBMBacktesterOptimized()
+                result = bt.run_backtest(symbol)
+                if result and result.get('predictions'):
+                    last_pred = result['predictions'][-1]
+                    up_prob = last_pred.get('up_probability', 0)
+                    win_rate = result.get('summary', {}).get('winRate', 0)
+                    signal = '看涨' if up_prob > 0.52 else '看跌' if up_prob < 0.48 else '中性'
+                    data['lgbm'] = {'up_prob': up_prob, 'signal': signal, 'win_rate': win_rate}
+            except Exception as e:
+                logger.warning(f"LGBM预测注入失败 {symbol}: {e}")
+            # 注入操作建议
+            try:
+                from advanced_analysis import get_action_recommendations
+                rec_data = get_action_recommendations(symbol)
+                recs = rec_data.get('recommendations', [])
+                if recs:
+                    r = recs[0]
+                    action = r.get('action', '持有')
+                    confidence = r.get('confidence', '中')
+                    reason = r.get('reason', '')
+                    t_sugg = r.get('t_suggestion', {})
+                    t_line = ''
+                    if t_sugg and t_sugg.get('buy_price'):
+                        t_line = f"\n做T: 买¥{t_sugg['buy_price']:.2f} 卖¥{t_sugg.get('sell_price', 0):.2f}"
+                    data['action_hint'] = f"{action}（置信度{confidence}）— {reason}{t_line}"
+            except Exception as e:
+                logger.warning(f"操作建议注入失败 {symbol}: {e}")
             return make_technical_card(data)
         elif intent == 'alert':
             alerts = get_smart_alerts()
@@ -185,7 +265,8 @@ def process_message(text: str) -> dict:
                 return make_text_card(f"风控评分失败: {data['error']}")
             return make_risk_card(data)
         elif intent == 'recommend':
-            data = get_action_recommendations()
+            symbol = params.get('symbol')
+            data = get_action_recommendations(symbol=symbol)
             if 'error' in data:
                 return make_text_card(f"操作建议获取失败: {data['error']}")
             return make_recommend_card(data)

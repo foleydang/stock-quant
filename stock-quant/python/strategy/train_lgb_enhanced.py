@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import lightgbm as lgb
+import sqlite3
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from sklearn.model_selection import TimeSeriesSplit
@@ -22,6 +23,8 @@ import warnings
 warnings.filterwarnings('ignore')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data/stock_data.db')
 
 
 class EnhancedFeatureEngineer:
@@ -260,6 +263,135 @@ class EnhancedFeatureEngineer:
 
         return features
 
+
+class MarketFeatureEngineer:
+    """市场/板块特征工程
+    从DB中读取北向资金、大盘涨跌、板块数据，
+    合并到30分钟线DataFrame中。
+    """
+
+    MARKET_FEATURE_NAMES = None
+
+    @staticmethod
+    def calculate_market_features(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame:
+        """
+        计算市场/板块特征（约8个）
+        
+        Args:
+            df: 30分钟K线DataFrame，必须有 'date' 列
+            symbol: 股票代码（如 '600036.SH'），用于查询板块映射
+        """
+        features = pd.DataFrame(index=df.index)
+
+        # 1. 从date列提取trade_date
+        if 'date' not in df.columns:
+            return features
+
+        df_dates = pd.to_datetime(df['date'])
+        # kline_30m用YYYY-MM-DD, hs300_daily用YYYYMMDD， north_flow用YYYY-MM-DD
+        trade_dates_ymd = df_dates.dt.strftime('%Y-%m-%d')
+        trade_dates_raw8 = df_dates.dt.strftime('%Y%m%d')  # BaoStock格式
+
+        # 2. 查询北向资金（从north_flow表，YYYY-MM-DD格式）
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            min_date_ymd = trade_dates_ymd.min()
+            max_date_ymd = trade_dates_ymd.max()
+            north_df = pd.read_sql(
+                "SELECT trade_date, total_net FROM north_flow "
+                "WHERE total_net IS NOT NULL AND total_net != 0 "
+                f"AND trade_date >= '{min_date_ymd}' AND trade_date <= '{max_date_ymd}'",
+                conn
+            )
+            conn.close()
+
+            if len(north_df) > 0:
+                north_df['total_net_billion'] = north_df['total_net'] / 10000  # 万元转亿元
+                north_map = dict(zip(north_df['trade_date'], north_df['total_net_billion']))
+
+                features['north_flow'] = trade_dates_ymd.map(north_map).fillna(0)
+                features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
+                features['north_flow_change'] = features['north_flow'].diff(6)
+            else:
+                features['north_flow'] = 0
+                features['north_flow_cum_3'] = 0
+                features['north_flow_change'] = 0
+        except Exception as e:
+            features['north_flow'] = 0
+            features['north_flow_cum_3'] = 0
+            features['north_flow_change'] = 0
+
+        # 3. 大盘涨跌幅（从hs300_daily表，YYYYMMDD格式）
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            min_date_raw8 = trade_dates_raw8.min()
+            max_date_raw8 = trade_dates_raw8.max()
+            hs300_df = pd.read_sql(
+                "SELECT trade_date, pct_chg, avg_pct_chg, up_count, down_count FROM hs300_daily "
+                f"WHERE trade_date >= '{min_date_raw8}' AND trade_date <= '{max_date_raw8}'",
+                conn
+            )
+            conn.close()
+
+            if len(hs300_df) > 0:
+                # 优先用pct_chg（BaoStock真实沪深300涨跌幅），fallback用avg_pct_chg（kline_30m推算）
+                # 字段名可能不同，需要适配
+                pct_col = 'pct_chg' if 'pct_chg' in hs300_df.columns else 'avg_pct_chg'
+                hs300_map_pct = dict(zip(hs300_df['trade_date'], hs300_df[pct_col]))
+                
+                up_col = 'up_count' if 'up_count' in hs300_df.columns else None
+                down_col = 'down_count' if 'down_count' in hs300_df.columns else None
+
+                features['market_pct_chg'] = trade_dates_raw8.map(hs300_map_pct).fillna(0)
+                if up_col:
+                    hs300_map_up = dict(zip(hs300_df['trade_date'], hs300_df[up_col]))
+                    hs300_map_down = dict(zip(hs300_df['trade_date'], hs300_df[down_col]))
+                    features['market_up_ratio'] = trade_dates_raw8.map(hs300_map_up).fillna(0) / \
+                                                  (trade_dates_raw8.map(hs300_map_down).fillna(0) + trade_dates_raw8.map(hs300_map_up).fillna(0) + 1e-10)
+                else:
+                    features['market_up_ratio'] = 0  # 无涨跌家数数据
+                features['market_momentum_3'] = features['market_pct_chg'].rolling(6, min_periods=1).sum()
+            else:
+                features['market_pct_chg'] = 0
+                features['market_up_ratio'] = 0
+                features['market_momentum_3'] = 0
+        except Exception as e:
+            features['market_pct_chg'] = 0
+            features['market_up_ratio'] = 0
+            features['market_momentum_3'] = 0
+
+        # 4. 个股vs大盘超额收益
+        if 'close' in df.columns and 'market_pct_chg' in features.columns:
+            stock_pct = df['close'].pct_change()
+            features['alpha_vs_market'] = stock_pct - features['market_pct_chg'] / 100
+            features['alpha_cum_3'] = features['alpha_vs_market'].rolling(6, min_periods=1).sum()
+        else:
+            features['alpha_vs_market'] = 0
+            features['alpha_cum_3'] = 0
+
+        # 5. 板块信息（从stock_sector表）
+        try:
+            if symbol:
+                conn = sqlite3.connect(DB_PATH)
+                sector_row = conn.execute(
+                    "SELECT industry FROM stock_sector WHERE symbol=?", (symbol,)
+                ).fetchone()
+                conn.close()
+                industry = sector_row[0] if sector_row else '其他'
+            else:
+                industry = '其他'
+        except:
+            industry = '其他'
+
+        # 板块是否为强势行业（编码为0/1）
+        strong_industries = {'电子', '电力设备', '计算机', '通信', '医药生物', '国防军工', '汽车'}
+        features['sector_is_strong'] = 1 if industry in strong_industries else 0
+
+        if MarketFeatureEngineer.MARKET_FEATURE_NAMES is None:
+            MarketFeatureEngineer.MARKET_FEATURE_NAMES = features.columns.tolist()
+
+        return features
+
     @staticmethod
     def calculate_target(df: pd.DataFrame, horizon: int = 3, threshold: float = 0.008) -> np.ndarray:
         """
@@ -332,61 +464,17 @@ def load_data_from_db(db_path: str) -> Dict[str, pd.DataFrame]:
     return all_data
 
 
-def load_data(cache_dir: str, use_csv: bool = True) -> Dict[str, pd.DataFrame]:
-    """加载数据（优先从数据库）"""
-    # 优先从数据库加载
+def load_data(cache_dir: str = '') -> Dict[str, pd.DataFrame]:
+    """加载数据（从数据库）
+
+    不再使用CSV/pkl缓存，直接从DB读取。
+    """
     db_path = os.path.join(os.path.dirname(__file__), '../data/stock_data.db')
     if os.path.exists(db_path):
         return load_data_from_db(db_path)
 
-    # 备用：从缓存加载
-    all_data = {}
-
-    # 加载沪深300缓存
-    if os.path.exists(cache_dir):
-        pkl_files = [f for f in os.listdir(cache_dir) if f.endswith('.pkl')]
-        print(f"加载沪深300缓存: {len(pkl_files)} 个文件")
-
-        for i, file in enumerate(pkl_files):
-            symbol = file.replace('.pkl', '')
-            cache_file = os.path.join(cache_dir, file)
-
-            try:
-                with open(cache_file, 'rb') as f:
-                    df = pickle.load(f)
-
-                if df is not None and len(df) >= 100:
-                    if 'date' in df.columns:
-                        df['date'] = pd.to_datetime(df['date'])
-                        df = df.sort_values('date').reset_index(drop=True)
-                    all_data[symbol] = df
-            except Exception as e:
-                print(f"  加载失败 {symbol}: {e}")
-
-    # 加载现有CSV数据
-    if use_csv:
-        data_dir = os.path.join(os.path.dirname(__file__), '../data')
-        csv_files = [f for f in os.listdir(data_dir) if f.endswith('_30m.csv')]
-
-        print(f"加载现有CSV: {len(csv_files)} 个文件")
-
-        for file in csv_files:
-            symbol = file.replace('_30m.csv', '')
-            if symbol in all_data:
-                continue
-
-            csv_file = os.path.join(data_dir, file)
-            try:
-                df = pd.read_csv(csv_file)
-                if len(df) >= 100:
-                    df['date'] = pd.to_datetime(df['date'])
-                    df = df.sort_values('date').reset_index(drop=True)
-                    all_data[symbol] = df
-            except Exception as e:
-                print(f"  加载失败 {symbol}: {e}")
-
-    print(f"成功加载 {len(all_data)} 只股票数据")
-    return all_data
+    print("数据库不存在，无法加载数据")
+    return {}
 
 
 def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -> Tuple[np.ndarray, np.ndarray]:
@@ -398,7 +486,13 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
 
     for i, (symbol, df) in enumerate(all_data.items()):
         try:
+            # 基础技术特征
             features = EnhancedFeatureEngineer.calculate_features(df)
+            # 市场/板块特征
+            market_features = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
+            # 合并
+            features = pd.concat([features, market_features], axis=1)
+
             target = EnhancedFeatureEngineer.calculate_target(df, horizon=horizon)
 
             # 过滤无效数据

@@ -7,9 +7,18 @@
 
 from datetime import datetime
 
+def _fmt_price(value, is_etf=False):
+    """价格格式化：ETF用3位小数(0.600)，个股用2位(74.52)"""
+    if value is None:
+        return "-"
+    if is_etf or (0 < value < 1):
+        return f"{value:.3f}"
+    return f"{value:.2f}"
+
+
 
 def make_position_card(summary, positions, t_suggestions=None):
-    """持仓概览"""
+    """持仓概览 - column_set + table布局"""
     total_value = summary.get('total_value', 0)
     total_profit = summary.get('total_profit', 0)
     profit_pct = summary.get('profit_pct', 0)
@@ -17,36 +26,59 @@ def make_position_card(summary, positions, t_suggestions=None):
     profit_color = "green" if total_profit < 0 else "red"
     profit_sign = "+" if total_profit >= 0 else ""
 
-    pos_rows = ""
+    # 持仓数据转 column_set 行（类似表格）
+    pos_elements = []
+    # 表头行
+    pos_elements.append({"tag": "column_set", "flex_mode": "none", "background_style": "default",
+        "columns": [
+            {"tag": "column", "width": "weighted", "weight": 2, "elements": [{"tag": "markdown", "content": "**股票**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**持仓**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**成本**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**现价**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**盈亏**"}]},
+        ]})
     for p in positions[:10]:
         p_pct = p.get('profit_pct', 0)
         p_sign = "+" if p_pct >= 0 else ""
         emoji = "🔴" if p_pct > 0 else "🟢" if p_pct < 0 else "⚪"
-        pos_rows += f"| {emoji} {p['stock_name']} | {p['shares']}股 | ¥{p['cost_price']:.2f} | ¥{p['current_price']:.2f} | {p_sign}{p_pct:.1f}% |\n"
+        profit_color = "red" if p_pct > 0 else "green" if p_pct < 0 else "default"
+        pos_elements.append({"tag": "column_set", "flex_mode": "none", "background_style": "grey",
+            "columns": [
+                {"tag": "column", "width": "weighted", "weight": 2, "elements": [{"tag": "markdown", "content": f"{emoji} {p['stock_name']}"}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"{p['shares']}股"}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"¥{p['cost_price']:.2f}"}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"¥{p['current_price']:.2f}"}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"<font color='{profit_color}'>{p_sign}{p_pct:.1f}%</font>"}]},
+            ]})
 
     t_section = ""
     if t_suggestions:
-        t_section = "\n---\n**💡 做T建议**\n"
+        t_section = "\n**💡 做T建议**\n"
         for t in t_suggestions[:5]:
             emoji_map = {"适合做T": "🟢", "可减仓": "🔵", "观望": "⚠️", "不建议": "❌"}
             emoji = emoji_map.get(t.get('action', ''), '⚪')
             t_section += f"- {emoji} **{t['stock_name']}** {t.get('action', '')}: {t.get('reason', '')}\n"
 
+    elements = [
+        {"tag": "column_set", "flex_mode": "bisect", "background_style": "default",
+         "columns": [
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**总市值**\n¥{total_value:,.0f}"}]},
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**浮动盈亏**\n<font color='{profit_color}'>{profit_sign}¥{total_profit:,.0f} ({profit_sign}{profit_pct:.1f}%)</font>"}]},
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**可用现金**\n¥{available_cash:,.0f}"}]},
+         ]},
+        {"tag": "hr"},
+    ]
+    if pos_elements:
+        elements.extend(pos_elements)
+    if t_section:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": t_section})
+    elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "⚠️ 仅供参考，不构成投资建议"}]})
+
     return {
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": "📊 持仓概览"}, "template": "blue" if total_profit >= 0 else "red"},
-        "elements": [
-            {"tag": "column_set", "flex_mode": "bisect", "background_style": "default",
-             "columns": [
-                 {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**总市值**\n¥{total_value:,.0f}"}]},
-                 {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**浮动盈亏**\n<font color='{profit_color}'>{profit_sign}¥{total_profit:,.0f} ({profit_sign}{profit_pct:.1f}%)</font>"}]},
-                 {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**可用现金**\n¥{available_cash:,.0f}"}]},
-             ]},
-            {"tag": "hr"},
-            {"tag": "markdown", "content": f"| 股票 | 持仓 | 成本 | 现价 | 盈亏 |\n|---|---|---|---|---|\n{pos_rows}"},
-            {"tag": "markdown", "content": t_section},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "⚠️ 仅供参考，不构成投资建议"}]}
-        ]
+        "elements": elements
     }
 
 
@@ -77,26 +109,38 @@ def make_stock_card(data):
             v = f"{volume/10000:.1f}万手" if volume > 10000 else f"{volume}手"
             detail += f" | 成交 {v}"
 
+    ind_elements = []
     indicators = data.get('indicators', {})
-    ind_section = ""
     if indicators:
         items = [f"**{k}**: {v}" for k, v in indicators.items() if v and v != 'N/A']
         if items:
-            ind_section = "\n---\n**技术指标** " + " | ".join(items[:6])
+            ind_section = "\n---\n**技术指标**\n"
+            # 每行3个指标，column_set布局
+            for i in range(0, len(items[:6]), 3):
+                row_items = items[i:i+3]
+                columns = []
+                for item in row_items:
+                    columns.append({"tag": "column", "width": "weighted", "weight": 1,
+                                   "elements": [{"tag": "markdown", "content": item}]})
+                ind_elements.append({"tag": "column_set", "flex_mode": "bisect",
+                                    "background_style": "grey", "columns": columns})
+
+    stock_elements = [
+        {"tag": "column_set", "flex_mode": "none", "background_style": "default",
+         "columns": [
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**当前价格**\n<font color='{color}'>¥{_fmt_price(price, 'ETF' in name)}</font>"}]},
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**涨跌幅**\n<font color='{color}'>{sign}{change_pct:.2f}%</font> ({amount_sign}¥{abs(change_amount):.2f})"}]},
+         ]},
+    ]
+    if detail:
+        stock_elements.append({"tag": "markdown", "content": detail})
+    stock_elements.extend(ind_elements)
+    stock_elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": f"更新: {datetime.now().strftime('%H:%M')} | Tushare"}]})
 
     return {
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": f"📈 {name} ({symbol})"}, "template": color},
-        "elements": [
-            {"tag": "column_set", "flex_mode": "none", "background_style": "default",
-             "columns": [
-                 {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**当前价格**\n<font color='{color}'>¥{price:.2f}</font>"}]},
-                 {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**涨跌幅**\n<font color='{color}'>{sign}{change_pct:.2f}%</font> ({amount_sign}¥{abs(change_amount):.2f})"}]},
-             ]},
-            {"tag": "markdown", "content": detail},
-            {"tag": "markdown", "content": ind_section},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": f"更新: {datetime.now().strftime('%H:%M')} | Tushare"}]}
-        ]
+        "elements": stock_elements
     }
 
 
@@ -192,17 +236,36 @@ def make_compare_card(compare_data):
 
 
 def make_signal_card(signals):
-    """交易信号"""
+    """交易信号 - column_set行布局"""
     if not signals:
         return make_text_card("当前没有新的交易信号")
-    rows = ""
+
+    buy_count = sum(1 for s in signals if '买入' in s.get('signal', '') or s.get('signal') == 'buy')
+    sell_count = sum(1 for s in signals if '卖出' in s.get('signal', '') or s.get('signal') == 'sell')
+
+    sig_elements = []
+    # 表头行
+    sig_elements.append({"tag": "column_set", "flex_mode": "none", "background_style": "default",
+        "columns": [
+            {"tag": "column", "width": "weighted", "weight": 2, "elements": [{"tag": "markdown", "content": "**股票**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**现价**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**信号**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**概率**"}]},
+            {"tag": "column", "width": "weighted", "weight": 2, "elements": [{"tag": "markdown", "content": "**原因**"}]},
+        ]})
     for s in signals[:10]:
         sig = s.get('signal', '持有')
         emoji = {"买入": "🟢", "卖出": "🔴", "buy": "🟢", "sell": "🔴"}.get(sig, "⚪")
         prob = f"{s.get('up_prob', 0):.0%}" if s.get('up_prob') else "-"
-        rows += f"| {emoji} {s.get('stock_name', '')} | ¥{s.get('current_price', 0):.2f} | {sig} | {prob} | {s.get('reason', '')[:30]} |\n"
-    buy_count = sum(1 for s in signals if '买入' in s.get('signal', '') or s.get('signal') == 'buy')
-    sell_count = sum(1 for s in signals if '卖出' in s.get('signal', '') or s.get('signal') == 'sell')
+        sig_elements.append({"tag": "column_set", "flex_mode": "none", "background_style": "grey",
+            "columns": [
+                {"tag": "column", "width": "weighted", "weight": 2, "elements": [{"tag": "markdown", "content": f"{emoji} {s.get('stock_name', '')}"}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"¥{s.get('current_price', 0):.2f}"}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": sig}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": prob}]},
+                {"tag": "column", "width": "weighted", "weight": 2, "elements": [{"tag": "markdown", "content": s.get('reason', '')[:30]}]},
+            ]})
+
     return {
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": "🔔 交易信号"}, "template": "blue"},
@@ -213,7 +276,7 @@ def make_signal_card(signals):
                  {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**卖出**: {sell_count}只"}]},
              ]},
             {"tag": "hr"},
-            {"tag": "markdown", "content": f"| 股票 | 现价 | 信号 | 概率 | 原因 |\n|---|---|---|---|---|\n{rows}"},
+        ] + sig_elements + [
             {"tag": "note", "elements": [{"tag": "plain_text", "content": "⚠️ 仅供参考"}]}
         ]
     }
@@ -253,7 +316,7 @@ def make_text_card(text):
 
 
 def make_alert_card(alert_type, symbol, name, details):
-    """异动告警"""
+    """异动告警（旧版，保留兼容）"""
     template = {"大涨": "green", "大跌": "red", "放量": "orange", "异动": "violet"}.get(alert_type, "red")
     return {
         "config": {"wide_screen_mode": True},
@@ -265,8 +328,80 @@ def make_alert_card(alert_type, symbol, name, details):
     }
 
 
+def make_alert_card_with_hint(alert_type, symbol, name, details, action_hint, ta_data=None):
+    """异动告警 + 操作建议（含个股技术指标详情）"""
+    template = {
+        "大涨": "green", "大跌": "red", "放量大涨": "orange", "放量大跌": "red",
+        "缩量大涨": "green", "缩量大跌": "red",
+        "接近支撑位": "blue", "接近压力位": "orange",
+        "异动": "violet"
+    }.get(alert_type, "red")
+
+    elements = []
+
+    # 标题行
+    elements.append({"tag": "markdown", "content": f"**{name}** ({symbol})"})
+
+    # 个股技术指标详情（column_set布局）
+    if ta_data and 'error' not in ta_data:
+        current = ta_data.get('current', 0)
+        change_pct = ta_data.get('change_pct', 0)
+        sign = '+' if change_pct > 0 else ''
+        color = 'red' if change_pct > 0 else 'green' if change_pct < 0 else 'default'
+        vol_ratio = ta_data.get('volume_ratio')
+        rsi_val = ta_data.get('rsi')
+        is_etf = 'ETF' in name or symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50')
+
+        ind_columns = [
+            {"tag": "column", "width": "weighted", "weight": 1,
+             "elements": [{"tag": "markdown", "content": f"**现价**\n<font color='{color}'>¥{_fmt_price(current, is_etf)} ({sign}{change_pct:.2f}%)</font>"}]},
+        ]
+        if vol_ratio:
+            vol_color = 'red' if vol_ratio > 2 else 'default'
+            ind_columns.append({"tag": "column", "width": "weighted", "weight": 1,
+                "elements": [{"tag": "markdown", "content": f"**量比**\n<font color='{vol_color}'>{vol_ratio:.1f}</font>"}]})
+        if rsi_val:
+            rsi_color = 'red' if rsi_val > 70 else 'green' if rsi_val < 30 else 'default'
+            ind_columns.append({"tag": "column", "width": "weighted", "weight": 1,
+                "elements": [{"tag": "markdown", "content": f"**RSI**\n<font color='{rsi_color}'>{rsi_val:.1f}</font>"}]})
+        ma5 = ta_data.get('ma5')
+        ma20 = ta_data.get('ma20')
+        if ma5 and ma20:
+            ma_color = 'red' if current > ma5 else 'green'
+            ind_columns.append({"tag": "column", "width": "weighted", "weight": 1,
+                "elements": [{"tag": "markdown", "content": f"**MA5/MA20**\n<font color='{ma_color}'>{_fmt_price(ma5, is_etf)} / {_fmt_price(ma20, is_etf)}</font>"}]})
+
+        elements.append({"tag": "column_set", "flex_mode": "bisect", "background_style": "grey", "columns": ind_columns})
+
+        # 支撑压力位（飞书table）
+        supports = ta_data.get('supports', [])
+        resistances = ta_data.get('resistances', [])
+        if supports or resistances:
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown", "content": "**关键价位**"})
+            sr_elements = _build_sr_columns(supports, resistances, current, is_etf)
+            elements.extend(sr_elements)
+
+    # 异动详情
+    elements.append({"tag": "hr"})
+    elements.append({"tag": "markdown", "content": details})
+
+    # 操作建议
+    if action_hint:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": "**💡 操作建议**\n" + action_hint})
+
+    elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "动态阈值+量价联合 | ⚠️ 不构成投资建议"}]})
+
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {"title": {"tag": "plain_text", "content": f"🚨 {alert_type} - {name}"}, "template": template},
+        "elements": elements
+    }
+
+
 def make_backtest_card(data):
-    """回测结果"""
+    """回测结果 - column_set行布局"""
     summary = data.get('summary', {})
     total_return = summary.get('total_return', 0)
     win_rate = summary.get('win_rate', 0)
@@ -275,25 +410,44 @@ def make_backtest_card(data):
     ret_color = "green" if total_return > 0 else "red"
     ret_sign = "+" if total_return > 0 else ""
     trades = data.get('trades', [])
-    rows = ""
+
+    trade_elements = []
+    # 表头行
+    trade_elements.append({"tag": "column_set", "flex_mode": "none", "background_style": "default",
+        "columns": [
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**操作**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**价格**"}]},
+            {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": "**数量**"}]},
+            {"tag": "column", "width": "weighted", "weight": 2, "elements": [{"tag": "markdown", "content": "**时间**"}]},
+        ]})
     for t in trades[:5]:
         t_type = t.get('type', '')
         emoji = "🟢" if t_type == "buy" else "🔴" if t_type == "sell" else "⚪"
-        rows += f"| {emoji} {t_type} | ¥{t.get('price', 0):.2f} | {t.get('shares', 0)}股 | {t.get('time', '')[:10]} |\n"
+        trade_elements.append({"tag": "column_set", "flex_mode": "none", "background_style": "grey",
+            "columns": [
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"{emoji} {t_type}"}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"¥{t.get('price', 0):.2f}"}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"{t.get('shares', 0)}股"}]},
+                {"tag": "column", "width": "weighted", "weight": 2, "elements": [{"tag": "markdown", "content": t.get('time', '')[:10]}]},
+            ]})
+
+    elements = [
+        {"tag": "column_set", "flex_mode": "bisect", "background_style": "default",
+         "columns": [
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**总收益**\n<font color='{ret_color}'>{ret_sign}{total_return:.2f}%</font>"}]},
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**胜率**\n{win_rate:.1f}%"}]},
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**交易数**\n{total_trades}笔"}]},
+         ]},
+        {"tag": "hr"},
+    ]
+    if trade_elements:
+        elements.extend(trade_elements)
+    elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "LGBM | ⚠️ 回测不代表未来"}]})
+
     return {
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": f"📊 回测 - {name}"}, "template": ret_color},
-        "elements": [
-            {"tag": "column_set", "flex_mode": "bisect", "background_style": "default",
-             "columns": [
-                 {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**总收益**\n<font color='{ret_color}'>{ret_sign}{total_return:.2f}%</font>"}]},
-                 {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**胜率**\n{win_rate:.1f}%"}]},
-                 {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**交易数**\n{total_trades}笔"}]},
-             ]},
-            {"tag": "hr"},
-            {"tag": "markdown", "content": f"| 操作 | 价格 | 数量 | 时间 |\n|---|---|---|---|\n{rows}"},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "LGBM | ⚠️ 回测不代表未来"}]}
-        ]
+        "elements": elements
     }
 
 
@@ -334,59 +488,103 @@ def make_daily_summary_card(summary, positions, signals, t_suggestions=None):
     }
 
 
+def _build_indicator_grid(indicators: list, row_size: int = 5) -> list:
+    """将指标列表转为飞书卡片 column_set 行（每行 row_size 个指标）
+    flex_mode 用 none 让列自适应宽度，不强制分组"""
+    rows = []
+    for i in range(0, len(indicators), row_size):
+        row_items = indicators[i:i+row_size]
+        columns = []
+        for item in row_items:
+            columns.append({"tag": "column", "width": "weighted", "weight": 1,
+                           "elements": [{"tag": "markdown", "content": item}]})
+        rows.append({"tag": "column_set", "flex_mode": "none",
+                    "background_style": "grey", "columns": columns})
+    return rows
+
+
+def _build_sr_columns(supports: list, resistances: list, current: float, is_etf: bool = False) -> list:
+    """将支撑压力位转为紧凑布局——支撑一行，压力一行"""
+    elements = []
+    # 支撑位：一行横排所有价位
+    if supports:
+        support_parts = []
+        for s in supports:
+            dist = (current - s) / current * 100 if current > 0 else 0
+            support_parts.append(f"¥{_fmt_price(s, is_etf)} ({dist:.1f}%)")
+        support_text = "🛡️ **支撑**: " + " | ".join(support_parts)
+        elements.append({"tag": "markdown", "content": support_text})
+    # 压力位：一行横排所有价位
+    if resistances:
+        resist_parts = []
+        for r in resistances:
+            dist = (r - current) / current * 100 if current > 0 else 0
+            resist_parts.append(f"¥{_fmt_price(r, is_etf)} ({dist:.1f}%)")
+        resist_text = "🚧 **压力**: " + " | ".join(resist_parts)
+        elements.append({"tag": "markdown", "content": resist_text})
+    return elements
+
+
 def make_technical_card(data: dict) -> dict:
-    """技术分析卡片"""
+    """技术分析卡片 - column_set网格 + table布局"""
     name = data.get('name', data.get('symbol', ''))
     symbol = data.get('symbol', '')
     current = data.get('current', 0)
     change_pct = data.get('change_pct', 0)
+    is_etf = 'ETF' in name or symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50')
     color = "red" if change_pct > 0 else "green" if change_pct < 0 else "default"
     sign = "+" if change_pct > 0 else ""
 
-    # 指标概览
+    # 指标概览（column_set网格）
     indicators = []
     ma5, ma10, ma20, ma60 = data.get('ma5'), data.get('ma10'), data.get('ma20'), data.get('ma60')
-    if ma5: indicators.append(f"MA5 {ma5:.2f}")
-    if ma10: indicators.append(f"MA10 {ma10:.2f}")
-    if ma20: indicators.append(f"MA20 {ma20:.2f}")
-    if ma60: indicators.append(f"MA60 {ma60:.2f}")
+    if ma5: indicators.append(f"**MA5**\n{ma5:.2f}")
+    if ma10: indicators.append(f"**MA10**\n{ma10:.2f}")
+    if ma20: indicators.append(f"**MA20**\n{ma20:.2f}")
+    if ma60: indicators.append(f"**MA60**\n{ma60:.2f}")
 
     rsi = data.get('rsi')
     if rsi:
         rsi_color = "red" if rsi > 70 else "green" if rsi < 30 else "default"
-        indicators.append(f"RSI <font color='{rsi_color}'>{rsi:.1f}</font>")
+        indicators.append(f"**RSI**\n<font color='{rsi_color}'>{rsi:.1f}</font>")
 
     kdj_j = data.get('kdj_j')
     if kdj_j:
         j_color = "red" if kdj_j > 100 else "green" if kdj_j < 0 else "default"
-        indicators.append(f"KDJ-J <font color='{j_color}'>{kdj_j:.1f}</font>")
+        indicators.append(f"**KDJ-J**\n<font color='{j_color}'>{kdj_j:.1f}</font>")
 
     vol_ratio = data.get('volume_ratio')
     if vol_ratio:
         vol_color = "red" if vol_ratio > 2 else "default"
-        indicators.append(f"量比 <font color='{vol_color}'>{vol_ratio:.1f}</font>")
+        indicators.append(f"**量比**\n<font color='{vol_color}'>{vol_ratio:.1f}</font>")
 
     macd_dif = data.get('macd_dif')
     macd_dea = data.get('macd_dea')
     if macd_dif and macd_dea:
         macd_color = "red" if macd_dif > macd_dea else "green"
-        indicators.append(f"MACD <font color='{macd_color}'>DIF {macd_dif:.2f}</font>")
+        indicators.append(f"**MACD**\n<font color='{macd_color}'>DIF {macd_dif:.2f}</font>")
 
     boll_upper, boll_lower = data.get('boll_upper'), data.get('boll_lower')
     if boll_upper and boll_lower:
-        indicators.append(f"布林 上{boll_upper:.2f} 下{boll_lower:.2f}")
+        indicators.append(f"**布林**\n上{_fmt_price(boll_upper, is_etf)} 下{_fmt_price(boll_lower, is_etf)}")
 
     threshold = data.get('dynamic_threshold')
     if threshold:
-        indicators.append(f"异动阈值 {threshold:.1f}%")
+        indicators.append(f"**阈值**\n{threshold:.1f}%")
 
-    ind_line = " | ".join(indicators)
+    # 构建元素列表
+    elements = [
+        {"tag": "markdown", "content": f"**当前** <font color='{color}'>¥{_fmt_price(current, is_etf)} ({sign}{change_pct:.2f}%)</font>"},
+    ]
+
+    # 指标网格（每行3个）
+    if indicators:
+        elements.extend(_build_indicator_grid(indicators, row_size=5))
 
     # 信号列表
     signals = data.get('signals', [])
-    signal_line = ""
     if signals:
-        signal_line = "\n---\n**🔔 技术信号**\n"
+        signal_line = "**🔔 技术信号**\n"
         for s in signals:
             emoji_map = {"金叉": "🟢", "死叉": "🔴", "超买": "⚠️", "超卖": "💡", "多头": "📈", "空头": "📉", "新高": "🔥", "新低": "❄️", "放量": "⚡", "缩量": "🔇", "支撑": "🛡️", "压力": "🚧", "突破": "🎯", "跌破": "💥"}
             emoji = "🔔"
@@ -395,30 +593,53 @@ def make_technical_card(data: dict) -> dict:
                     emoji = e
                     break
             signal_line += f"- {emoji} {s}\n"
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": signal_line})
     else:
-        signal_line = "\n---\n*当前无重要技术信号*"
+        elements.append({"tag": "markdown", "content": "*当前无重要技术信号*"})
 
-    # 支撑压力位
-    sr_line = ""
+    # 支撑压力位（飞书table）
     supports = data.get('supports', [])
     resistances = data.get('resistances', [])
     if supports or resistances:
-        sr_line = "\n**关键价位**\n"
-        if supports:
-            sr_line += f"🛡️ 支撑: " + " | ".join([f"¥{s:.2f}" for s in supports]) + "\n"
-        if resistances:
-            sr_line += f"🚧 压力: " + " | ".join([f"¥{r:.2f}" for r in resistances]) + "\n"
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": "**关键价位**"})
+        sr_elements = _build_sr_columns(supports, resistances, current, is_etf)
+        elements.extend(sr_elements)
+
+    # 操作建议
+    action_hint = data.get('action_hint', '')
+    if action_hint:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": "**💡 操作建议**\n" + action_hint})
+
+    # LGBM AI预测
+    lgbm = data.get('lgbm')
+    if lgbm:
+        up_prob = lgbm.get('up_prob', 0)
+        signal = lgbm.get('signal', '')
+        win_rate = lgbm.get('win_rate', 0)
+        prob_color = 'red' if up_prob > 0.5 else 'green' if up_prob < 0.5 else 'default'
+        elements.append({"tag": "column_set", "flex_mode": "bisect", "background_style": "grey",
+            "columns": [
+                {"tag": "column", "width": "weighted", "weight": 1,
+                 "elements": [{"tag": "markdown", "content": f"**🤖 AI预测**\n<font color='{prob_color}'>{signal} ({up_prob:.0%})</font>"}]},
+                {"tag": "column", "width": "weighted", "weight": 1,
+                 "elements": [{"tag": "markdown", "content": f"**历史胜率**\n{win_rate:.1%}"}]},
+            ]})
+
+    # 新闻面
+    news_hint = data.get('news_hint', '')
+    if news_hint:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": news_hint})
+
+    elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "技术面+消息面+LLM | ⚠️ 不构成投资建议"}]})
 
     return {
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": f"📊 {name} ({symbol}) 技术分析"}, "template": "blue"},
-        "elements": [
-            {"tag": "markdown", "content": f"**当前** <font color='{color}'>¥{current:.2f} ({sign}{change_pct:.2f}%)</font>"},
-            {"tag": "markdown", "content": ind_line},
-            {"tag": "markdown", "content": signal_line},
-            {"tag": "markdown", "content": sr_line},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "⚠️ 仅供参考，不构成投资建议"}]}
-        ]
+        "elements": elements
     }
 
 
@@ -511,45 +732,50 @@ def make_deep_data_card(data: dict) -> dict:
     v = data.get('valuation', {})
     p = data.get('profit', {})
     
-    # 估值行
+    # 估值行（column_set布局）
     val_items = []
     pe = v.get('pe_ttm')
-    if pe: val_items.append(f"PE {pe:.1f}")
+    if pe: val_items.append(f"**PE**\n{pe:.1f}")
     pb = v.get('pb')
-    if pb: val_items.append(f"PB {pb:.2f}")
+    if pb: val_items.append(f"**PB**\n{pb:.2f}")
     mv = v.get('total_mv')
-    if mv: val_items.append(f"市值 {mv/10000:.0f}亿")  # 万元→亿
+    if mv: val_items.append(f"**市值**\n{mv/10000:.0f}亿")  # 万元→亿
     tr = v.get('turnover_rate')
-    if tr: val_items.append(f"换手率 {tr:.2f}%")
+    if tr: val_items.append(f"**换手率**\n{tr:.2f}%")
     vr = v.get('volume_ratio')
-    if vr: val_items.append(f"量比 {vr:.1f}")
-    val_line = " | ".join(val_items) if val_items else "暂无估值数据"
+    if vr: val_items.append(f"**量比**\n{vr:.1f}")
+    val_grid = _build_indicator_grid(val_items, row_size=3) if val_items else [{"tag": "markdown", "content": "暂无估值数据"}]
     
-    # 盈利行
+    # 盈利行（column_set布局）
     profit_items = []
     roe = p.get('roe')
-    if roe: profit_items.append(f"ROE {roe:.2f}%")
+    if roe: profit_items.append(f"**ROE**\n{roe:.2f}%")
     npm = p.get('netprofit_margin')
-    if npm: profit_items.append(f"净利率 {npm:.2f}%")
+    if npm: profit_items.append(f"**净利率**\n{npm:.2f}%")
     gpm = p.get('grossprofit_margin')
-    if gpm: profit_items.append(f"毛利率 {gpm:.2f}%")
+    if gpm: profit_items.append(f"**毛利率**\n{gpm:.2f}%")
     or_yoy = p.get('or_yoy')
-    if or_yoy: profit_items.append(f"营收增速 {or_yoy:.2f}%")
+    if or_yoy: profit_items.append(f"**营收增速**\n{or_yoy:.2f}%")
     np_yoy = p.get('netprofit_yoy')
-    if np_yoy: profit_items.append(f"净利增速 {np_yoy:.2f}%")
-    profit_line = " | ".join(profit_items) if profit_items else "暂无盈利数据"
+    if np_yoy: profit_items.append(f"**净利增速**\n{np_yoy:.2f}%")
+    profit_grid = _build_indicator_grid(profit_items, row_size=3) if profit_items else [{"tag": "markdown", "content": "暂无盈利数据"}]
     end_date = p.get('end_date', '')
     
+    elements = [
+        {"tag": "markdown", "content": f"**当前** <font color='{color}'>¥{_fmt_price(current, 'ETF' in name)} ({sign}{change_pct:.2f}%)</font>"},
+        {"tag": "hr"},
+        {"tag": "markdown", "content": "**估值指标**"},
+    ]
+    elements.extend(val_grid)
+    elements.append({"tag": "hr"})
+    elements.append({"tag": "markdown", "content": f"**盈利指标**（{end_date}）"})
+    elements.extend(profit_grid)
+    elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "Tushare | ⚠️ 仅供参考"}]})
+
     return {
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": f"🔍 {name} ({symbol}) 深度数据"}, "template": "blue"},
-        "elements": [
-            {"tag": "markdown", "content": f"**当前** <font color='{color}'>¥{current:.2f} ({sign}{change_pct:.2f}%)</font>"},
-            {"tag": "hr"},
-            {"tag": "markdown", "content": f"**估值指标**\n{val_line}"},
-            {"tag": "markdown", "content": f"**盈利指标**（{end_date}）\n{profit_line}"},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "Tushare | ⚠️ 仅供参考"}]}
-        ]
+        "elements": elements
     }
 
 
@@ -685,41 +911,146 @@ def make_risk_card(data: dict) -> dict:
     }
 
 
+
+def _fmt_price(value, is_etf=False):
+    """价格格式化：ETF用3位小数(0.600)，个股用2位(74.52)"""
+    if value is None:
+        return "-"
+    if is_etf or (value < 1 and value > 0):
+        return f"{value:.3f}"
+    return f"{value:.2f}"
+
+def _fmt_pct(value):
+    """百分比格式化"""
+    if value is None:
+        return "-"
+    return f"{value:.2f}"
+
 def make_recommend_card(data: dict) -> dict:
-    """综合操作建议卡片"""
+    """综合操作建议卡片 - 每只股票独立区块，column_set+table布局"""
     recs = data.get('recommendations', [])
     sentiment = data.get('market_sentiment', '未知')
-    
-    NL = chr(10)
-    lines = "**大盘情绪**: " + sentiment + NL + NL
-    
+    avg_market_pct = data.get('avg_market_pct', 0)
+    market_sign = '+' if avg_market_pct > 0 else '' if avg_market_pct != 0 else ''
+    market_color = 'red' if avg_market_pct > 0 else 'green' if avg_market_pct < 0 else 'default'
+
+    # 大盘情绪header
+    elements = [
+        {"tag": "markdown", "content": f"**大盘情绪**: {sentiment}"},
+    ]
+    if avg_market_pct:
+        elements.append({"tag": "column_set", "flex_mode": "bisect", "background_style": "default",
+            "columns": [
+                {"tag": "column", "width": "weighted", "weight": 1,
+                 "elements": [{"tag": "markdown", "content": f"**大盘涨跌**\n<font color='{market_color}'>{market_sign}{avg_market_pct:.2f}%</font>"}]},
+            ]})
+    elements.append({"tag": "hr"})
+
+    # 每只股票一个独立区块
     for r in recs:
         action = r.get('action', '持有')
         priority = r.get('priority', '✅')
         profit_pct = r.get('profit_pct', 0)
-        profit_sign = "+" if profit_pct >= 0 else ""
-        profit_color = "red" if profit_pct > 0 else "green"
+        profit_sign = '+' if profit_pct >= 0 else ''
+        profit_color = 'red' if profit_pct > 0 else 'green'
         confidence = r.get('confidence', '中')
-        
-        lines += priority + " **" + r['name'] + "** → " + action + "（置信度" + confidence + "）" + NL
-        lines += "  <font color='" + profit_color + "'>" + profit_sign + f"{profit_pct:.1f}" + "%</font> | " + r['reason'] + NL
-        
+        is_etf = r.get('is_etf', False)
+        name = r.get('name', '')
+        symbol = r.get('symbol', '')
+        current = r.get('current_price', 0)
+
+        # 标题：优先级+股票名+操作+置信度
+        elements.append({"tag": "markdown",
+            "content": priority + " **" + name + "** → " + action + "（置信度" + confidence + "）"})
+
+        # 关键数据 column_set: 盈亏 + 原因（自适应宽度）
+        reason_col = [{"tag": "column", "width": "auto",
+            "elements": [{"tag": "markdown",
+                "content": f"<font color='{profit_color}'>{profit_sign}{profit_pct:.1f}%</font>  " + r.get('reason', '')}]}]
+        # 做T价位
+        if r.get('t_suggestion') and r['t_suggestion'].get('buy_price'):
+            reason_col.append({"tag": "column", "width": "auto",
+                "elements": [{"tag": "markdown",
+                    "content": f"**做T**\n低买¥{_fmt_price(r['t_suggestion']['buy_price'], is_etf)} 高卖¥{_fmt_price(r['t_suggestion']['sell_price'], is_etf)}"}]})
         if r.get('price_target'):
-            lines += "  🎯 目标价: ¥" + f"{r['price_target']:.2f}" + NL
-        
+            reason_col.append({"tag": "column", "width": "auto",
+                "elements": [{"tag": "markdown",
+                    "content": f"**目标价**\n¥{_fmt_price(r['price_target'], is_etf)}"}]})
+        elements.append({"tag": "column_set", "flex_mode": "bisect", "background_style": "grey", "columns": reason_col})
+
+        # 技术指标详情（column_set网格）
+        td = r.get('tech_detail', {})
+        if td:
+            td_items = []
+            if td.get('change_pct') is not None:
+                chg_sign = '+' if td['change_pct'] >= 0 else ''
+                chg_color = 'red' if td['change_pct'] > 0 else 'green' if td['change_pct'] < 0 else 'default'
+                td_items.append(f"**涨跌**\n<font color='{chg_color}'>{chg_sign}{td['change_pct']:.2f}%</font>")
+            if td.get('rsi') is not None:
+                rsi_color = 'red' if td['rsi'] > 70 else 'green' if td['rsi'] < 30 else 'default'
+                td_items.append(f"**RSI**\n<font color='{rsi_color}'>{td['rsi']:.1f}</font>")
+            if td.get('volume_ratio') is not None:
+                td_items.append(f"**量比**\n{td['volume_ratio']:.1f}")
+            if td.get('macd_dif') is not None and td.get('macd_dea') is not None:
+                macd_color = 'red' if td['macd_dif'] > td['macd_dea'] else 'green'
+                td_items.append(f"**MACD**\n<font color='{macd_color}'>DIF {td['macd_dif']:.2f}</font>")
+            if td.get('supports'):
+                td_items.append(f"**支撑**\n" + '/'.join([_fmt_price(s, is_etf) for s in td['supports']]))
+            if td.get('resistances'):
+                td_items.append(f"**压力**\n" + '/'.join([_fmt_price(v, is_etf) for v in td['resistances']]))
+            if td_items:
+                elements.extend(_build_indicator_grid(td_items, row_size=3))
+
+        # 技术信号
         if r.get('key_signals'):
-            for sig in r['key_signals'][:2]:
-                lines += "  🔔 " + sig + NL
-        
-        lines += NL
-    
+            sig_text = ""
+            for sig in r['key_signals'][:3]:
+                sig_text += "🔔 " + sig + chr(10)
+            if sig_text:
+                elements.append({"tag": "markdown", "content": sig_text})
+
+        # LGBM AI预测
+        lgbm = r.get('lgbm')
+        if lgbm:
+            up_prob = lgbm.get('up_prob', 0)
+            signal = lgbm.get('signal', '')
+            win_rate = lgbm.get('win_rate', 0)
+            prob_color = 'red' if up_prob > 0.5 else 'green' if up_prob < 0.5 else 'default'
+            elements.append({"tag": "column_set", "flex_mode": "bisect", "background_style": "default",
+                "columns": [
+                    {"tag": "column", "width": "weighted", "weight": 1,
+                     "elements": [{"tag": "markdown", "content": f"**AI预测**\n<font color='{prob_color}'>看涨{up_prob:.0%}</font> → {signal}"}]},
+                    {"tag": "column", "width": "weighted", "weight": 1,
+                     "elements": [{"tag": "markdown", "content": f"**胜率**\n{win_rate:.1f}%"}]},
+                ]})
+
+        # 新闻面
+        news_list = r.get('news', [])
+        if news_list:
+            news_text = "**📰 消息面**" + chr(10)
+            for n in news_list[:3]:
+                news_text += "- " + n['title'] + chr(10)
+            elements.append({"tag": "markdown", "content": news_text})
+        news_sent = r.get('news_sentiment')
+        if news_sent:
+            ns_score = news_sent.get('score', 0.5)
+            ns_emoji = "🟢" if ns_score > 0.6 else "🔴" if ns_score < 0.4 else "🟡"
+            elements.append({"tag": "markdown",
+                "content": ns_emoji + " " + news_sent.get('summary', '') + "  " + news_sent.get('sentiment_label', f'情绪{ns_score:.2f}')})
+
+        # 每只股票之间加分隔线
+        elements.append({"tag": "hr"})
+
+    # 去掉最后一个多余的分隔线
+    if elements and elements[-1]['tag'] == 'hr':
+        elements.pop()
+
+    elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "技术+消息+AI预测+做T | ⚠️ 不构成投资建议"}]})
+
     return {
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": "💡 综合操作建议"}, "template": "blue"},
-        "elements": [
-            {"tag": "markdown", "content": lines},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "风控+技术+资金综合判断 | ⚠️ 不构成投资建议"}]}
-        ]
+        "elements": elements
     }
 
 
@@ -771,30 +1102,30 @@ def make_valuation_card(data: dict) -> dict:
     turnover = data.get('turnover_rate')
     signals = data.get('signals', [])
     
-    NL = chr(10)
-    
+    # 估值指标（column_set布局）
     val_items = []
-    if pe: val_items.append("PE " + f"{pe:.1f}")
-    if pb: val_items.append("PB " + f"{pb:.2f}")
-    if total_mv: val_items.append("市值" + f"{total_mv/10000:.0f}" + "亿")
-    if turnover: val_items.append("换手率" + f"{turnover:.2f}" + "%")
+    if pe: val_items.append(f"**PE**\n{pe:.1f}")
+    if pb: val_items.append(f"**PB**\n{pb:.2f}")
+    if total_mv: val_items.append(f"**市值**\n{total_mv/10000:.0f}亿")
+    if turnover: val_items.append(f"**换手率**\n{turnover:.2f}%")
     
-    val_line = " | ".join(val_items)
+    val_grid = _build_indicator_grid(val_items, row_size=3) if val_items else []
     
-    signal_line = ""
+    elements = [
+        {"tag": "markdown", "content": f"**当前** ¥{current:.2f}\n\n**估值判断**: {color_emoji} {level}"},
+    ]
+    if val_grid:
+        elements.extend(val_grid)
     if signals:
-        signal_line = NL + "**技术信号**" + NL
+        signal_line = "**技术信号**\n"
         for s in signals:
-            signal_line += "- 🔔 " + s + NL
-    
-    val_content = "**当前** ¥" + f"{current:.2f}" + NL + val_line + NL + NL + "**估值判断**: " + color_emoji + " " + level
-    
+            signal_line += "- 🔔 " + s + "\n"
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": signal_line})
+    elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "PE/PB对比行业 | ⚠️ 仅供参考"}]})
+
     return {
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": color_emoji + " " + name + " 估值: " + level}, "template": "blue"},
-        "elements": [
-            {"tag": "markdown", "content": val_content},
-            {"tag": "markdown", "content": signal_line},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "PE/PB对比行业 | ⚠️ 仅供参考"}]}
-        ]
+        "elements": elements
     }

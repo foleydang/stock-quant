@@ -61,6 +61,13 @@ STOCK_NAME_MAP = {
     "隆基绿能": "601012.SH",
     "紫金矿业": "601899.SH",
     "紫金": "601899.SH",
+    "美团-W": "03690.HK",
+    "阿里巴巴-W": "9988.HK",
+    "港股通互联网ETF": "159792.SZ",
+    "港股通ETF": "159792.SZ",
+    "互联网ETF": "159792.SZ",
+    "港股通互联网": "159792.SZ",
+    "港股互联网": "159792.SZ",
 }
 
 
@@ -77,13 +84,13 @@ def extract_symbol(text: str) -> Optional[str]:
         if m:
             return m.group(1)
 
-    # 2. 匹配纯数字代码
+    # 2. 匹配纯数字代码（含ETF：15xxxx, 51xxxx, 50xxxx）
     num_match = re.search(r'(\d{6})', text)
     if num_match:
         code = num_match.group(1)
-        if code.startswith(('0', '3')):
+        if code.startswith(('0', '3', '1')):  # 0/3=深市个股, 1=深市ETF
             return f"{code}.SZ"
-        elif code.startswith(('6', '9')):
+        elif code.startswith(('5', '6', '9')):  # 5=沪市ETF, 6/9=沪市个股
             return f"{code}.SH"
 
     # 3. 匹配港股简码
@@ -125,16 +132,16 @@ def classify_intent(text: str) -> Tuple[str, Dict]:
     if any(k in text_lower for k in ['持仓', '仓位', '持仓概览', '我的股票', '持有']):
         return 'positions', {}
 
-    if any(k in text_lower for k in ['做t', 't操作', '做t建议', '日内', '做T', '怎么操作']):
-        return 't_strategy', {}
+    if any(k in text_lower for k in ['做t', 't操作', '做t建议', '日内', '做T']):
+        return 't_strategy', {'symbol': extract_symbol(text)}
 
     # 风控评分
     if any(k in text_lower for k in ['风险', '风控', '评分', '危险', '安全']):
-        return 'risk', {}
+        return 'risk', {'symbol': extract_symbol(text)}
 
     # 综合操作建议
-    if any(k in text_lower for k in ['建议', '操作建议', '该怎么办', '综合建议']):
-        return 'recommend', {}
+    if any(k in text_lower for k in ['建议', '操作建议', '该怎么办', '综合建议', '补仓', '加仓', '减仓', '清仓', '割肉', '跑吗', '买吗', '卖吗', '需要补', '需要加', '可以买', '该买', '该卖', '要不要', '怎么操作', '该怎么操作', '如何操作', '该怎么']):
+        return 'recommend', {'symbol': extract_symbol(text)}
 
     # 财经要闻
     if any(k in text_lower for k in ['新闻', '要闻', '资讯']):
@@ -198,6 +205,27 @@ def classify_intent(text: str) -> Tuple[str, Dict]:
         return 'stock', {'symbol': extract_symbol(text)}
 
     # ★★★ 以下必须在 stock 默认匹配之前 ★★★
+
+    # 先检查是否包含已知股票/ETF名称（避免被大盘等规则误抢）
+    # 只在文本较短（<=15字）且明确是股票名/代码时才抢占
+    stock_symbol = extract_symbol(text)
+    if stock_symbol:
+        # 检查symbol是否确实匹配了文本中的内容（而不是数据库模糊匹配的误杀）
+        is_explicit = False
+        for name in STOCK_NAME_MAP:
+            if name in text:
+                is_explicit = True
+                break
+        # 或纯数字代码
+        import re
+        if re.search(r'\d{6}', text):
+            is_explicit = True
+        # 或ETF关键词
+        if 'ETF' in text or 'etf' in text.lower():
+            is_explicit = True
+
+        if is_explicit and not any(k in text_lower for k in ['指标', '技术', '分析', '做t', '建议', '风控', '估值', '深度', '资金', '新闻', '自选', '止损', '异动', '板块', '北向', '对比', '信号', '总结', '持仓', '回测']):
+            return 'stock', {'symbol': stock_symbol}
 
     # 大盘指数
     if any(k in text_lower for k in ['大盘', '指数', 'a股', '港股', '沪指', '深指', '创业板指', '恒生', '上证', '纳斯达克', '纳指', '道琼斯', '标普']):

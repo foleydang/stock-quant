@@ -1,4 +1,9 @@
-"""数据处理器 - 支持A股/港股/ETF"""
+"""数据处理器 - 支持A股/港股/ETF
+
+数据流：DB → API（不再使用CSV缓存）
+- 查询优先从 SQLite DB 读取
+- DB数据不新鲜时从 API 拉取，并写入 DB
+"""
 
 import os
 import sys
@@ -10,7 +15,7 @@ from datetime import datetime, timedelta
 import time
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'stock_data.db')
-DATA_DIR = os.path.join(os.path.dirname(__file__), '../data')
+DATA_DIR = os.path.join(os.path.dirname(__file__))
 
 # 腾讯财经 API（港股/ETF/A股实时行情）
 TENCENT_QUOTE_API = 'http://qt.gtimg.cn/q='
@@ -27,8 +32,6 @@ class DataHandler:
         self.last_fetch_status = {}
         self.tushare_pro = None
         self._init_tushare()
-        if not os.path.exists(self.data_dir):
-            os.makedirs(self.data_dir)
 
     def _init_tushare(self):
         try:
@@ -39,8 +42,11 @@ class DataHandler:
             sys.stderr.write(f"Tushare 初始化失败: {e}\n")
 
     def fetch_stock_data(self, symbol, days=60, force_refresh=None):
-        """获取股票数据"""
-        cache_path = os.path.join(self.data_dir, f"{symbol}_daily.csv")
+        """获取股票数据（DB优先，API补充）
+
+        1. 先从 DB 读，数据够且新鲜就直接返回
+        2. DB不够或不新鲜 → 从 API 拉取，写入 DB 后返回
+        """
         should_refresh = force_refresh if force_refresh is not None else self.force_refresh
 
         # 从数据库读取（如果数据足够且新鲜）
@@ -50,37 +56,35 @@ class DataHandler:
             if df is not None and len(df) >= 200 and self.is_data_fresh(df):
                 return df
 
-        # 检查缓存（4小时有效）
-        if not should_refresh and os.path.exists(cache_path):
-            mod_time = datetime.fromtimestamp(os.path.getmtime(cache_path))
-            if datetime.now() - mod_time < timedelta(hours=4):
-                df = pd.read_csv(cache_path)
-                df['date'] = pd.to_datetime(df['date'])
-                if self.is_data_fresh(df):
-                    return df
-
-        # 根据类型选择数据源
+        # DB数据不够或不新鲜，从API拉取
         if symbol.endswith('.HK'):
-            return self._fetch_hk_stock(symbol, cache_path)
+            return self._fetch_hk_stock(symbol)
         
         if '.SZ' in symbol or '.SH' in symbol:
-            # ETF 判断：代码以 51/15/16/18 开头
             code = symbol[:6]
             if code.startswith(('51', '15', '16', '18')):
-                return self._fetch_etf(symbol, cache_path)
-            return self._fetch_a_stock(symbol, cache_path)
+                return self._fetch_etf(symbol)
+            return self._fetch_a_stock(symbol)
 
         return None
 
-    def _load_from_db(self, symbol):
+    def _load_from_db(self, symbol, min_rows=200):
+        """从数据库加载股票数据"""
         if not os.path.exists(self.db_path):
             return None
         try:
             conn = sqlite3.connect(self.db_path)
+            # 优先查30分钟线（数据量更丰富）
             df = pd.read_sql_query(
                 'SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol = ? ORDER BY date',
                 conn, params=(symbol,)
             )
+            if df.empty or len(df) < min_rows:
+                # fallback到日线
+                df = pd.read_sql_query(
+                    'SELECT date, open, high, low, close, volume FROM kline_daily WHERE symbol = ? ORDER BY date',
+                    conn, params=(symbol,)
+                )
             conn.close()
             if df.empty:
                 return None
@@ -89,17 +93,35 @@ class DataHandler:
         except Exception as e:
             return None
 
+    def _save_to_db(self, symbol, df, table='kline_daily'):
+        """将数据写入数据库"""
+        if df is None or df.empty:
+            return
+        try:
+            conn = sqlite3.connect(self.db_path)
+            # 逐行写入，利用 UNIQUE(symbol, date) 做去重
+            for _, row in df.iterrows():
+                date_str = row['date'].strftime('%Y-%m-%d') if pd.notna(row['date']) else str(row['date'])
+                conn.execute(
+                    f'INSERT OR REPLACE INTO {table} (symbol, date, open, high, low, close, volume, updated_at) '
+                    'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    (symbol, date_str, float(row['open']), float(row['high']),
+                     float(row['low']), float(row['close']), float(row['volume']),
+                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            sys.stderr.write(f"写入DB失败 {symbol}: {e}\n")
+
     # ==================== 腾讯财经 API（实时行情） ====================
     
     def _fetch_from_tencent(self, symbol):
         """从腾讯财经获取实时行情（港股/ETF/A股）"""
-        # 提取代码部分：3690.HK -> 3690, 600036.SH -> 600036
         code = symbol.split('.')[0]
         
-        # 构建查询参数
         if symbol.endswith('.HK'):
-            # 港股代码需要补齐5位，如 3690 -> hk03690
-            hk_code = code.zfill(5)  # 补齐5位: 3690 -> 03690
+            hk_code = code.zfill(5)
             query = f"hk{hk_code}"
         elif symbol.endswith('.SZ'):
             query = f"sz{code}"
@@ -113,7 +135,6 @@ class DataHandler:
             r = requests.get(url, timeout=15)
             r.raise_for_status()
             
-            # 解析数据: v_xxxx="字段1~字段2~..."
             match = re.search(r'v_\w+="(.+)"', r.text)
             if not match:
                 return None
@@ -122,15 +143,12 @@ class DataHandler:
             if len(fields) < 7:
                 return None
             
-            # 提取关键数据
             name = fields[1]
             current_price = float(fields[3])
             prev_close = float(fields[4])
             open_price = float(fields[5])
             volume = float(fields[6])
             
-            # 高低价从腾讯API字段提取（统一位置）
-            # fields[33] = 最高价, fields[34] = 最低价（港股/A股/ETF都一样）
             try:
                 high_price = float(fields[33]) if len(fields) > 33 and fields[33] else current_price
                 low_price = float(fields[34]) if len(fields) > 34 and fields[34] else current_price
@@ -138,7 +156,6 @@ class DataHandler:
                 high_price = current_price
                 low_price = current_price
             
-            # 构建单条数据（今日）
             now = datetime.now()
             df = pd.DataFrame([{
                 'date': now,
@@ -171,51 +188,63 @@ class DataHandler:
             }
         return None
 
-    def _fetch_hk_stock(self, symbol, cache_path):
-        """获取港股数据 - 使用腾讯财经"""
-        df = self._fetch_from_tencent(symbol)
-        if df is not None and not df.empty:
-            # 港股只有实时数据，没有历史K线
-            # 合并缓存的历史数据
-            cached = self._use_cache(cache_path)
-            if cached is not None and not cached.empty:
-                # 添加今日数据到历史
-                df = pd.concat([cached, df]).tail(60).reset_index(drop=True)
-            df.to_csv(cache_path, index=False)
+    def _fetch_hk_stock(self, symbol):
+        """获取港股数据 - 腾讯实时 → 合并DB历史 → 写回DB"""
+        realtime_df = self._fetch_from_tencent(symbol)
+        if realtime_df is not None and not realtime_df.empty:
+            # 合并DB中的历史数据
+            history_df = self._load_from_db(symbol, min_rows=0)
+            if history_df is not None and not history_df.empty:
+                df = pd.concat([history_df, realtime_df]).drop_duplicates(
+                    subset=['date'], keep='last'
+                ).tail(60).reset_index(drop=True)
+            else:
+                df = realtime_df
+            self._save_to_db(symbol, df)
             return df
-        return self._use_cache(cache_path)
+        # API失败，fallback到DB历史
+        return self._load_from_db(symbol, min_rows=0)
 
-    def _fetch_etf(self, symbol, cache_path):
-        """获取ETF数据 - 使用腾讯财经"""
-        df = self._fetch_from_tencent(symbol)
-        if df is not None and not df.empty:
-            cached = self._use_cache(cache_path)
-            if cached is not None and not cached.empty:
-                df = pd.concat([cached, df]).tail(60).reset_index(drop=True)
-            df.to_csv(cache_path, index=False)
+    def _fetch_etf(self, symbol):
+        """获取ETF数据 - 腾讯实时 → 合并DB历史 → 写回DB"""
+        realtime_df = self._fetch_from_tencent(symbol)
+        if realtime_df is not None and not realtime_df.empty:
+            history_df = self._load_from_db(symbol, min_rows=0)
+            if history_df is not None and not history_df.empty:
+                df = pd.concat([history_df, realtime_df]).drop_duplicates(
+                    subset=['date'], keep='last'
+                ).tail(60).reset_index(drop=True)
+            else:
+                df = realtime_df
+            self._save_to_db(symbol, df)
             return df
-        return self._use_cache(cache_path)
+        return self._load_from_db(symbol, min_rows=0)
 
-    def _fetch_a_stock(self, symbol, cache_path):
-        """获取A股数据 - Tushare日线 + 腾讯实时"""
+    def _fetch_a_stock(self, symbol):
+        """获取A股数据 - Tushare日线 → 写入DB → 返回"""
         # 方法1: Tushare 日线
-        df = self._fetch_from_tushare(symbol)  # 默认365天
+        df = self._fetch_from_tushare(symbol)
         if df is not None and not df.empty:
-            df.to_csv(cache_path, index=False)
+            self._save_to_db(symbol, df)
             return df
         
-        # 方法2: 腾讯实时（备用）
-        df = self._fetch_from_tencent(symbol)
-        if df is not None and not df.empty:
-            cached = self._use_cache(cache_path)
-            if cached is not None and not cached.empty:
-                df = pd.concat([cached, df]).tail(60).reset_index(drop=True)
-            df.to_csv(cache_path, index=False)
+        # 方法2: 腾讯实时（备用） → 合并DB历史
+        realtime_df = self._fetch_from_tencent(symbol)
+        if realtime_df is not None and not realtime_df.empty:
+            history_df = self._load_from_db(symbol, min_rows=0)
+            if history_df is not None and not history_df.empty:
+                df = pd.concat([history_df, realtime_df]).drop_duplicates(
+                    subset=['date'], keep='last'
+                ).tail(60).reset_index(drop=True)
+            else:
+                df = realtime_df
+            self._save_to_db(symbol, df)
             return df
         
-        return self._use_cache(cache_path)
+        # 全失败，fallback到DB历史
+        return self._load_from_db(symbol, min_rows=0)
 
-    def _fetch_from_tushare(self, symbol, days=365):  # 默认获取1年历史
+    def _fetch_from_tushare(self, symbol, days=365):
         if self.tushare_pro is None:
             return None
         try:
@@ -238,7 +267,6 @@ class DataHandler:
         except Exception as e:
             sys.stderr.write(f"Tushare 失败 {symbol}: {e}\n")
         return None
-
 
     def fetch_real_30min_kline(self, symbol, count=20):
         """Fetch real 30min K-line from Sina Finance API"""
@@ -273,13 +301,6 @@ class DataHandler:
             sys.stderr.write(f"Sina 30min failed {symbol}: {e}\n")
         return None
 
-    def _use_cache(self, cache_path):
-        if os.path.exists(cache_path):
-            df = pd.read_csv(cache_path)
-            df['date'] = pd.to_datetime(df['date'])
-            return df
-        return None
-
     def fetch_batch_stocks(self, symbols, force_refresh=True):
         """批量获取"""
         results = {}
@@ -292,13 +313,11 @@ class DataHandler:
 
     def get_realtime_prices(self, symbols):
         """批量获取实时价格（腾讯财经，适合监控）"""
-        # 构建查询字符串
         queries = []
-        symbol_to_query = {}  # 反查映射
+        symbol_to_query = {}
         for symbol in symbols:
             code = symbol.split('.')[0]
             if symbol.endswith('.HK'):
-                # 港股代码必须补齐5位：0700 -> 00700 -> hk00700
                 hk_code = code.zfill(5)
                 query = f"hk{hk_code}"
                 queries.append(query)
@@ -326,10 +345,8 @@ class DataHandler:
                     query_key = match.group(1)
                     fields = match.group(2).split('~')
                     if len(fields) >= 7:
-                        # 用映射表反查原始symbol，避免港股前导0丢失
                         symbol = symbol_to_query.get(query_key)
                         if not symbol:
-                            # fallback: 尝试从query_key解析
                             if query_key.startswith('hk'):
                                 code = query_key[2:].lstrip('0')
                                 if not code:
@@ -396,11 +413,9 @@ class DataHandler:
         last_date = pd.to_datetime(df['date'].iloc[-1])
         now = datetime.now()
         
-        # 如果是今日实时数据，认为是新鲜的
         if last_date.date() == now.date():
             return True
         
-        # 日线数据是交易日 15:00 的收盘数据
         last_date_with_time = datetime(last_date.year, last_date.month, last_date.day, 15, 0)
         age_hours = (now - last_date_with_time).total_seconds() / 3600
         

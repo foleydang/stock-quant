@@ -137,14 +137,27 @@ def get_stock_data(symbol: str) -> Dict:
 
     from data.data_handler import DataHandler
     dh = DataHandler(force_refresh=False)
-    df = dh.fetch_stock_data(symbol)
 
-    if df is None or df.empty:
-        return {'error': f'无法获取 {symbol} 的数据'}
+    # 优先用实时行情，确保涨跌额和涨跌幅基准一致
+    realtime = dh.get_realtime_prices([symbol])
+    rt = realtime.get(symbol, {})
 
-    latest = df.iloc[-1]
-    prev = df.iloc[-2] if len(df) > 1 else latest
-    change_pct = (latest['close'] - prev['close']) / prev['close'] * 100
+    if rt and rt.get('price') and rt.get('prev_close'):
+        current_price = rt['price']
+        prev_close = rt['prev_close']
+        change_amount = current_price - prev_close
+        change_pct = (change_amount / prev_close) * 100
+    else:
+        # 实时行情不可用时，用K线数据
+        df = dh.fetch_stock_data(symbol)
+        if df is None or df.empty:
+            return {'error': f'无法获取 {symbol} 的数据'}
+        latest = df.iloc[-1]
+        prev = df.iloc[-2] if len(df) > 1 else latest
+        current_price = float(latest['close'])
+        prev_close = float(prev['close'])
+        change_amount = current_price - prev_close
+        change_pct = (change_amount / prev_close) * 100
 
     conn = _get_conn()
     cursor = conn.cursor()
@@ -153,15 +166,10 @@ def get_stock_data(symbol: str) -> Dict:
     name = row[0] if row and row[0] else symbol
     conn.close()
 
-    realtime = dh.get_realtime_prices([symbol])
-    current_price = realtime.get(symbol, {}).get('price', float(latest['close']))
-    realtime_change = realtime.get(symbol, {}).get('change_pct', change_pct)
-
     return {
         'symbol': symbol, 'name': name,
-        'current_price': current_price, 'change_pct': realtime_change,
-        'change_amount': realtime.get(symbol, {}).get('change_amount', current_price - float(prev['close'])),
-        'latest_close': float(latest['close']),
+        'current_price': current_price, 'change_pct': change_pct,
+        'change_amount': change_amount,
     }
 
 

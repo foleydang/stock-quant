@@ -42,10 +42,7 @@ def fetch_daily_data(symbol: str, days: int = 60):
             df = df[['date', 'open', 'high', 'low', 'close', 'volume']]
             df = df.sort_values('date').reset_index(drop=True)
             
-            # 保存缓存
-            cache_path = os.path.join(DATA_DIR, f'{symbol}_daily.csv')
-            df.to_csv(cache_path, index=False)
-            
+            # 不再保存CSV缓存，数据已在DB中
             return df
     except Exception as e:
         print(f'Tushare 日线获取失败 {symbol}: {e}')

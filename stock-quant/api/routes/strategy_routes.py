@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 import sys
 import os
 import time
+import pandas as pd
 from functools import lru_cache
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../python'))
@@ -34,8 +35,29 @@ def run_strategy(symbol):
         dh = DataHandler()
         df = dh.fetch_real_30min_kline(symbol, count=20)
         
+        # API失败时fallback到DB
         if df is None or df.empty:
-            return jsonify({'status': 'error', 'message': '无数据'}), 404
+            import sqlite3
+            from config_loader import get_db_path
+            conn = sqlite3.connect(get_db_path())
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 20',
+                (symbol,)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            if not rows:
+                return jsonify({'status': 'error', 'message': '无数据'}), 404
+            data = []
+            for r in rows:
+                data.append({'date': r[0], 'open': float(r[1]), 'high': float(r[2]), 'low': float(r[3]), 'close': float(r[4]), 'volume': int(r[5])})
+            data.reverse()  # 恢复时间正序
+            df = pd.DataFrame(data)
+            df['date'] = pd.to_datetime(df['date'])
+            source = 'db_fallback'
+        else:
+            source = 'api'
         
         # 简单策略分析
         latest = df.iloc[-1]
@@ -46,6 +68,7 @@ def run_strategy(symbol):
         return jsonify({
             'status': 'success',
             'symbol': symbol,
+            'source': source,
             'latest_price': float(latest['close']),
             'change_pct': float(change_pct),
             'high': float(latest['high']),

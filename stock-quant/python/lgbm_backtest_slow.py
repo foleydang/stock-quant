@@ -115,14 +115,25 @@ class LGBMBacktester:
             return 0.5, f"预测错误:{e}"
 
     def load_data(self, symbol: str) -> pd.DataFrame:
-        """加载数据"""
-        cache_path = os.path.join(os.path.dirname(__file__), f'data/{symbol}_30m.csv')
-        if os.path.exists(cache_path):
-            df = pd.read_csv(cache_path)
-            df['date'] = pd.to_datetime(df['date'])
-            df = df.sort_values('date').reset_index(drop=True)
-            # 不过滤数据，使用全部历史数据计算特征
-            return df
+        """加载数据（从数据库）"""
+        db_path = os.path.join(os.path.dirname(__file__), 'data/stock_data.db')
+        if os.path.exists(db_path):
+            try:
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    'SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date ASC',
+                    (symbol,)
+                )
+                rows = cursor.fetchall()
+                conn.close()
+                if rows:
+                    df = pd.DataFrame(rows, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+                    df['date'] = pd.to_datetime(df['date'])
+                    df = df.sort_values('date').reset_index(drop=True)
+                    return df
+            except Exception as e:
+                print(f"数据库读取失败 {symbol}: {e}")
         return None
 
     def run_backtest(self, stocks: List[Dict]):
