@@ -22,9 +22,6 @@ python/logs/*.json
 # 数据文件（CSV）
 python/data/*.csv
 
-# 大数据库文件（LFS管理）
-python/data/*.db
-
 # IDE
 .idea/
 .vscode/
