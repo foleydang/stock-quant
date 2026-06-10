@@ -100,12 +100,19 @@ while rs.next():
 print(f"  BaoStock返回: {len(industry_rows)} 条")
 print(f"  字段: {rs.fields}")
 
-# 格式: (code, code_name, industry, industryClassification, ...)
+# 格式: (updateDate, code, code_name, industry, industryClassification)
+# fields顺序: updateDate是第0列, code是第1列
 sector_records = []
 for row in industry_rows:
-    code = row[0]  # sh.600036
-    name = row[1]  # 招商银行
-    industry = row[2] if row[2] else (row[3] if len(row) > 3 else "其他")
+    # 正确的列索引
+    code = row[1]        # sh.600036 (第1列)
+    name = row[2]        # 招商银行 (第2列)
+    industry = row[3] if len(row) > 3 and row[3] else "其他"  # 银行 (第3列)
+    industryClassification = row[4] if len(row) > 4 else ""  # 申万L1 (第4列)
+    
+    # 如果row[3]为空，用row[4]
+    if not industry or industry == "":
+        industry = industryClassification if industryClassification else "其他"
     
     # 转换: sh.600036 → 600036.SH
     parts = code.split(".")
