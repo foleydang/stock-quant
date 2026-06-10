@@ -292,7 +292,45 @@ class MarketFeatureEngineer:
         trade_dates_ymd = df_dates.dt.strftime('%Y-%m-%d')
         trade_dates_raw8 = df_dates.dt.strftime('%Y%m%d')  # BaoStock格式
 
-        # 2. 查询北向资金（从north_flow表，YYYY-MM-DD格式）
+        # 2. 大盘涨跌幅（从hs300_daily表，YYYYMMDD格式）- 先算，北向fallback依赖它
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            min_date_raw8 = trade_dates_raw8.min()
+            max_date_raw8 = trade_dates_raw8.max()
+            hs300_df = pd.read_sql(
+                "SELECT trade_date, pct_chg, avg_pct_chg, up_count, down_count FROM hs300_daily "
+                f"WHERE trade_date >= '{min_date_raw8}' AND trade_date <= '{max_date_raw8}'",
+                conn
+            )
+            conn.close()
+
+            if len(hs300_df) > 0:
+                pct_col = 'pct_chg' if 'pct_chg' in hs300_df.columns else 'avg_pct_chg'
+                hs300_map_pct = dict(zip(hs300_df['trade_date'], hs300_df[pct_col]))
+                
+                up_col = 'up_count' if 'up_count' in hs300_df.columns else None
+                down_col = 'down_count' if 'down_count' in hs300_df.columns else None
+
+                features['market_pct_chg'] = trade_dates_raw8.map(hs300_map_pct).fillna(0)
+                if up_col:
+                    hs300_map_up = dict(zip(hs300_df['trade_date'], hs300_df[up_col]))
+                    hs300_map_down = dict(zip(hs300_df['trade_date'], hs300_df[down_col]))
+                    features['market_up_ratio'] = trade_dates_raw8.map(hs300_map_up).fillna(0) / \
+                                                  (trade_dates_raw8.map(hs300_map_down).fillna(0) + trade_dates_raw8.map(hs300_map_up).fillna(0) + 1e-10)
+                else:
+                    features['market_up_ratio'] = 0
+                features['market_momentum_3'] = features['market_pct_chg'].rolling(6, min_periods=1).sum()
+            else:
+                features['market_pct_chg'] = 0
+                features['market_up_ratio'] = 0
+                features['market_momentum_3'] = 0
+        except Exception as e:
+            features['market_pct_chg'] = 0
+            features['market_up_ratio'] = 0
+            features['market_momentum_3'] = 0
+
+        # 3. 查询北向资金（从north_flow表，YYYY-MM-DD格式）
+        # 当北向数据缺失时，用大盘涨跌幅作为情绪替代
         try:
             conn = sqlite3.connect(DB_PATH)
             min_date_ymd = trade_dates_ymd.min()
@@ -307,58 +345,30 @@ class MarketFeatureEngineer:
 
             if len(north_df) > 0:
                 north_df['total_net_billion'] = north_df['total_net'] / 10000  # 万元转亿元
+                north_df = north_df[north_df['total_net_billion'].abs() < 500]  # 排除占位值
                 north_map = dict(zip(north_df['trade_date'], north_df['total_net_billion']))
 
-                features['north_flow'] = trade_dates_ymd.map(north_map).fillna(0)
+                north_mapped = trade_dates_ymd.map(north_map)
+                coverage = north_mapped.notna().sum() / len(north_mapped)
+
+                if coverage >= 0.5:
+                    # 北向数据覆盖率高，直接用
+                    features['north_flow'] = north_mapped.fillna(0)
+                    features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
+                    features['north_flow_change'] = features['north_flow'].diff(6)
+                else:
+                    # 北向数据覆盖率低，用大盘涨跌幅作为情绪替代
+                    features['north_flow'] = features['market_pct_chg'].fillna(0) * 10
+                    features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
+                    features['north_flow_change'] = features['north_flow'].diff(6)
+            else:
+                features['north_flow'] = features['market_pct_chg'].fillna(0) * 10
                 features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
                 features['north_flow_change'] = features['north_flow'].diff(6)
-            else:
-                features['north_flow'] = 0
-                features['north_flow_cum_3'] = 0
-                features['north_flow_change'] = 0
         except Exception as e:
-            features['north_flow'] = 0
-            features['north_flow_cum_3'] = 0
-            features['north_flow_change'] = 0
-
-        # 3. 大盘涨跌幅（从hs300_daily表，YYYYMMDD格式）
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            min_date_raw8 = trade_dates_raw8.min()
-            max_date_raw8 = trade_dates_raw8.max()
-            hs300_df = pd.read_sql(
-                "SELECT trade_date, pct_chg, avg_pct_chg, up_count, down_count FROM hs300_daily "
-                f"WHERE trade_date >= '{min_date_raw8}' AND trade_date <= '{max_date_raw8}'",
-                conn
-            )
-            conn.close()
-
-            if len(hs300_df) > 0:
-                # 优先用pct_chg（BaoStock真实沪深300涨跌幅），fallback用avg_pct_chg（kline_30m推算）
-                # 字段名可能不同，需要适配
-                pct_col = 'pct_chg' if 'pct_chg' in hs300_df.columns else 'avg_pct_chg'
-                hs300_map_pct = dict(zip(hs300_df['trade_date'], hs300_df[pct_col]))
-                
-                up_col = 'up_count' if 'up_count' in hs300_df.columns else None
-                down_col = 'down_count' if 'down_count' in hs300_df.columns else None
-
-                features['market_pct_chg'] = trade_dates_raw8.map(hs300_map_pct).fillna(0)
-                if up_col:
-                    hs300_map_up = dict(zip(hs300_df['trade_date'], hs300_df[up_col]))
-                    hs300_map_down = dict(zip(hs300_df['trade_date'], hs300_df[down_col]))
-                    features['market_up_ratio'] = trade_dates_raw8.map(hs300_map_up).fillna(0) / \
-                                                  (trade_dates_raw8.map(hs300_map_down).fillna(0) + trade_dates_raw8.map(hs300_map_up).fillna(0) + 1e-10)
-                else:
-                    features['market_up_ratio'] = 0  # 无涨跌家数数据
-                features['market_momentum_3'] = features['market_pct_chg'].rolling(6, min_periods=1).sum()
-            else:
-                features['market_pct_chg'] = 0
-                features['market_up_ratio'] = 0
-                features['market_momentum_3'] = 0
-        except Exception as e:
-            features['market_pct_chg'] = 0
-            features['market_up_ratio'] = 0
-            features['market_momentum_3'] = 0
+            features['north_flow'] = features.get('market_pct_chg', pd.Series(0, index=df.index)).fillna(0) * 10
+            features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
+            features['north_flow_change'] = features['north_flow'].diff(6)
 
         # 4. 个股vs大盘超额收益
         if 'close' in df.columns and 'market_pct_chg' in features.columns:
