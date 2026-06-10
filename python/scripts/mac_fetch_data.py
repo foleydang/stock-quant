@@ -185,7 +185,33 @@ hs300_df.to_csv(hs300_csv, index=False)
 print(f"✅ hs300_daily.csv: {len(hs300_df)} 条 → {hs300_csv}")
 
 # ========================================
-# 总结
+# ========================================
+# 4. 市场资金流向（含北向资金近期数据）
+# ========================================
+print("\n" + "=" * 50)
+print("4. 拉取市场资金流向（akshare）")
+print("=" * 50)
+
+try:
+    df_flow = ak.stock_market_fund_flow()
+    print(f"  market_fund_flow: {len(df_flow)} 条")
+    print(f"  列: {df_flow.columns.tolist()[:10]}")
+    print(f"  范围: {df_flow['日期'].iloc[0]} ~ {df_flow['日期'].iloc[-1]}")
+    
+    # 看有没有北向字段
+    north_cols = [c for c in df_flow.columns if '北向' in c or '外资' in c or '沪股' in c or '深股' in c]
+    print(f"  北向相关列: {north_cols}")
+    
+    flow_csv = os.path.join(OUTPUT_DIR, "market_fund_flow.csv")
+    df_flow.to_csv(flow_csv, index=False)
+    print(f"  ✅ market_fund_flow.csv: {len(df_flow)} 条 → {flow_csv}")
+    print(f"  最近3天:")
+    print(df_flow.tail(3).to_string())
+    
+    time.sleep(5)
+except Exception as e:
+    print(f"  ❌ market_fund_flow错误: {e}")
+    print(f"  ⚠️ 这台Mac上应该能正常拉，服务器IP被限频才失败")
 # ========================================
 print("\n" + "=" * 50)
 print("拉取完成！请将以下3个文件传到服务器：")
