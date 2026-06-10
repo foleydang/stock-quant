@@ -15,15 +15,15 @@ __pycache__/
 .vite/
 
 # Logs
-stock-quant/logs/*.log
-stock-quant/python/logs/*.log
-stock-quant/python/logs/*.json
+logs/*.log
+python/logs/*.log
+python/logs/*.json
 
 # 数据文件（CSV）
-stock-quant/python/data/*.csv
+python/data/*.csv
 
-# 大数据库文件
-stock-quant/python/data/*.db
+# 大数据库文件（LFS管理）
+python/data/*.db
 
 # IDE
 .idea/
@@ -31,26 +31,10 @@ stock-quant/python/data/*.db
 .DS_Store
 
 # Environment
-stock-quant/python/.env
+python/.env
+agent/.env
 
 # 临时文件
 *.tmp
 *.bak
 *.swp
-node_modules/
-dist/
-*.env
-*.log
-logs/
-__pycache__/
-*.pyc
-.vite/
-
-# 只排除临时文件, db和model通过LFS管理
-*.csv
-logs/cron.log
-logs/monitor.log
-logs/hs300_update.log
-logs/service_check.log
-logs/kline_accumulate.log
-logs/backtest.log
