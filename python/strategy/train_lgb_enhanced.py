@@ -384,8 +384,13 @@ class MarketFeatureEngineer:
             industry = '其他'
 
         # 板块是否为强势行业（编码为0/1）
-        strong_industries = {'电子', '电力设备', '计算机', '通信', '医药生物', '国防军工', '汽车'}
-        features['sector_is_strong'] = 1 if industry in strong_industries else 0
+        strong_industries = {'C39', 'C35', 'I65', 'C38', 'C27', 'C26', 'C34', 'D44', 'J66', 'J68', 'K70'}
+        # BaoStock格式如 "C39计算机、通信和其他电子设备制造业" 或 "J66货币金融服务"
+        # 匹配行业代码前缀
+        industry_code = industry.split('计算机')[0].split('货币')[0].split('保险')[0] if industry else ''
+        # 更简单：看行业名是否包含关键词
+        is_strong = any(kw in industry for kw in ['电子', '计算机', '通信', '软件', '医药', '医疗', '电力设备', '电气', '军工', '国防', '汽车', '新能源', '半导体', '芯片', '金融', '保险'])
+        features['sector_is_strong'] = 1 if is_strong else 0
 
         if MarketFeatureEngineer.MARKET_FEATURE_NAMES is None:
             MarketFeatureEngineer.MARKET_FEATURE_NAMES = features.columns.tolist()
