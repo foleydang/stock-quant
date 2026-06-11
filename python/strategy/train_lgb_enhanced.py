@@ -599,8 +599,8 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
             
             # ====== 全部11个搜索参数 ======
             # 树结构
-            'num_leaves': trial.suggest_int('num_leaves', 20, 127),
-            'max_depth': trial.suggest_int('max_depth', 3, 12),
+            'num_leaves': trial.suggest_int('num_leaves', 15, 63),  # v6.1: 上限从127降到63, 防过拟合
+            'max_depth': trial.suggest_int('max_depth', 3, 8),  # v6.1: 上限从12降到8
             'min_child_samples': trial.suggest_int('min_child_samples', 10, 200),
             
             # 训练控制
@@ -703,12 +703,16 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
     # 使用最后一个模型
     final_model = models[-1]
     
-    # 整体评估
-    y_pred_all = final_model.predict(X)
-    print(f"\n整体评估:")
-    print(f"  准确率: {accuracy_score(y, y_pred_all):.2%}")
+    # 整体评估 - 只用后20%验证数据(不是全部数据, 否则90%是虚假的)
+    # 之前用全部数据评估导致CV 70% vs 整体90%的20%差距(过拟合假象)
+    valid_start = int(len(X) * 0.8)
+    X_valid_all = X[valid_start:]
+    y_valid_all = y[valid_start:]
+    y_pred_valid = final_model.predict(X_valid_all)
+    print(f"\n验证集评估 (后20%数据, 未参与训练):")
+    print(f"  准确率: {accuracy_score(y_valid_all, y_pred_valid):.2%}")
     print(f"\n分类报告:")
-    print(classification_report(y, y_pred_all, target_names=['下跌', '上涨']))
+    print(classification_report(y_valid_all, y_pred_valid, target_names=['下跌', '上涨']))
     
     # 特征重要性（用实际特征名）
     if feature_names and len(feature_names) == len(final_model.feature_importances_):
