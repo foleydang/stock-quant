@@ -658,8 +658,9 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
             'path_smooth': trial.suggest_float('path_smooth', 0.0, 10.0),
         }
         
-        # 3折快速评估
-        mini_tscv = TimeSeriesSplit(n_splits=3)
+        # P1.2修复: 3折Purged K-Fold (gap=3, 因为预测目标是3根K线后)
+        # 不加gap会导致train最后3根K线和test前3根K线有重叠信息
+        mini_tscv = TimeSeriesSplit(n_splits=3, gap=3)
         scores = []
         for train_idx, test_idx in mini_tscv.split(X_search):
             X_tr, X_te = X_search[train_idx], X_search[test_idx]
@@ -704,14 +705,16 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
     }
     best_lgbm_params.update(best_params)
     
-    print(f"\n用最优参数做5折交叉验证...")
+    print(f"\n用最优参数做5折Purged交叉验证(gap=3)...")
     
     cv_scores = []
     models = []
     fold_up_recalls = []
     fold_down_recalls = []
     
-    for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
+    # P1.2修复: 5折Purged K-Fold, gap=3
+    tscv_purged = TimeSeriesSplit(n_splits=5, gap=3)
+    for fold, (train_idx, test_idx) in enumerate(tscv_purged.split(X)):
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
         
@@ -751,7 +754,44 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
     print(f"\n分类报告:")
     print(classification_report(y_valid_all, y_pred_valid, target_names=['下跌', '上涨']))
     
-    # ====== P0修复: 训练时做特征选择, 去掉零重要度特征 ======
+    # ====== P1.3修复: 特征去冗余(高相关过滤) ======
+    # 问题: price_above_ma5~120等16个特征高度相关(>0.9), 表达同一信息
+    # 修复: 移除相关度>0.95的特征对, 保留方差大的
+    if feature_names is not None and len(feature_names) > 20:
+        X_train_part = X[:valid_start]
+        corr_matrix = np.corrcoef(X_train_part.T)
+        high_corr_pairs = []
+        for i in range(len(feature_names)):
+            for j in range(i+1, len(feature_names)):
+                if abs(corr_matrix[i, j]) > 0.95:
+                    high_corr_pairs.append((i, j, feature_names[i], feature_names[j], abs(corr_matrix[i, j])))
+        
+        if high_corr_pairs:
+            # 对每组高相关特征, 保留方差大的
+            to_remove = set()
+            for i, j, fn_i, fn_j, corr in high_corr_pairs:
+                if i in to_remove or j in to_remove:
+                    continue
+                var_i = np.var(X_train_part[:, i])
+                var_j = np.var(X_train_part[:, j])
+                to_remove.add(i if var_i < var_j else j)
+            
+            if to_remove:
+                keep_mask = np.ones(len(feature_names), dtype=bool)
+                keep_mask[list(to_remove)] = False
+                removed_corr = [feature_names[i] for i in sorted(to_remove)]
+                
+                print(f"\n特征去冗余 (corr > 0.95):")
+                print(f"  删除: {', '.join(removed_corr[:8])}" + 
+                      (f' ...等{len(removed_corr)}个' if len(removed_corr) > 8 else ''))
+                print(f"  保留: {sum(keep_mask)}/{len(feature_names)} 个特征")
+                
+                X = X[:, keep_mask]
+                feature_names = [fn for fn, m in zip(feature_names, keep_mask) if m]
+                # 更新valid_start对应的X
+                valid_start = int(len(X) * 0.8)
+    
+    # ====== P0.4修复: 训练时做特征选择, 去掉零重要度特征 ======
     # 问题: 之前训练时包含price_above_ma5~120等无用特征,
     #       推理时在forecast_routes.py硬编码ZERO_IMP_FEATURES删掉 → 前后不一致
     # 修复: 用SelectFromModel在训练时过滤, 保存过滤后的特征名
