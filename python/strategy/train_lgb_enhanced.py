@@ -578,10 +578,11 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
     tscv = TimeSeriesSplit(n_splits=5)
     
     # ====== Optuna一次性搜索全部11个参数 ======
-    print("\n🔍 Optuna超参数搜索 (100轮, 11个参数, 目标=F1-macro)")
+    print("\n🔍 Optuna超参数搜索 (100轮, 13个参数, 目标=F1-macro)")
     print("  搜索: num_leaves, max_depth, learning_rate, feature_fraction,")
     print("        bagging_fraction, bagging_freq, min_child_samples,")
-    print("        reg_alpha, reg_lambda, scale_pos_weight, min_gain_to_split")
+    print("        reg_alpha, reg_lambda, scale_pos_weight,")
+    print("        min_gain_to_split, extra_trees, path_smooth")
     
     # 用前80%数据搜索，后20%验证
     split_idx = int(len(X) * 0.8)
@@ -618,6 +619,8 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
             # 量化专属
             'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.5, 3.0),
             'min_gain_to_split': trial.suggest_float('min_gain_to_split', 0.0, 5.0),
+            'extra_trees': trial.suggest_categorical('extra_trees', [True, False]),
+            'path_smooth': trial.suggest_float('path_smooth', 0.0, 10.0),
         }
         
         # 3折快速评估
