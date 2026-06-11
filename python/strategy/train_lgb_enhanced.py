@@ -536,7 +536,7 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
                 fail_count += 1
 
         except Exception as e:
-            print(f"  特征计算失败 {symbol}: {e}")
+            print(f"  特征计算失败 {symbol}: {type(e).__name__}: {e}")
             fail_count += 1
 
         if (i + 1) % 50 == 0:
@@ -596,6 +596,8 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
 
     cv_scores = []
     models = []
+    fold_up_recalls = []
+    fold_down_recalls = []
 
     for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
         X_train, X_test = X[train_idx], X[test_idx]
@@ -616,14 +618,16 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         # 分类别报告
         up_recall = np.sum((y_pred == 1) & (y_test == 1)) / np.sum(y_test == 1)
         down_recall = np.sum((y_pred == 0) & (y_test == 0)) / np.sum(y_test == 0)
+        fold_up_recalls.append(up_recall)
+        fold_down_recalls.append(down_recall)
         print(f"  Fold {fold + 1}: Accuracy={accuracy:.4f}, 上涨recall={up_recall:.4f}, 下跌recall={down_recall:.4f}")
 
     avg_accuracy = np.mean(cv_scores)
     print(f"\n平均交叉验证准确率: {avg_accuracy:.4f}")
 
     # 各折上涨recall均值
-    up_recalls = [np.sum((models[i].predict(X[tscv.split(X)[i][1]]) == 1) & (y[tscv.split(X)[i][1]] == 1)) / np.sum(y[tscv.split(X)[i][1]] == 1) for i in range(5)]
-    print(f"平均上涨recall: {np.mean(up_recalls):.4f}")
+    print(f"平均上涨recall: {np.mean(fold_up_recalls):.4f}")
+    print(f"平均下跌recall: {np.mean(fold_down_recalls):.4f}")
 
     # 使用最后一个模型
     final_model = models[-1]
