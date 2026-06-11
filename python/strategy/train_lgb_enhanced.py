@@ -19,6 +19,7 @@ from typing import Dict, List, Tuple, Optional
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import accuracy_score, classification_report, precision_recall_fscore_support
 from sklearn.feature_selection import SelectFromModel
+import optuna
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -559,105 +560,151 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
 
 
 def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -> Dict:
-    """训练模型（v3: 非对称损失 + 特征分组采样 + 更多正则化）"""
+    """训练模型（v4: Optuna超参数搜索）
+    
+    不再手动猜参数，用Optuna自动搜索最优配置。
+    搜索目标: 加权recall（上涨recall权重更高，因为实盘赚钱靠抓上涨）
+    """
+    import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    
     tscv = TimeSeriesSplit(n_splits=5)
-
-    # ====== v3 参数优化 ======
-    # 1. 非对称损失: 上涨判错的代价更高(实盘要赚钱，漏涨比误判跌更致命)
-    #    scale_pos_weight = 下跌样本数/上涨样本数，让模型对上涨更敏感
-    pos_count = np.sum(y == 1)
-    neg_count = np.sum(y == 0)
-    # v3.1: scale_pos_weight更激进，上涨加权1.5倍
-    # 之前1.08太弱，上涨recall只有0.66
-    scale_pos_weight = neg_count / pos_count * 1.4  # ≈1.51
-
-    params = {
+    
+    # ====== Optuna 超参数搜索 ======
+    print("\n🔍 Optuna超参数搜索 (50轮, 目标=加权recall)...")
+    
+    # 用前80%数据搜索，后20%验证
+    split_idx = int(len(X) * 0.8)
+    X_search, y_search = X[:split_idx], y[:split_idx]
+    
+    def objective(trial):
+        params = {
+            'objective': 'binary',
+            'metric': 'binary_logloss',
+            'boosting_type': 'gbdt',
+            'verbose': -1,
+            'n_jobs': -1,
+            'random_state': 42,
+            
+            # ====== Optuna搜索的参数 ======
+            'num_leaves': trial.suggest_int('num_leaves', 20, 80),
+            'max_depth': trial.suggest_int('max_depth', 4, 10),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.05, log=True),
+            'n_estimators': trial.suggest_int('n_estimators', 300, 1000),
+            'feature_fraction': trial.suggest_float('feature_fraction', 0.5, 0.9),
+            'bagging_fraction': trial.suggest_float('bagging_fraction', 0.6, 0.9),
+            'bagging_freq': trial.suggest_int('bagging_freq', 3, 7),
+            'min_child_samples': trial.suggest_int('min_child_samples', 20, 100),
+            'reg_alpha': trial.suggest_float('reg_alpha', 0.01, 1.0, log=True),
+            'reg_lambda': trial.suggest_float('reg_lambda', 0.01, 1.0, log=True),
+            'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.8, 2.0),  # 关键: 自动搜索上涨权重
+        }
+        
+        # 3折快速评估
+        mini_tscv = TimeSeriesSplit(n_splits=3)
+        scores = []
+        for train_idx, test_idx in mini_tscv.split(X_search):
+            X_tr, X_te = X_search[train_idx], X_search[test_idx]
+            y_tr, y_te = y_search[train_idx], y_search[test_idx]
+            
+            model = lgb.LGBMClassifier(**params)
+            model.fit(X_tr, y_tr, eval_set=[(X_te, y_te)],
+                      callbacks=[lgb.early_stopping(30, verbose=False)])
+            y_pred = model.predict(X_te)
+            
+            # 目标函数: 加权recall (上涨recall权重1.5, 因为赚钱靠抓上涨)
+            up_recall = np.sum((y_pred == 1) & (y_te == 1)) / (np.sum(y_te == 1) + 1e-10)
+            down_recall = np.sum((y_pred == 0) & (y_te == 0)) / (np.sum(y_te == 0) + 1e-10)
+            weighted_recall = 1.5 * up_recall + 1.0 * down_recall  # 上涨更重要
+            scores.append(weighted_recall)
+        
+        return np.mean(scores)  # Optuna最大化这个值
+    
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=50, show_progress_bar=True)
+    
+    best_params = study.best_params
+    best_value = study.best_value
+    print(f"\n✅ Optuna搜索完成!")
+    print(f"  最优加权recall: {best_value:.4f}")
+    print(f"  最优参数:")
+    for k, v in best_params.items():
+        print(f"    {k}: {v}")
+    
+    # ====== 用最优参数做完整5折训练 ======
+    best_params.update({
         'objective': 'binary',
         'metric': 'binary_logloss',
         'boosting_type': 'gbdt',
-        'num_leaves': 48,          # v3.1: 从31回到48(31太保守了)
-        'learning_rate': 0.025,    # v3.1: 从0.02微调到0.025
-        'feature_fraction': 0.65,  # v3.1: 从0.6微调到0.65
-        'bagging_fraction': 0.8,
-        'bagging_freq': 5,
         'verbose': -1,
-        'n_estimators': 600,      # v3.1: 800太多，600适中
-        'max_depth': 7,           # v3.1: 从6提到7
-        'min_child_samples': 40,  # v3.1: 从50降到40
-        'reg_alpha': 0.3,         # v3.1: 从0.5降到0.3
-        'reg_lambda': 0.5,        # v3.1: 从1.0降到0.5
-        'scale_pos_weight': scale_pos_weight,  # v3: 非对称损失
+        'n_jobs': -1,
         'random_state': 42,
-        'n_jobs': -1
-    }
-
-    print(f"\n训练 LightGBM 模型（v3.1: 平衡版 - 提上涨recall + 适度正则化）")
-    print(f"  scale_pos_weight={scale_pos_weight:.2f} (上涨加权1.5x)")
-    print(f"  num_leaves=48, max_depth=7, feature_fraction=0.65")
-    print(f"  reg_alpha=0.3, reg_lambda=0.5")
-
+    })
+    
+    print(f"\n用最优参数做5折交叉验证...")
+    
     cv_scores = []
     models = []
     fold_up_recalls = []
     fold_down_recalls = []
-
+    
     for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
-
-        model = lgb.LGBMClassifier(**params)
+        
+        model = lgb.LGBMClassifier(**best_params)
         model.fit(
             X_train, y_train,
             eval_set=[(X_test, y_test)],
-            callbacks=[lgb.early_stopping(50, verbose=False)]  # v3: patience从30增到50
+            callbacks=[lgb.early_stopping(50, verbose=False)]
         )
-
+        
         y_pred = model.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
         cv_scores.append(accuracy)
         models.append(model)
-
-        # 分类别报告
+        
         up_recall = np.sum((y_pred == 1) & (y_test == 1)) / np.sum(y_test == 1)
         down_recall = np.sum((y_pred == 0) & (y_test == 0)) / np.sum(y_test == 0)
         fold_up_recalls.append(up_recall)
         fold_down_recalls.append(down_recall)
         print(f"  Fold {fold + 1}: Accuracy={accuracy:.4f}, 上涨recall={up_recall:.4f}, 下跌recall={down_recall:.4f}")
-
+    
     avg_accuracy = np.mean(cv_scores)
     print(f"\n平均交叉验证准确率: {avg_accuracy:.4f}")
-
-    # 各折上涨recall均值
     print(f"平均上涨recall: {np.mean(fold_up_recalls):.4f}")
     print(f"平均下跌recall: {np.mean(fold_down_recalls):.4f}")
-
+    
     # 使用最后一个模型
     final_model = models[-1]
-
+    
     # 整体评估
     y_pred_all = final_model.predict(X)
     print(f"\n整体评估:")
     print(f"  准确率: {accuracy_score(y, y_pred_all):.2%}")
     print(f"\n分类报告:")
     print(classification_report(y, y_pred_all, target_names=['下跌', '上涨']))
-
-    # 特征重要性（用实际训练时的特征名）
-    feature_importance = dict(zip(
-        EnhancedFeatureEngineer.FEATURE_NAMES or [] + MarketFeatureEngineer.MARKET_FEATURE_NAMES or [],
-        final_model.feature_importances_
-    ))
-
+    
+    # 特征重要性（用实际特征名）
+    if feature_names and len(feature_names) == len(final_model.feature_importances_):
+        feature_importance = dict(zip(feature_names, final_model.feature_importances_))
+    else:
+        feature_importance = dict(zip(
+            (EnhancedFeatureEngineer.FEATURE_NAMES or []) + (MarketFeatureEngineer.MARKET_FEATURE_NAMES or []),
+            final_model.feature_importances_
+        ))
+    
     return {
         'model': final_model,
         'cv_accuracy': avg_accuracy,
         'cv_scores': cv_scores,
         'feature_importance': feature_importance,
-        'feature_names': None,  # 由prepare_training_data传入实际特征名
-        'params': params,
+        'feature_names': feature_names,
+        'params': best_params,
+        'optuna_study': study,
         'train_samples': len(X),
         'train_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
-
 
 def save_model(model_data: Dict, model_dir: str):
     """保存模型"""
