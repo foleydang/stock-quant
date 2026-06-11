@@ -1,3 +1,0 @@
-# 统一在根目录管理依赖
-# 安装: cd .. && pip install -r requirements.txt
-# 本文件仅作提示，请使用根目录 requirements.txt
