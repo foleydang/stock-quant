@@ -17,13 +17,29 @@ conn = sqlite3.connect(DB_PATH)
 
 def load_progress():
     if os.path.exists(PROGRESS_FILE):
-        with open(PROGRESS_FILE) as f: return json.load(f)
-    return {'hs300_done': [], 'kline_done': [], 'total_new': 0, 'total_fail': 0}
+        with open(PROGRESS_FILE) as f:
+            d = json.load(f)
+            # 转换为set加速查找, 再存回set格式
+            if isinstance(d.get('kline_done'), list):
+                d['kline_done'] = set(d['kline_done'])
+            if isinstance(d.get('hs300_done'), list):
+                d['hs300_done'] = set(d['hs300_done'])
+            return d
+    return {'hs300_done': set(), 'kline_done': set(), 'total_new': 0, 'total_fail': 0}
 
 def save_progress(p):
-    with open(PROGRESS_FILE, 'w') as f: json.dump(p, f)
+    # 只每隔50次保存, 不用每次stock×quarter都写
+    # 写入时转回list (set不可JSON序列化)
+    d = {k: (list(v) if isinstance(v, set) else v) for k, v in p.items()}
+    with open(PROGRESS_FILE, 'w') as f: json.dump(d, f)
 
 progress = load_progress()
+_save_counter = [0]  # 用list包装以便在嵌套函数中修改
+
+def save_if_needed():
+    _save_counter[0] += 1
+    if _save_counter[0] % 50 == 0:
+        save_progress(progress)
 
 lg = bs.login()
 print(f"baostock登录: {lg.error_msg}")
@@ -51,9 +67,9 @@ for year in years:
             new += 1
     
     conn.commit()
-    progress['hs300_done'].append(str(year))
+    progress['hs300_done'].add(str(year))
     progress['total_new'] += new
-    save_progress(progress)
+    save_if_needed()
     print(f"{year}: {len(rows)}条(新增{new})")
 
 f = conn.execute("SELECT COUNT(*), MIN(trade_date), MAX(trade_date) FROM hs300_daily").fetchone()
@@ -119,9 +135,9 @@ for i, sym in enumerate(symbols):
                 new += 1
         
         if new > 0: conn.commit()
-        progress['kline_done'].append(key)
+        progress['kline_done'].add(key)
         progress['total_new'] += new
-        save_progress(progress)
+        save_if_needed()
         
         if i % 20 == 0 and new > 0:
             done_pct = len(progress['kline_done']) / total_calls * 100
