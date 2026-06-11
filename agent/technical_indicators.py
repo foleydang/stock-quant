@@ -306,10 +306,11 @@ def calc_volume_ratio(kline: List[Dict], period: int = 5) -> float:
 
 # ========== 支撑压力位 ==========
 
-def calc_support_resistance(kline: List[Dict], levels: int = 3) -> Dict:
-    """计算支撑位和压力位（基于局部极值法 + 均线支撑）
+def calc_support_resistance(kline: List[Dict], levels: int = 3, cost_price: float = None) -> Dict:
+    """计算支撑位和压力位（基于局部极值法 + 均线支撑 + 持仓成本价）
 
     规则：支撑位必须明显低于当前价（差距>1%），压力位必须明显高于当前价（差距>1%）
+    持仓成本价自动作为重要支撑位（成本价附近是心理支撑）
     """
     if len(kline) < 20:
         return {'supports': [], 'resistances': []}
@@ -337,7 +338,7 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3) -> Dict:
         if ma_vals:
             ma_candidates.append((period, ma_vals[-1]))
 
-    # 支撑位：低于当前价的均线 + 局部低点，差距>1%
+    # 支撑位：低于当前价的均线 + 局部低点 + 持仓成本价，差距>1%
     min_gap_pct = 0.01  # 至少1%的距离才算有效支撑/压力
     support_candidates = []
     for s in local_lows:
@@ -346,8 +347,11 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3) -> Dict:
     for period, ma_val in ma_candidates:
         if ma_val < current and (current - ma_val) / current >= min_gap_pct:
             support_candidates.append(ma_val)
+    # 持仓成本价作为重要支撑位（成本价附近是心理支撑）
+    if cost_price and cost_price < current and (current - cost_price) / current >= min_gap_pct:
+        support_candidates.append(cost_price)
 
-    # 压力位：高于当前价的均线 + 局部高点，差距>1%
+    # 压力位：高于当前价的均线 + 局部高点 + 持仓成本价（浮亏时成本价是心理压力位），差距>1%
     resistance_candidates = []
     for r in local_highs:
         if r > current and (r - current) / current >= min_gap_pct:
@@ -355,6 +359,9 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3) -> Dict:
     for period, ma_val in ma_candidates:
         if ma_val > current and (ma_val - current) / current >= min_gap_pct:
             resistance_candidates.append(ma_val)
+    # 持仓成本价高于当前价时，作为心理压力位（成本价是浮亏卖出心理关口）
+    if cost_price and cost_price > current and (cost_price - current) / current >= min_gap_pct:
+        resistance_candidates.append(cost_price)
 
     # 去重、排序、取最近的几个
     # 支撑位：离当前价越近的越重要（但必须低于当前价>1%）
@@ -382,7 +389,26 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3) -> Dict:
                 resistances.append(round(r, 2))
         resistances.sort()
 
-    return {'supports': supports[:levels], 'resistances': resistances[:levels], 'current': current}
+    # 持仓成本价作为特殊支撑/压力位：必须出现在结果中
+    # 成本价低于当前价 → 重要支撑位（优先级最高）
+    # 成本价高于当前价 → 重要压力位（优先级最高，必须包含）
+    if cost_price:
+        if cost_price < current:
+            # 成本价插入支撑位最前面
+            supports = [cost_price] + [s for s in supports if s != cost_price]
+            supports = supports[:levels]
+        elif cost_price > current:
+            # 成本价插入压力位（即使距离远也要包含，因为这是持仓者的心理关口）
+            resistances = [r for r in resistances if r != cost_price]
+            resistances.append(cost_price)
+            resistances.sort()
+            # 取最近的2个 + 成本价，确保成本价永远在列表中
+            if cost_price not in resistances[:levels]:
+                resistances = resistances[:levels-1] + [cost_price]
+            else:
+                resistances = resistances[:levels]
+
+    return {'supports': supports[:levels], 'resistances': resistances[:levels], 'current': current, 'cost_price': cost_price}
 
 
 # ========== 动态异动阈值 ==========
@@ -483,8 +509,22 @@ def get_technical_analysis(symbol: str) -> Dict:
     final_current = rt_current if rt_current is not None else current
     final_change_pct = rt_change_pct if rt_change_pct is not None else ((kline[-1]['close'] - kline[-2]['close']) / kline[-2]['close'] * 100 if len(kline) > 1 else 0)
 
-    # 支撑压力位（基于K线计算，再用实时价校验）
-    sr = calc_support_resistance(kline)
+    # 支撑压力位（基于K线 + 持仓成本价计算）
+    # 先查持仓成本价
+    cost_price = None
+    try:
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT cost_price FROM positions WHERE symbol=?", (symbol,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0] > 0:
+            cost_price = float(row[0])
+    except Exception:
+        pass
+
+    sr = calc_support_resistance(kline, cost_price=cost_price)
     sr['current'] = final_current
 
     # 如果实时价明显高于K线收盘价（盘中缺今天数据），局部高点可能低于实时价
@@ -627,8 +667,13 @@ def get_technical_analysis(symbol: str) -> Dict:
     name = row[0] if row else symbol
     conn.close()
 
+    # 港股标识
+    is_hk = symbol.endswith('.HK')
+    currency = 'HK$' if is_hk else '¥'
+
     return {
         'symbol': symbol, 'name': name, 'current': final_current,
+        'is_hk': is_hk, 'currency': currency,
         'ma5': ma5[-1] if ma5 else None, 'ma10': ma10[-1] if ma10 else None,
         'ma20': ma20[-1] if ma20 else None, 'ma60': ma60[-1] if ma60 else None,
         'macd_dif': macd['dif'][-1] if macd['dif'] else None,

@@ -263,26 +263,32 @@ def main():
     for key, val in status.items():
         print(f"  {key}: {val}")
     
-    # 按优先级执行缺失的步骤
+    # 按优先级执行缺失的步骤（每次只做一个Tushare步骤）
+    tushare_done = False
+    
     # 1. 板块映射（如果"其他"类太多）
     if not status['sector']['done']:
         print("\n--- 执行: 板块映射 ---")
-        step_sector_mapping(conn)
-        return  # Tushare限频，每次只能做一个
+        ok = step_sector_mapping(conn)
+        if ok:
+            return  # Tushare成功，本次结束
+        # 限频失败，继续尝试其他非Tushare步骤
     
     # 2. 沪深300日线
     if not status['hs300']['done']:
         print("\n--- 执行: 沪深300日线 ---")
-        step_hs300_daily(conn)
-        return
+        ok = step_hs300_daily(conn)
+        if ok:
+            return
     
-    # 3. 个股日线数据
+    # 3. 个股日线数据（也是Tushare，如果前面Tushare限频了，这里也大概率限频，但可以试试）
     if not status['daily_coverage']['done']:
         print("\n--- 执行: 补充日线数据 ---")
-        step_kline_daily(conn)
-        return
+        ok = step_kline_daily(conn)
+        if ok:
+            return
     
-    # 4. 北向资金补全
+    # 4. 北向资金补全（用akshare，不占Tushare额度）
     if not status['north_flow'].get('max_date') or status['north_flow']['max_date'] < '2025-12-31':
         print("\n--- 执行: 北向资金补全 ---")
         step_north_flow(conn)
