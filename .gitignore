@@ -10,9 +10,6 @@ python/venv/
 # IDE
 .idea/
 
-# 密钥
-python/.env
-agent/.env
 
 # 日志
 logs/*.log

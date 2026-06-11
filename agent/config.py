@@ -9,11 +9,11 @@ import os
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()
-
 # 项目目录
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PYTHON_DIR = os.path.join(PROJECT_ROOT, 'python')
+
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
 # 加载 config.yaml
 _config_path = os.path.join(PYTHON_DIR, 'config.yaml')
