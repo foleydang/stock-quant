@@ -271,7 +271,14 @@ class MarketFeatureEngineer:
     @staticmethod
     def calculate_market_features(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame:
         """
-        计算市场/板块特征（约8个）
+        计算市场/板块特征（v2优化版）
+        
+        v1问题: market_pct_chg等大盘绝对值排Top5，模型本质是预测大盘涨跌
+        v2改进: 
+        - 去掉纯大盘绝对值特征(market_pct_chg/up_ratio/momentum_3)
+        - 北向资金改为相对值: north_surprise(超预期程度)
+        - 强化个股vs大盘超额特征(alpha/contra_market/vol_ratio等)
+        - 去掉伪规律日历特征(day_of_month/day_of_week/hour/minute)
         
         Args:
             df: 30分钟K线DataFrame，必须有 'date' 列
@@ -284,17 +291,17 @@ class MarketFeatureEngineer:
             return features
 
         df_dates = pd.to_datetime(df['date'])
-        # kline_30m用YYYY-MM-DD, hs300_daily用YYYYMMDD， north_flow用YYYY-MM-DD
         trade_dates_ymd = df_dates.dt.strftime('%Y-%m-%d')
-        trade_dates_raw8 = df_dates.dt.strftime('%Y%m%d')  # BaoStock格式
+        trade_dates_raw8 = df_dates.dt.strftime('%Y%m%d')
 
-        # 2. 大盘涨跌幅（从hs300_daily表，YYYYMMDD格式）- 先算，北向fallback依赖它
+        # ====== 大盘数据（内部变量，不直接输出为特征）======
+        market_pct = None
         try:
             conn = sqlite3.connect(DB_PATH)
             min_date_raw8 = trade_dates_raw8.min()
             max_date_raw8 = trade_dates_raw8.max()
             hs300_df = pd.read_sql(
-                "SELECT trade_date, pct_chg, avg_pct_chg, up_count, down_count FROM hs300_daily "
+                "SELECT trade_date, pct_chg, avg_pct_chg FROM hs300_daily "
                 f"WHERE trade_date >= '{min_date_raw8}' AND trade_date <= '{max_date_raw8}'",
                 conn
             )
@@ -302,31 +309,15 @@ class MarketFeatureEngineer:
 
             if len(hs300_df) > 0:
                 pct_col = 'pct_chg' if 'pct_chg' in hs300_df.columns else 'avg_pct_chg'
-                hs300_map_pct = dict(zip(hs300_df['trade_date'], hs300_df[pct_col]))
-                
-                up_col = 'up_count' if 'up_count' in hs300_df.columns else None
-                down_col = 'down_count' if 'down_count' in hs300_df.columns else None
-
-                features['market_pct_chg'] = trade_dates_raw8.map(hs300_map_pct).fillna(0)
-                if up_col:
-                    hs300_map_up = dict(zip(hs300_df['trade_date'], hs300_df[up_col]))
-                    hs300_map_down = dict(zip(hs300_df['trade_date'], hs300_df[down_col]))
-                    features['market_up_ratio'] = trade_dates_raw8.map(hs300_map_up).fillna(0) / \
-                                                  (trade_dates_raw8.map(hs300_map_down).fillna(0) + trade_dates_raw8.map(hs300_map_up).fillna(0) + 1e-10)
-                else:
-                    features['market_up_ratio'] = 0
-                features['market_momentum_3'] = features['market_pct_chg'].rolling(6, min_periods=1).sum()
-            else:
-                features['market_pct_chg'] = 0
-                features['market_up_ratio'] = 0
-                features['market_momentum_3'] = 0
+                hs300_map = dict(zip(hs300_df['trade_date'], hs300_df[pct_col]))
+                market_pct = trade_dates_raw8.map(hs300_map).fillna(0) / 100  # 转为小数
         except Exception as e:
-            features['market_pct_chg'] = 0
-            features['market_up_ratio'] = 0
-            features['market_momentum_3'] = 0
+            pass
 
-        # 3. 查询北向资金（从north_flow表，YYYY-MM-DD格式）
-        # 当北向数据缺失时，用大盘涨跌幅作为情绪替代
+        # ====== 北向资金（改为相对值：超预期程度）======
+        # 之前north_flow绝对值跟大盘涨跌高度相关
+        # 改为: 当日流入 vs 近期均值 的偏离程度(超预期)
+        north_flow_abs = None
         try:
             conn = sqlite3.connect(DB_PATH)
             min_date_ymd = trade_dates_ymd.min()
@@ -340,42 +331,60 @@ class MarketFeatureEngineer:
             conn.close()
 
             if len(north_df) > 0:
-                north_df['total_net_billion'] = north_df['total_net'] / 10000  # 万元转亿元
-                north_df = north_df[north_df['total_net_billion'].abs() < 500]  # 排除占位值
+                north_df['total_net_billion'] = north_df['total_net'] / 10000
+                north_df = north_df[north_df['total_net_billion'].abs() < 500]
                 north_map = dict(zip(north_df['trade_date'], north_df['total_net_billion']))
-
                 north_mapped = trade_dates_ymd.map(north_map)
                 coverage = north_mapped.notna().sum() / len(north_mapped)
-
                 if coverage >= 0.5:
-                    # 北向数据覆盖率高，直接用
-                    features['north_flow'] = north_mapped.fillna(0)
-                    features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
-                    features['north_flow_change'] = features['north_flow'].diff(6)
-                else:
-                    # 北向数据覆盖率低，用大盘涨跌幅作为情绪替代
-                    features['north_flow'] = features['market_pct_chg'].fillna(0) * 10
-                    features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
-                    features['north_flow_change'] = features['north_flow'].diff(6)
-            else:
-                features['north_flow'] = features['market_pct_chg'].fillna(0) * 10
-                features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
-                features['north_flow_change'] = features['north_flow'].diff(6)
+                    north_flow_abs = north_mapped.fillna(0)
         except Exception as e:
-            features['north_flow'] = features.get('market_pct_chg', pd.Series(0, index=df.index)).fillna(0) * 10
-            features['north_flow_cum_3'] = features['north_flow'].rolling(6, min_periods=1).sum()
-            features['north_flow_change'] = features['north_flow'].diff(6)
+            pass
 
-        # 4. 个股vs大盘超额收益
-        if 'close' in df.columns and 'market_pct_chg' in features.columns:
+        if north_flow_abs is not None:
+            # 北向超预期: 当日流入 vs 近2日均值(10根30分钟线≈2天)
+            north_ma = north_flow_abs.rolling(10, min_periods=1).mean()
+            features['north_surprise'] = (north_flow_abs - north_ma) / (north_ma.abs() + 1e-6)
+            features['north_surprise_cum'] = features['north_surprise'].rolling(6, min_periods=1).sum()
+            # 北向方向(0/1): 净流入为正=1
+            features['north_direction'] = (north_flow_abs > 0).astype(int)
+        else:
+            features['north_surprise'] = 0
+            features['north_surprise_cum'] = 0
+            features['north_direction'] = 0
+
+        # ====== 个股vs大盘超额特征（核心：这才是个股的"真实信号"）======
+        if 'close' in df.columns and market_pct is not None:
             stock_pct = df['close'].pct_change()
-            features['alpha_vs_market'] = stock_pct - features['market_pct_chg'] / 100
+
+            # alpha = 个股涨跌幅 - 大盘涨跌幅
+            features['alpha_vs_market'] = stock_pct - market_pct
             features['alpha_cum_3'] = features['alpha_vs_market'].rolling(6, min_periods=1).sum()
+            features['alpha_cum_5'] = features['alpha_vs_market'].rolling(10, min_periods=1).sum()
+
+            # 个股是否逆势（强信号）
+            features['contra_market_up'] = ((stock_pct > 0) & (market_pct < 0)).astype(int)
+            features['contra_market_down'] = ((stock_pct < 0) & (market_pct > 0)).astype(int)
+
+            # 个股波动vs大盘波动
+            stock_vol = stock_pct.rolling(20, min_periods=1).std()
+            market_vol = market_pct.rolling(20, min_periods=1).std()
+            features['vol_ratio_vs_market'] = stock_vol / (market_vol + 1e-10)
+
+            # 日内alpha: 从开盘到当前的涨跌 vs 大盘同期
+            if 'open' in df.columns:
+                intraday_stock = (df['close'] - df['open']) / (df['open'] + 1e-10)
+                features['intraday_alpha'] = intraday_stock - market_pct
         else:
             features['alpha_vs_market'] = 0
             features['alpha_cum_3'] = 0
+            features['alpha_cum_5'] = 0
+            features['contra_market_up'] = 0
+            features['contra_market_down'] = 0
+            features['vol_ratio_vs_market'] = 0
+            features['intraday_alpha'] = 0
 
-        # 5. 板块信息（从stock_sector表）
+        # ====== 板块信息 ======
         try:
             if symbol:
                 conn = sqlite3.connect(DB_PATH)
@@ -389,12 +398,6 @@ class MarketFeatureEngineer:
         except:
             industry = '其他'
 
-        # 板块是否为强势行业（编码为0/1）
-        strong_industries = {'C39', 'C35', 'I65', 'C38', 'C27', 'C26', 'C34', 'D44', 'J66', 'J68', 'K70'}
-        # BaoStock格式如 "C39计算机、通信和其他电子设备制造业" 或 "J66货币金融服务"
-        # 匹配行业代码前缀
-        industry_code = industry.split('计算机')[0].split('货币')[0].split('保险')[0] if industry else ''
-        # 更简单：看行业名是否包含关键词
         is_strong = any(kw in industry for kw in ['电子', '计算机', '通信', '软件', '医药', '医疗', '电力设备', '电气', '军工', '国防', '汽车', '新能源', '半导体', '芯片', '金融', '保险'])
         features['sector_is_strong'] = 1 if is_strong else 0
 
@@ -402,6 +405,7 @@ class MarketFeatureEngineer:
             MarketFeatureEngineer.MARKET_FEATURE_NAMES = features.columns.tolist()
 
         return features
+
 
     @staticmethod
     def calculate_target(df: pd.DataFrame, horizon: int = 3, threshold: float = 0.008) -> np.ndarray:
