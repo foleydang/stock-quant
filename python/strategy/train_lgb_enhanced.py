@@ -557,32 +557,42 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
     return X, y, feature_names
 
 
-def train_model(X: np.ndarray, y: np.ndarray) -> Dict:
-    """训练模型"""
-    # 时序交叉验证
+def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -> Dict:
+    """训练模型（v3: 非对称损失 + 特征分组采样 + 更多正则化）"""
     tscv = TimeSeriesSplit(n_splits=5)
 
-    # 优化后的参数
+    # ====== v3 参数优化 ======
+    # 1. 非对称损失: 上涨判错的代价更高(实盘要赚钱，漏涨比误判跌更致命)
+    #    scale_pos_weight = 下跌样本数/上涨样本数，让模型对上涨更敏感
+    pos_count = np.sum(y == 1)
+    neg_count = np.sum(y == 0)
+    scale_pos_weight = neg_count / pos_count  # ≈1.08, 微调上涨recall
+
     params = {
         'objective': 'binary',
         'metric': 'binary_logloss',
         'boosting_type': 'gbdt',
-        'num_leaves': 63,
-        'learning_rate': 0.03,
-        'feature_fraction': 0.8,
+        'num_leaves': 31,          # v3: 从63降到31，更保守防过拟合
+        'learning_rate': 0.02,    # v3: 从0.03降到0.02，更慢更稳
+        'feature_fraction': 0.6,  # v3: 从0.8降到0.6，每棵树只用60%特征
+                                   #     防止north_surprise一直排Top
         'bagging_fraction': 0.8,
         'bagging_freq': 5,
         'verbose': -1,
-        'n_estimators': 500,
-        'max_depth': 8,
-        'min_child_samples': 30,
-        'reg_alpha': 0.1,
-        'reg_lambda': 0.1,
+        'n_estimators': 800,      # v3: 从500增到800，配合更低learning_rate
+        'max_depth': 6,           # v3: 从8降到6，更浅的树
+        'min_child_samples': 50,  # v3: 从30增到50，更保守
+        'reg_alpha': 0.5,         # v3: 从0.1增到0.5，更强L1正则
+        'reg_lambda': 1.0,        # v3: 从0.1增到1.0，更强L2正则
+        'scale_pos_weight': scale_pos_weight,  # v3: 非对称损失
         'random_state': 42,
         'n_jobs': -1
     }
 
-    print("\n训练 LightGBM 模型（5折交叉验证）...")
+    print(f"\n训练 LightGBM 模型（v3: 非对称损失 + 更强正则化）")
+    print(f"  scale_pos_weight={scale_pos_weight:.2f} (上涨样本加权)")
+    print(f"  num_leaves=31, max_depth=6, feature_fraction=0.6")
+    print(f"  reg_alpha=0.5, reg_lambda=1.0")
 
     cv_scores = []
     models = []
@@ -595,7 +605,7 @@ def train_model(X: np.ndarray, y: np.ndarray) -> Dict:
         model.fit(
             X_train, y_train,
             eval_set=[(X_test, y_test)],
-            callbacks=[lgb.early_stopping(30, verbose=False)]
+            callbacks=[lgb.early_stopping(50, verbose=False)]  # v3: patience从30增到50
         )
 
         y_pred = model.predict(X_test)
@@ -603,10 +613,17 @@ def train_model(X: np.ndarray, y: np.ndarray) -> Dict:
         cv_scores.append(accuracy)
         models.append(model)
 
-        print(f"  Fold {fold + 1}: Accuracy = {accuracy:.4f}")
+        # 分类别报告
+        up_recall = np.sum((y_pred == 1) & (y_test == 1)) / np.sum(y_test == 1)
+        down_recall = np.sum((y_pred == 0) & (y_test == 0)) / np.sum(y_test == 0)
+        print(f"  Fold {fold + 1}: Accuracy={accuracy:.4f}, 上涨recall={up_recall:.4f}, 下跌recall={down_recall:.4f}")
 
     avg_accuracy = np.mean(cv_scores)
     print(f"\n平均交叉验证准确率: {avg_accuracy:.4f}")
+
+    # 各折上涨recall均值
+    up_recalls = [np.sum((models[i].predict(X[tscv.split(X)[i][1]]) == 1) & (y[tscv.split(X)[i][1]] == 1)) / np.sum(y[tscv.split(X)[i][1]] == 1) for i in range(5)]
+    print(f"平均上涨recall: {np.mean(up_recalls):.4f}")
 
     # 使用最后一个模型
     final_model = models[-1]
@@ -675,7 +692,7 @@ def main():
         return
 
     # 训练模型
-    model_data = train_model(X, y)
+    model_data = train_model(X, y, feature_names=feature_names)
     # 写入正确的特征名
     if feature_names:
         model_data['feature_names'] = feature_names
