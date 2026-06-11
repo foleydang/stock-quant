@@ -101,42 +101,34 @@ def load_30min_data(db_path: str) -> Dict[str, pd.DataFrame]:
 
 
 def load_daily_data(db_path: str) -> pd.DataFrame:
-    """加载所有股票的日线数据（含大盘和北向）"""
+    """加载日线数据 (优先 kline_daily 表, 回退到30分钟聚合)"""
     conn = sqlite3.connect(db_path)
 
-    # 检查日线表
+    # 检查表
     tables = [r[0] for r in conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-    print(f"数据库表: {tables}")
 
-    daily_table = None
-    for t in ['daily_kline', 'kline_daily', 'stock_daily']:
-        if t in tables:
-            daily_table = t
-            break
-
-    if not daily_table:
-        # 从30分钟聚合
-        print("无日线表, 从30分钟聚合...")
+    if 'kline_daily' in tables:
+        # kline_daily 列名是 date (不是 trade_date)
         df = pd.read_sql_query(
-            "SELECT symbol, date(date) as trade_date, "
-            "FIRST_VALUE(open) as open, MAX(high) as high, "
-            "MIN(low) as low, LAST_VALUE(close) as close, "
-            "SUM(volume) as volume "
-            "FROM kline_30m GROUP BY symbol, date(date) ORDER BY symbol, trade_date",
-            conn)
+            "SELECT symbol, date as trade_date, open, high, low, close, volume "
+            "FROM kline_daily ORDER BY symbol, date", conn)
+        print(f"日线(kline_daily): {len(df):,} 行, {df['symbol'].nunique()} 只")
     else:
-        df = pd.read_sql_query(
-            f"SELECT * FROM {daily_table} ORDER BY symbol, trade_date", conn)
+        # 从30分钟聚合
+        print("无 kline_daily 表, 从30分钟K线聚合日线...")
+        df = pd.read_sql_query("""
+            SELECT symbol, date(date) as trade_date,
+                   FIRST_VALUE(open) as open, MAX(high) as high,
+                   MIN(low) as low, LAST_VALUE(close) as close,
+                   SUM(volume) as volume
+            FROM kline_30m GROUP BY symbol, date(date)
+            ORDER BY symbol, trade_date
+        """, conn)
+        print(f"日线(聚合): {len(df):,} 行, {df['symbol'].nunique() if 'symbol' in df.columns else '?'} 只")
 
     conn.close()
-
-    if 'trade_date' in df.columns:
-        df['trade_date'] = pd.to_datetime(df['trade_date'])
-    elif 'date' in df.columns:
-        df['trade_date'] = pd.to_datetime(df['date'])
-
-    print(f"日线数据: {len(df):,} 行, {df['symbol'].nunique() if 'symbol' in df.columns else '?'} 只\n")
+    df['trade_date'] = pd.to_datetime(df['trade_date'])
     return df
 
 
