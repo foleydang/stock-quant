@@ -534,6 +534,7 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
                 success_count += 1
             else:
                 fail_count += 1
+                print(f"  数据不足 {symbol}: 有效样本{len(features_valid)}条(需>50)")
 
         except Exception as e:
             print(f"  特征计算失败 {symbol}: {type(e).__name__}: {e}")
@@ -566,33 +567,34 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
     #    scale_pos_weight = 下跌样本数/上涨样本数，让模型对上涨更敏感
     pos_count = np.sum(y == 1)
     neg_count = np.sum(y == 0)
-    scale_pos_weight = neg_count / pos_count  # ≈1.08, 微调上涨recall
+    # v3.1: scale_pos_weight更激进，上涨加权1.5倍
+    # 之前1.08太弱，上涨recall只有0.66
+    scale_pos_weight = neg_count / pos_count * 1.4  # ≈1.51
 
     params = {
         'objective': 'binary',
         'metric': 'binary_logloss',
         'boosting_type': 'gbdt',
-        'num_leaves': 31,          # v3: 从63降到31，更保守防过拟合
-        'learning_rate': 0.02,    # v3: 从0.03降到0.02，更慢更稳
-        'feature_fraction': 0.6,  # v3: 从0.8降到0.6，每棵树只用60%特征
-                                   #     防止north_surprise一直排Top
+        'num_leaves': 48,          # v3.1: 从31回到48(31太保守了)
+        'learning_rate': 0.025,    # v3.1: 从0.02微调到0.025
+        'feature_fraction': 0.65,  # v3.1: 从0.6微调到0.65
         'bagging_fraction': 0.8,
         'bagging_freq': 5,
         'verbose': -1,
-        'n_estimators': 800,      # v3: 从500增到800，配合更低learning_rate
-        'max_depth': 6,           # v3: 从8降到6，更浅的树
-        'min_child_samples': 50,  # v3: 从30增到50，更保守
-        'reg_alpha': 0.5,         # v3: 从0.1增到0.5，更强L1正则
-        'reg_lambda': 1.0,        # v3: 从0.1增到1.0，更强L2正则
+        'n_estimators': 600,      # v3.1: 800太多，600适中
+        'max_depth': 7,           # v3.1: 从6提到7
+        'min_child_samples': 40,  # v3.1: 从50降到40
+        'reg_alpha': 0.3,         # v3.1: 从0.5降到0.3
+        'reg_lambda': 0.5,        # v3.1: 从1.0降到0.5
         'scale_pos_weight': scale_pos_weight,  # v3: 非对称损失
         'random_state': 42,
         'n_jobs': -1
     }
 
-    print(f"\n训练 LightGBM 模型（v3: 非对称损失 + 更强正则化）")
-    print(f"  scale_pos_weight={scale_pos_weight:.2f} (上涨样本加权)")
-    print(f"  num_leaves=31, max_depth=6, feature_fraction=0.6")
-    print(f"  reg_alpha=0.5, reg_lambda=1.0")
+    print(f"\n训练 LightGBM 模型（v3.1: 平衡版 - 提上涨recall + 适度正则化）")
+    print(f"  scale_pos_weight={scale_pos_weight:.2f} (上涨加权1.5x)")
+    print(f"  num_leaves=48, max_depth=7, feature_fraction=0.65")
+    print(f"  reg_alpha=0.3, reg_lambda=0.5")
 
     cv_scores = []
     models = []
