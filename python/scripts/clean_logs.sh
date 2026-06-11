@@ -1,7 +1,7 @@
 #!/bin/bash
 # 日志清理脚本 - 每周运行
 
-LOG_DIR="/root/github/stock-quant/logs"
+LOG_DIR="$(cd "$(dirname "$0")" && pwd)/../logs"
 
 # 清理超过30天的日志
 find "$LOG_DIR" -name "*.log" -mtime +30 -delete

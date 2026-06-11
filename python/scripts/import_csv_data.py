@@ -6,13 +6,14 @@ CSV数据导入 - 读取Mac传来的3个CSV文件，写入DB
   python3 import_csv_data.py
 """
 
+import os
 import sqlite3
 import pandas as pd
 from datetime import datetime
 from collections import Counter
 
-DATA_DIR = '/root/github/stock-quant/python/data'
-DB_PATH = f'{DATA_DIR}/stock_data.db'
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+DB_PATH = os.path.join(DATA_DIR, 'stock_data.db')
 
 conn = sqlite3.connect(DB_PATH)
 
@@ -147,8 +148,8 @@ print("最终数据状态")
 print("=" * 50)
 
 import sys
-sys.path.insert(0, '/root/github/stock-quant/python')
-sys.path.insert(0, '/root/github/stock-quant/python/strategy')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'strategy'))
 from strategy.train_lgb_enhanced import MarketFeatureEngineer
 
 # 各表数据量

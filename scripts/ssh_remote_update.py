@@ -44,7 +44,7 @@ class SSHDatabaseUpdater:
         
         # 3. SSH 执行导入脚本
         import_cmd = f'''
-cd /root/github/stock-quant/python
+cd ~/stock-quant/python
 python3.8 << 'PYEOF'
 import json
 import sqlite3

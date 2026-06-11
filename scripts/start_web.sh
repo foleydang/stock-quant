@@ -1,7 +1,7 @@
 #!/bin/bash
 # Stock-quant 网站启动脚本 - 先清理旧进程再启动
 
-PROJECT_DIR="/root/github/stock-quant"
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)/.."
 
 # 清理旧的 vite 进程
 pkill -f "vite" 2>/dev/null

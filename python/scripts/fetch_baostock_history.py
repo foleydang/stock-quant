@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """baostock补全数据 - 不限频
 
 1. 个股30分钟K线 (2020-2024, 每只约7700条)
@@ -11,7 +12,7 @@
 import baostock as bs, sqlite3, time, json, os, sys
 from datetime import datetime
 
-DB_PATH = '/root/github/stock-quant/python/data/stock_data.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'stock_data.db')
 PROGRESS_FILE = '/tmp/baostock_progress.json'
 conn = sqlite3.connect(DB_PATH)
 

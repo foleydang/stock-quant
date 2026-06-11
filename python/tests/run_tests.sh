@@ -1,3 +1,5 @@
 #!/bin/bash
-cd /root/github/stock-quant/python
-/root/miniconda3/bin/python -m pytest tests/ -v
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PYTHON_DIR"
+python3 -m pytest tests/ -v

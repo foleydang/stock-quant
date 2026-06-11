@@ -5,7 +5,7 @@ import sqlite3
 import tushare as ts
 from datetime import datetime
 
-DB_PATH = '/root/github/stock-quant/python/data/stock_data.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'stock_data.db')
 TUSHARE_TOKEN = '7a9014b18909e8cbce5109d7175f7b21ce37354eaff2371db0da2c58'
 
 ts.set_token(TUSHARE_TOKEN)

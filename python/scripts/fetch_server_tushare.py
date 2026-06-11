@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """服务器后台补数据脚本 - tushare版
 
 策略: 372只×3年(2022-2024) = 1116次调用, 1次/分钟 ≈ 18.6小时
@@ -10,7 +11,7 @@ import tushare as ts, sqlite3, time, json, os, sys
 from datetime import datetime
 
 TUSHARE_TOKEN = '7a9014b18909e8cbce5109d7175f7b21ce37354eaff2371db0da2c58'
-DB_PATH = '/root/github/stock-quant/python/data/stock_data.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'stock_data.db')
 PROGRESS_FILE = '/tmp/fetch_progress.json'
 
 ts.set_token(TUSHARE_TOKEN)

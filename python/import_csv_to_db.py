@@ -5,9 +5,9 @@ import os
 import sqlite3
 import pandas as pd
 
-BASE_DIR = '/root/github/stock-quant/python'
-DB_PATH = f'{BASE_DIR}/data/stock_data.db'
-DATA_DIR = f'{BASE_DIR}/data'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'data', 'stock_data.db')
+DATA_DIR = os.path.join(BASE_DIR, 'data')
 
 # 创建数据库和表
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)

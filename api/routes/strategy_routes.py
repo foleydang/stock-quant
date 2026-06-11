@@ -272,7 +272,7 @@ def lgbm_backtest(symbol):
     """LGBM回测 - 使用真实训练模型"""
     try:
         import sys
-        sys.path.insert(0, "/root/github/stock-quant/python")
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "python"))
         
         from lgbm_backtest import LGBMBacktesterOptimized
         import sqlite3

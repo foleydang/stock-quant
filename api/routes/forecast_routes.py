@@ -34,7 +34,7 @@ def _load_model():
     if _model_data is not None:
         return _model_data, _feature_engineer, _filtered_feature_names
 
-    model_path = '/root/github/stock-quant/python/models/lgb_hs300/model.pkl'
+    model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'python', 'models', 'lgb_hs300', 'model.pkl')
     if not os.path.exists(model_path):
         return None, None, None
 
@@ -149,7 +149,7 @@ def forecast_7days(symbol):
         # 计算特征
         features = feature_engineer.calculate_features(df)
         try:
-            sys.path.insert(0, '/root/github/stock-quant/python')
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'python'))
             from strategy.train_lgb_v3 import AdvancedFeatureEngineer
             adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
             features = pd.concat([features, adv_features], axis=1)
@@ -276,7 +276,7 @@ def forecast_history(symbol):
         # 计算特征
         features = feature_engineer.calculate_features(df)
         try:
-            sys.path.insert(0, '/root/github/stock-quant/python')
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'python'))
             from strategy.train_lgb_v3 import AdvancedFeatureEngineer
             adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
             features = pd.concat([features, adv_features], axis=1)
@@ -414,7 +414,7 @@ def forecast_stats():
                 # 计算特征
                 features_calc = feature_engineer.calculate_features(df)
                 try:
-                    sys.path.insert(0, '/root/github/stock-quant/python')
+                    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'python'))
                     from strategy.train_lgb_v3 import AdvancedFeatureEngineer
                     adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
                     features_calc = pd.concat([features_calc, adv_features], axis=1)
@@ -540,7 +540,7 @@ def forecast_accuracy(symbol):
 
         # 高级特征(v3)
         try:
-            sys.path.insert(0, '/root/github/stock-quant/python')
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'python'))
             from strategy.train_lgb_v3 import AdvancedFeatureEngineer
             adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
             features = pd.concat([features, adv_features], axis=1)
