@@ -492,10 +492,13 @@ def load_data(cache_dir: str = '') -> Dict[str, pd.DataFrame]:
     return {}
 
 
-def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -> Tuple[np.ndarray, np.ndarray]:
+def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """准备训练数据"""
     all_features = []
     all_targets = []
+    success_count = 0
+    fail_count = 0
+    feature_names = None
 
     print("计算特征...")
 
@@ -508,7 +511,12 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
             # 合并
             features = pd.concat([features, market_features], axis=1)
 
-            target = EnhancedFeatureEngineer.calculate_target(df, horizon=horizon)
+            # 记录特征名（仅第一次）
+            if feature_names is None and len(features.columns) > 0:
+                feature_names = features.columns.tolist()
+                print(f"  特征数: {len(feature_names)}")
+
+            target = MarketFeatureEngineer.calculate_target(df, horizon=horizon)
 
             # 过滤无效数据
             valid_mask = ~(features.isna().any(axis=1)) & (target >= 0)
@@ -516,30 +524,37 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
             target_valid = target[valid_mask].astype(int)
 
             # 过滤前120行（特征不完整）
-            features_valid = features_valid.iloc[120:]
-            target_valid = target_valid[120:]
+            if len(features_valid) > 120:
+                features_valid = features_valid.iloc[120:]
+                target_valid = target_valid[120:]
 
             if len(features_valid) > 50:
                 all_features.append(features_valid.values)
                 all_targets.append(target_valid)
+                success_count += 1
+            else:
+                fail_count += 1
 
         except Exception as e:
             print(f"  特征计算失败 {symbol}: {e}")
+            fail_count += 1
 
         if (i + 1) % 50 == 0:
-            print(f"  已处理 {i + 1}/{len(all_data)} 只股票")
+            print(f"  已处理 {i + 1}/{len(all_data)} 只股票 (成功{success_count}, 失败{fail_count})")
 
     if not all_features:
-        return None, None
+        return None, None, None
 
     X = np.vstack(all_features)
     y = np.concatenate(all_targets)
 
+    print(f"\n数据准备完成: 成功{success_count}只, 失败{fail_count}只")
     print(f"总样本数: {len(X)}")
     print(f"  上涨: {np.sum(y == 1)} ({np.sum(y == 1)/len(y)*100:.1f}%)")
     print(f"  下跌: {np.sum(y == 0)} ({np.sum(y == 0)/len(y)*100:.1f}%)")
+    print(f"  特征数: {len(feature_names) if feature_names else 'N/A'}")
 
-    return X, y
+    return X, y, feature_names
 
 
 def train_model(X: np.ndarray, y: np.ndarray) -> Dict:
@@ -603,9 +618,9 @@ def train_model(X: np.ndarray, y: np.ndarray) -> Dict:
     print(f"\n分类报告:")
     print(classification_report(y, y_pred_all, target_names=['下跌', '上涨']))
 
-    # 特征重要性
+    # 特征重要性（用实际训练时的特征名）
     feature_importance = dict(zip(
-        EnhancedFeatureEngineer.FEATURE_NAMES or [],
+        EnhancedFeatureEngineer.FEATURE_NAMES or [] + MarketFeatureEngineer.MARKET_FEATURE_NAMES or [],
         final_model.feature_importances_
     ))
 
@@ -614,9 +629,10 @@ def train_model(X: np.ndarray, y: np.ndarray) -> Dict:
         'cv_accuracy': avg_accuracy,
         'cv_scores': cv_scores,
         'feature_importance': feature_importance,
-        'feature_names': EnhancedFeatureEngineer.FEATURE_NAMES,
+        'feature_names': None,  # 由prepare_training_data传入实际特征名
         'params': params,
-        'train_samples': len(X)
+        'train_samples': len(X),
+        'train_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
 
@@ -652,7 +668,7 @@ def main():
     print(f"\n加载了 {len(all_data)} 只股票，开始训练...")
 
     # 准备训练数据
-    X, y = prepare_training_data(all_data, horizon=3)
+    X, y, feature_names = prepare_training_data(all_data, horizon=3)
 
     if X is None or len(X) < 500:
         print(f"训练数据不足 ({len(X) if X is not None else 0} 条)")
@@ -660,6 +676,10 @@ def main():
 
     # 训练模型
     model_data = train_model(X, y)
+    # 写入正确的特征名
+    if feature_names:
+        model_data['feature_names'] = feature_names
+        model_data['feature_importance'] = dict(zip(feature_names, model_data['model'].feature_importances_))
 
     # 保存模型
     model_dir = os.path.join(os.path.dirname(__file__), '../models/lgb_hs300')
