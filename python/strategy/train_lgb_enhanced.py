@@ -563,119 +563,99 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
 
 
 def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -> Dict:
-    """训练模型（v5: LightGBMTunerCV + 量化参数扩展搜索）
+    """训练模型（v6: Optuna一次性搜索全部11个参数，100轮）
     
-    方案:
-    1. 第一阶段: LightGBMTunerCV步进搜索（官方最佳实践）
-       搜索: feature_fraction, num_leaves, bagging, lambda_l1/l2, min_child_samples
-    2. 第二阶段: Optuna搜索量化专属参数（TunerCV不覆盖的）
-       搜索: learning_rate, scale_pos_weight, min_gain_to_split, extra_trees, path_smooth
-    3. 最终: 5折完整交叉验证
+    v5的两阶段搜索有参数交互问题: 第一阶段TunerCV搜num_leaves等时，
+    learning_rate/scale_pos_weight用的是默认值，搜出来的"最优"可能不是真正的最优。
+    
+    v6方案: 所有11个参数一次性搜索，100轮(最佳实践)，
+    让Optuna自动发现参数间的最优组合(包括交互效应)。
+    搜索目标: F1-macro(兼顾上涨和下跌，不会偏向一方)。
     """
     import optuna
-    from optuna_integration.lightgbm import LightGBMTunerCV
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     
     tscv = TimeSeriesSplit(n_splits=5)
     
-    # ====== 第一阶段: LightGBMTunerCV 步进搜索 ======
-    print("\n🔍 第一阶段: LightGBMTunerCV 步进搜索 (官方最佳实践)")
-    print("  搜索: feature_fraction, num_leaves, bagging, lambda_l1/l2, min_child_samples")
+    # ====== Optuna一次性搜索全部11个参数 ======
+    print("\n🔍 Optuna超参数搜索 (100轮, 11个参数, 目标=F1-macro)")
+    print("  搜索: num_leaves, max_depth, learning_rate, feature_fraction,")
+    print("        bagging_fraction, bagging_freq, min_child_samples,")
+    print("        reg_alpha, reg_lambda, scale_pos_weight, min_gain_to_split")
     
-    # 准备lgb.Dataset
-    import lightgbm as lgb
-    # 用前80%数据搜索
+    # 用前80%数据搜索，后20%验证
     split_idx = int(len(X) * 0.8)
     X_search, y_search = X[:split_idx], y[:split_idx]
-    X_valid, y_valid = X[split_idx:], y[split_idx:]
     
-    lgb_train = lgb.Dataset(X_search, label=y_search)
-    lgb_valid = lgb.Dataset(X_valid, label=y_valid, reference=lgb_train)
-    
-    base_params = {
-        'objective': 'binary',
-        'metric': 'binary_logloss',
-        'boosting_type': 'gbdt',
-        'verbose': -1,
-        'n_jobs': -1,
-        'random_state': 42,
-        'n_estimators': 2000,  # 上限，靠early_stopping自动停
-    }
-    
-    tuner = LightGBMTunerCV(
-        params=base_params,
-        train_set=lgb_train,
-        num_boost_round=2000,
-        early_stopping_rounds=50,
-        time_budget=300,  # 5分钟时间预算
-        nfold=3,          # 3折CV搜索
-        stratified=False,  # 时序数据不做stratified
-        show_progress_bar=True,
-    )
-    tuner.run()
-    
-    tuned_params = tuner.best_params
-    best_score = tuner.best_score
-    print(f"\n✅ 第一阶段完成!")
-    print(f"  最优CV分数: {best_score:.4f}")
-    print(f"  步进搜索结果:")
-    for k, v in tuned_params.items():
-        if isinstance(v, float):
-            print(f"    {k}: {v:.6f}")
-        else:
-            print(f"    {k}: {v}")
-    
-    # ====== 第二阶段: Optuna搜索量化专属参数 ======
-    print("\n🔍 第二阶段: Optuna搜索量化专属参数 (50轮, 5个参数最佳实践)")
-    print("  搜索: learning_rate, scale_pos_weight, min_gain_to_split, extra_trees, path_smooth")
-    
-    # 用第一阶段的参数作为基础，补充量化参数
-    def objective_quant(trial):
-        quant_params = tuned_params.copy()
-        quant_params.update({
-            'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.3, log=True),
-            'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.5, 3.0),
-            'min_gain_to_split': trial.suggest_float('min_gain_to_split', 0.0, 5.0),
-            'extra_trees': trial.suggest_categorical('extra_trees', [True, False]),
-            'path_smooth': trial.suggest_float('path_smooth', 0.0, 10.0),
-            'n_estimators': 2000,
+    def objective(trial):
+        params = {
             'objective': 'binary',
             'metric': 'binary_logloss',
+            'boosting_type': 'gbdt',
             'verbose': -1,
             'n_jobs': -1,
             'random_state': 42,
-        })
+            'n_estimators': 2000,  # 不搜，靠early_stopping自动停
+            
+            # ====== 全部11个搜索参数 ======
+            # 树结构
+            'num_leaves': trial.suggest_int('num_leaves', 20, 127),
+            'max_depth': trial.suggest_int('max_depth', 3, 12),
+            'min_child_samples': trial.suggest_int('min_child_samples', 10, 200),
+            
+            # 训练控制
+            'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.3, log=True),
+            
+            # 采样
+            'feature_fraction': trial.suggest_float('feature_fraction', 0.4, 1.0),
+            'bagging_fraction': trial.suggest_float('bagging_fraction', 0.4, 1.0),
+            'bagging_freq': trial.suggest_int('bagging_freq', 1, 7),
+            
+            # 正则化
+            'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 10.0, log=True),
+            'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 10.0, log=True),
+            
+            # 量化专属
+            'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.5, 3.0),
+            'min_gain_to_split': trial.suggest_float('min_gain_to_split', 0.0, 5.0),
+        }
         
+        # 3折快速评估
         mini_tscv = TimeSeriesSplit(n_splits=3)
         scores = []
         for train_idx, test_idx in mini_tscv.split(X_search):
             X_tr, X_te = X_search[train_idx], X_search[test_idx]
             y_tr, y_te = y_search[train_idx], y_search[test_idx]
             
-            model = lgb.LGBMClassifier(**quant_params)
+            model = lgb.LGBMClassifier(**params)
             model.fit(X_tr, y_tr, eval_set=[(X_te, y_te)],
                       callbacks=[lgb.early_stopping(50, verbose=False)])
             y_pred = model.predict(X_te)
             
             # 目标函数: F1-macro (兼顾上涨和下跌，不会偏向一方)
-            # v4的加权recall导致下跌recall=0.51，模型几乎什么都判上涨
             from sklearn.metrics import f1_score
             f1_macro = f1_score(y_te, y_pred, average='macro')
             scores.append(f1_macro)
         
-        return np.mean(scores)
+        return np.mean(scores)  # Optuna最大化F1-macro
     
     study = optuna.create_study(direction='maximize')
-    study.optimize(objective_quant, n_trials=50, show_progress_bar=True)
+    study.optimize(objective, n_trials=100, show_progress_bar=True)
     
-    quant_best = study.best_params
-    quant_best.pop('up_weight', None)  # up_weight不是LGBM参数
-    best_up_weight = 1.5  # 默认值，F1-macro不需要搜up_weight
+    best_params = study.best_params
+    best_value = study.best_value
     
-    # 合并两阶段最优参数
-    final_params = tuned_params.copy()
-    final_params.update(quant_best)
-    final_params.update({
+    print(f"\n✅ Optuna搜索完成!")
+    print(f"  最优F1-macro: {best_value:.4f}")
+    print(f"  最优参数:")
+    for k, v in best_params.items():
+        if isinstance(v, float):
+            print(f"    {k}: {v:.6f}")
+        else:
+            print(f"    {k}: {v}")
+    
+    # ====== 用最优参数做完整5折训练 ======
+    best_lgbm_params = {
         'objective': 'binary',
         'metric': 'binary_logloss',
         'boosting_type': 'gbdt',
@@ -683,15 +663,9 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         'n_jobs': -1,
         'random_state': 42,
         'n_estimators': 2000,
-    })
+    }
+    best_lgbm_params.update(best_params)
     
-    print(f"\n✅ 第二阶段完成!")
-    print(f"  量化专属参数:")
-    for k, v in quant_best.items():
-        print(f"    {k}: {v}")
-    print(f"  上涨权重(up_weight): {best_up_weight:.2f}")
-    
-    # ====== 最终: 5折完整交叉验证 ======
     print(f"\n用最优参数做5折交叉验证...")
     
     cv_scores = []
@@ -703,7 +677,7 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
         
-        model = lgb.LGBMClassifier(**final_params)
+        model = lgb.LGBMClassifier(**best_lgbm_params)
         model.fit(
             X_train, y_train,
             eval_set=[(X_test, y_test)],
@@ -753,10 +727,7 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         'fold_down_recalls': fold_down_recalls,
         'feature_importance': feature_importance,
         'feature_names': feature_names,
-        'params': final_params,
-        'up_weight': best_up_weight,
-        'tuner_params': tuned_params,
-        'quant_params': quant_best,
+        'params': best_lgbm_params,
         'optuna_study': study,
         'train_samples': len(X),
         'train_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
