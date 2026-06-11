@@ -344,9 +344,11 @@ class MarketFeatureEngineer:
             pass
 
         if north_flow_abs is not None:
-            # 北向超预期: 当日流入 vs 近2日均值(10根30分钟线≈2天)
+            # 北向超预期: 当日流入 vs 近2日均值(10根30分钟线≈2天), z-score标准化防垄断
             north_ma = north_flow_abs.rolling(10, min_periods=1).mean()
-            features['north_surprise'] = (north_flow_abs - north_ma) / (north_ma.abs() + 1e-6)
+            north_std = north_flow_abs.rolling(10, min_periods=1).std().fillna(1)
+            north_std = north_std.replace(0, 1)  # 防止std=0导致除0
+            features['north_surprise'] = (north_flow_abs - north_ma) / north_std  # z-score标准化
             features['north_surprise_cum'] = features['north_surprise'].rolling(6, min_periods=1).sum()
             # 北向方向(0/1): 净流入为正=1
             features['north_direction'] = (north_flow_abs > 0).astype(int)
@@ -575,7 +577,7 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
     import optuna
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     
-    tscv = TimeSeriesSplit(n_splits=5)
+    tscv = TimeSeriesSplit(n_splits=5, gap=3)  # Purged K-Fold: 留3根K线=90分钟间隔, 防止数据泄漏
     
     # ====== Optuna一次性搜索全部11个参数 ======
     print("\n🔍 Optuna超参数搜索 (100轮, 13个参数, 目标=F1-macro)")
@@ -624,7 +626,7 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         }
         
         # 3折快速评估
-        mini_tscv = TimeSeriesSplit(n_splits=3)
+        mini_tscv = TimeSeriesSplit(n_splits=3, gap=3)  # Purged K-Fold: 留3根K线=90分钟间隔
         scores = []
         for train_idx, test_idx in mini_tscv.split(X_search):
             X_tr, X_te = X_search[train_idx], X_search[test_idx]
