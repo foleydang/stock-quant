@@ -65,8 +65,12 @@ for year in years:
         print(f"{year}: {len(df)}条(新增{new})")
     except Exception as e:
         print(f"{year}错误: {e}")
+        if '频率超限' in str(e):
+            print(f"限频等待65秒后重试...")
+            time.sleep(65)
+            continue  # 重试当年
     
-    time.sleep(61)  # 限频1次/分钟
+    time.sleep(65)  # 限频1次/分钟+缓冲
 
 f = conn.execute("SELECT COUNT(*), MIN(trade_date), MAX(trade_date) FROM hs300_daily").fetchone()
 print(f"✅ 大盘数据: {f[0]}条 ({f[1]} ~ {f[2]})")
@@ -119,10 +123,14 @@ for i, sym in enumerate(symbols):
         except Exception as e:
             progress['total_fail'] += 1
             save_progress(progress)
+            if '频率超限' in str(e):
+                print(f"限频等待65秒后重试 {key}...")
+                time.sleep(65)
+                continue  # 重试这个key
             if progress['total_fail'] <= 20:
                 print(f"{key}错误: {e}")
         
-        time.sleep(61)  # 限频1次/分钟
+        time.sleep(65)  # 限频1次/分钟+缓冲
 
 conn.commit()
 f = conn.execute("SELECT COUNT(*), MIN(date), MAX(date) FROM kline_30m").fetchone()
