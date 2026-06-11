@@ -23,15 +23,102 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from train_lgb_enhanced import EnhancedFeatureEngineer
 
-# ====== 信号阈值 ======
-STRONG_BUY_THRESHOLD = 0.005    # 预测收益率 > 0.5%/90min → 强买入
-BUY_THRESHOLD = 0.002           # 预测收益率 > 0.2%/90min → 关注
-HOLD_THRESHOLD = -0.001         # -0.1% ~ 0.2% → 持有
-REDUCE_THRESHOLD = -0.003       # -0.3% ~ -0.1% → 减仓
-STRONG_SELL_THRESHOLD = -0.005  # < -0.5% → 清仓
+# ====== 自适应信号阈值 (基于大盘状态) ======
+# 固定阈值的问题: 牛市0.5%太保守, 熊市0.5%太乐观
+# 修复: 根据大盘趋势动态调整
 
-TOP_N_CANDIDATES = 5            # 展示Top N买入候选
-POSITION_RANK_WARN = 300        # 持仓排名 >300 触发警告
+# 基准阈值(震荡市)
+BASE_BUY_THRESHOLD = 0.003       # 基准买入阈值 0.3%
+BASE_STRONG_BUY = 0.005          # 基准强买阈值 0.5%
+BASE_SELL_THRESHOLD = -0.003     # 基准卖出阈值 -0.3%
+BASE_STRONG_SELL = -0.005        # 基准强卖阈值 -0.5%
+
+TOP_N_CANDIDATES = 5
+POSITION_RANK_WARN = 300
+
+
+def get_market_regime() -> dict:
+    """获取大盘状态 (基于沪深300日线)
+    
+    Returns:
+        {'regime': 'bull'|'bear'|'sideways',
+         'trend_strength': float,       # 趋势强度
+         'daily_vol': float,            # 日波动率
+         'adjustment': float}           # 阈值调整系数
+    """
+    try:
+        db_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'data/stock_data.db'
+        )
+        conn = sqlite3.connect(db_path)
+        df = pd.read_sql_query(
+            "SELECT trade_date, close, pct_chg FROM hs300_daily ORDER BY trade_date DESC LIMIT 120",
+            conn
+        )
+        conn.close()
+
+        if df.empty or len(df) < 60:
+            return {'regime': 'sideways', 'trend_strength': 0, 'daily_vol': 0.015, 'adjustment': 1.0}
+
+        df = df.sort_values('trade_date').reset_index(drop=True)
+        close = df['close'].values
+
+        # 趋势判断: 20日MA vs 60日MA
+        ma20 = np.mean(close[-20:])
+        ma60 = np.mean(close[-60:]) if len(close) >= 60 else np.mean(close)
+        current = close[-1]
+
+        # 趋势强度 = (MA20偏离MA60的程度)
+        trend_strength = (ma20 - ma60) / ma60
+
+        if ma20 > ma60 and current > ma20:
+            regime = 'bull'
+        elif ma20 < ma60 and current < ma20:
+            regime = 'bear'
+        else:
+            regime = 'sideways'
+
+        # 日波动率
+        returns = df['pct_chg'].values / 100
+        daily_vol = np.std(returns[-20:]) if len(returns) >= 20 else 0.015
+
+        # 阈值调整系数
+        # 牛市: 放宽买入阈值(容易涨), 收紧卖出阈值(少卖)
+        # 熊市: 收紧买入阈值(容易跌), 放宽卖出阈值(多卖)
+        if regime == 'bull':
+            adjustment = 0.7  # 阈值 × 0.7 → 更容易触发买入
+        elif regime == 'bear':
+            adjustment = 1.5  # 阈值 × 1.5 → 更难买入, 更容易卖出
+        else:
+            adjustment = 1.0
+
+        return {
+            'regime': regime,
+            'trend_strength': round(float(trend_strength), 4),
+            'daily_vol': round(float(daily_vol), 4),
+            'adjustment': adjustment,
+        }
+
+    except Exception as e:
+        return {'regime': 'sideways', 'trend_strength': 0, 'daily_vol': 0.015, 'adjustment': 1.0}
+
+
+def get_adaptive_thresholds() -> dict:
+    """获取自适应阈值"""
+    regime_info = get_market_regime()
+    adj = regime_info['adjustment']
+
+    return {
+        'strong_buy': BASE_STRONG_BUY * adj,
+        'buy': BASE_BUY_THRESHOLD * adj,
+        'hold': 0,  # 中性
+        'reduce': BASE_SELL_THRESHOLD * adj,
+        'strong_sell': BASE_STRONG_SELL * adj,
+        'regime': regime_info['regime'],
+        'trend_strength': regime_info['trend_strength'],
+        'daily_vol': regime_info['daily_vol'],
+    }
 
 
 class V8Predictor:
@@ -118,12 +205,14 @@ class V8Predictor:
     def predict_all(self, limit: int = None) -> List[Dict]:
         """
         预测所有股票的收益率 → 按预测值排序
-
-        Returns:
-            [{symbol, name, predicted_return, rank, signal}, ...]
+        
+        使用自适应阈值: 根据大盘状态(牛/熊/震荡)动态调整
         """
         if not self.model:
             return []
+
+        # 获取自适应阈值
+        thresholds = get_adaptive_thresholds()
 
         db_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -131,7 +220,6 @@ class V8Predictor:
         )
         conn = sqlite3.connect(db_path)
 
-        # 获取股票列表
         symbols = [row[0] for row in
                    conn.execute("SELECT DISTINCT symbol FROM kline_30m ORDER BY symbol").fetchall()]
 
@@ -142,57 +230,49 @@ class V8Predictor:
         for sym in symbols:
             pred = self.predict_return(sym)
             if pred is not None:
-                # 获取股票名称
                 name_row = conn.execute("SELECT name FROM stock_info WHERE symbol=?", (sym,)).fetchone()
                 name = name_row[0] if name_row and name_row[0] else sym
                 results.append({'symbol': sym, 'name': name, 'predicted_return': pred})
 
         conn.close()
 
-        # 按预测收益率降序排列
         results.sort(key=lambda x: x['predicted_return'], reverse=True)
 
-        # 添加排名和信号
+        # 自适应信号
         for rank, r in enumerate(results):
             r['rank'] = rank + 1
             ret = r['predicted_return']
-            if ret > STRONG_BUY_THRESHOLD:
+
+            if ret > thresholds['strong_buy']:
                 r['signal'] = 'strong_buy'
                 r['signal_text'] = '🔥 强烈买入'
-            elif ret > BUY_THRESHOLD:
+            elif ret > thresholds['buy']:
                 r['signal'] = 'buy'
                 r['signal_text'] = '📈 可关注'
-            elif ret > HOLD_THRESHOLD:
+            elif ret > thresholds['reduce']:
                 r['signal'] = 'hold'
                 r['signal_text'] = '➖ 持有'
-            elif ret > REDUCE_THRESHOLD:
-                r['signal'] = 'reduce'
-                r['signal_text'] = '⚠️ 建议减仓'
-            elif ret > STRONG_SELL_THRESHOLD:
+            elif ret > thresholds['strong_sell']:
                 r['signal'] = 'sell'
                 r['signal_text'] = '📉 建议卖出'
             else:
                 r['signal'] = 'strong_sell'
                 r['signal_text'] = '🚨 强烈卖出'
 
+        # 附加大盘状态
+        self._regime_info = thresholds
+
         return results
 
     def get_position_advice(self, positions: List[Dict]) -> List[Dict]:
-        """
-        对持仓股票给出加减仓建议
-
-        Args:
-            positions: [{symbol, name, shares, cost_price, current_price}, ...]
-
-        Returns:
-            带建议的持仓列表, 按预测收益率排序
-        """
+        """对持仓股票给出加减仓建议 (自适应阈值)"""
         if not self.model:
             return [dict(p, signal='unknown', signal_text='❓ 模型未加载') for p in positions]
 
+        # 自适应阈值
+        thresholds = get_adaptive_thresholds()
         all_rankings = self.predict_all()
 
-        # 建立排名查找表
         rank_map = {r['symbol']: r for r in all_rankings}
 
         advice = []
@@ -206,21 +286,24 @@ class V8Predictor:
             if predicted_return is None:
                 signal = 'unknown'
                 signal_text = '❓ 数据不足'
-            elif predicted_return > STRONG_BUY_THRESHOLD:
+            elif predicted_return > thresholds['strong_buy']:
                 signal = 'add'
-                signal_text = f'🔥 建议加仓 (+{predicted_return:.2%})'
-            elif predicted_return > BUY_THRESHOLD:
+                signal_text = f'🔥 建议加仓'
+            elif predicted_return > thresholds['buy']:
                 signal = 'hold_add'
-                signal_text = f'📈 持有观察 (+{predicted_return:.2%})'
-            elif predicted_return > HOLD_THRESHOLD:
+                signal_text = f'📈 持有观察'
+            elif predicted_return > thresholds['reduce']:
                 signal = 'hold'
-                signal_text = f'➖ 继续持有 ({predicted_return:.2%})'
-            elif predicted_return > REDUCE_THRESHOLD:
+                signal_text = f'➖ 继续持有'
+            elif predicted_return > thresholds['strong_sell']:
                 signal = 'reduce'
-                signal_text = f'⚠️ 减仓 ({predicted_return:.2%})'
+                signal_text = f'⚠️ 减仓'
             else:
                 signal = 'sell'
-                signal_text = f'🚨 建议清仓 ({predicted_return:.2%})'
+                signal_text = f'🚨 建议清仓'
+
+            # 预测值
+            pred_str = f"+{predicted_return:.2%}" if predicted_return and predicted_return > 0 else f"{predicted_return:.2%}" if predicted_return else "?"
 
             # 排名警告
             rank_warning = ''
@@ -230,12 +313,12 @@ class V8Predictor:
             advice.append({
                 **pos,
                 'predicted_return': predicted_return,
+                'predicted_return_str': pred_str,
                 'rank': rank,
                 'signal': signal,
                 'signal_text': signal_text + rank_warning,
             })
 
-        # 按预测收益率排序
         advice.sort(key=lambda x: x.get('predicted_return', -999), reverse=True)
         return advice
 
@@ -263,11 +346,16 @@ class V8Predictor:
         return candidates[:n]
 
 
-def format_feishu_message(rankings: List[Dict], positions_advice: List[Dict], spearman: float = None) -> str:
-    """
-    格式化为飞书消息（Markdown格式）
-    """
+def format_feishu_message(rankings: List[Dict], positions_advice: List[Dict], spearman: float = None, regime_info: dict = None) -> str:
+    """格式化为飞书消息（Markdown格式）"""
     lines = ["**📊 v8 模型预测 (90分钟)**\n"]
+
+    # 大盘状态
+    if regime_info:
+        regime = regime_info.get('regime', '?')
+        emoji = {'bull': '🐂', 'bear': '🐻', 'sideways': '📊'}.get(regime, '📊')
+        cn = {'bull': '牛市', 'bear': '熊市', 'sideways': '震荡'}.get(regime, '?')
+        lines.append(f"{emoji} 大盘: **{cn}** | 趋势强度: {regime_info.get('trend_strength', 0):.2%} | 阈值×{regime_info.get('adjustment', 1.0):.1f}\n")
 
     # 买入候选
     candidates = [r for r in rankings if r['signal'] in ('strong_buy', 'buy')][:TOP_N_CANDIDATES]
