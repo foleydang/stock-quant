@@ -485,10 +485,6 @@ def main():
     if model_path is None:
         model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                   'models/lgb_hs300/model.pkl')
-        if not os.path.exists(model_path):
-            # 尝试 v8
-            model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                      'models/lgb_hs300/model_v8.pkl')
 
     if not os.path.exists(model_path):
         logger.error(f"模型不存在: {model_path}")
