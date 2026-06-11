@@ -1,7 +1,0 @@
-# 旧 CSV 和缓存 (数据已在 stock_data.db)
-csv_backup_*/
-__pycache__/
-*.csv
-
-# 旧数据库备份
-backup/

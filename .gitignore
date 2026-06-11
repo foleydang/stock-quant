@@ -5,13 +5,16 @@ node_modules/
 dist/
 build/
 
-# Python cache
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
+venv/
+python/venv/
 
-# Vite 缓存
+# Vite
 .vite/
 
 # Logs
@@ -19,17 +22,23 @@ logs/*.log
 python/logs/*.log
 python/logs/*.json
 
-# 数据文件（CSV）
-python/data/**/*.csv
-
 # IDE
 .idea/
 .vscode/
 .DS_Store
 
-# Environment
+# Env
 python/.env
 agent/.env
+
+# 数据 (已在 stock_data.db)
+python/data/*.csv
+python/data/csv_backup_*/
+python/data/backup/
+
+# 模型时间戳备份 (model.pkl 保留)
+python/models/lgb_hs300/model_[0-9]*_[0-9]*.pkl
+python/models/lgb_hs300/model_daily_[0-9]*_[0-9]*.pkl
 
 # 临时文件
 *.tmp
