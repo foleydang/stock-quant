@@ -206,19 +206,46 @@ class LGBMBacktesterOptimized:
         return None
 
     def preload_features(self, all_data: Dict[str, pd.DataFrame]):
-        """预计算所有特征 + 建立时间索引映射"""
+        """预计算所有特征 + 建立时间索引映射
+        
+        P0修复: 
+        - v8模型不用MarketFeatureEngineer(日级别特征不应在30分钟回测)
+        - 始终从模型读取feature_names, 不硬编码ZERO_IMP_FEATURES
+        """
         logger.info("\n预计算特征...")
+        
+        # 从模型获取需要的特征名
+        model_feature_names = None
+        if self.model_data and 'feature_names' in self.model_data:
+            model_feature_names = self.model_data['feature_names']
+            logger.info(f"  使用模型特征集: {len(model_feature_names)}个特征")
+        
         for symbol, df in all_data.items():
             logger.debug(f"计算 {symbol} 特征...")
-            # 使用 v3 的组合特征 (基础+高级，过滤时间和零重要性)
-            base_features = EnhancedFeatureEngineer.calculate_features(df)
-            adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
-            market_features = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
-            all_features = pd.concat([base_features, adv_features, market_features], axis=1)
-            drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
-            keep_cols = [c for c in all_features.columns if c not in drop_cols]
-            all_features = all_features[keep_cols]
+            
+            if model_feature_names is not None:
+                # v8+: 只计算模型需要的特征
+                base_features = EnhancedFeatureEngineer.calculate_features(df)
+                all_features = base_features
+            else:
+                # 兼容旧模型: 计算全部特征
+                base_features = EnhancedFeatureEngineer.calculate_features(df)
+                adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
+                market_features = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
+                all_features = pd.concat([base_features, adv_features, market_features], axis=1)
+            
             all_features = all_features.fillna(0)
+            
+            # 按模型特征名过滤
+            if model_feature_names is not None:
+                missing = [c for c in model_feature_names if c not in all_features.columns]
+                for c in missing:
+                    all_features[c] = 0
+                all_features = all_features[model_feature_names]
+            else:
+                drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
+                all_features = all_features[[c for c in all_features.columns if c not in drop_cols]]
+            
             self.features_cache[symbol] = all_features
             # 建立时间到索引的映射
             self.time_index_map[symbol] = {row['date']: idx for idx, row in df.iterrows()}

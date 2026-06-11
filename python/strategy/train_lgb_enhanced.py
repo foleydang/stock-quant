@@ -412,7 +412,7 @@ class MarketFeatureEngineer:
     @staticmethod
     def calculate_target(df: pd.DataFrame, horizon: int = 3, threshold: float = 0.008) -> np.ndarray:
         """
-        计算预测目标
+        计算预测目标 (固定阈值版本, 兼容旧调用)
         horizon: 预测周期（3根K线 = 90分钟）
         threshold: 涨跌阈值（0.8%）
         """
@@ -421,6 +421,38 @@ class MarketFeatureEngineer:
 
         for i in range(len(close) - horizon):
             ret = (close[i + horizon] - close[i]) / close[i]
+            if ret > threshold:
+                target[i] = 1  # 上涨
+            elif ret < -threshold:
+                target[i] = 0  # 下跌
+            else:
+                target[i] = -1  # 震荡（标记为-1，后续过滤）
+
+        return target
+
+    @staticmethod
+    def calculate_target_adaptive(df: pd.DataFrame, horizon: int = 3) -> np.ndarray:
+        """
+        计算预测目标 (P1修复: 自适应阈值)
+        
+        问题: 固定0.8%阈值对大盘股太宽, 对小盘股太窄
+        修复: threshold = volatility_20 * 0.5, 夹在[0.3%, 2%]
+              茅台日波动~1.5% → threshold=0.75%
+              小盘股日波动~3% → threshold=1.5%
+        """
+        close = df['close'].values
+        target = np.zeros(len(close))
+        
+        # 计算20根K线波动率作为自适应阈值基准
+        returns = pd.Series(close).pct_change()
+        vol_20 = returns.rolling(20).std().fillna(0.008).values
+        
+        for i in range(len(close) - horizon):
+            ret = (close[i + horizon] - close[i]) / close[i]
+            # 自适应阈值: 波动率 × 0.5, 夹在0.3%~2%
+            base_threshold = vol_20[i] * 0.5
+            threshold = np.clip(base_threshold, 0.003, 0.02)
+            
             if ret > threshold:
                 target[i] = 1  # 上涨
             elif ret < -threshold:
@@ -495,30 +527,34 @@ def load_data(cache_dir: str = '') -> Dict[str, pd.DataFrame]:
 
 
 def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-    """准备训练数据"""
+    """准备训练数据 (v8: 纯30分钟级别特征, 不用日级别市场特征)
+    
+    P0修复:
+    - 删除MarketFeatureEngineer(北向/大盘等日级别数据不应出现在30分钟模型)
+    - north_surprise每天1条数据被强制广播到8条30分钟K线 → 重要性虚高
+    - north_surprise_cum ≈ 6×north_surprise → 纯数据泄漏
+    """
     all_features = []
     all_targets = []
     success_count = 0
     fail_count = 0
     feature_names = None
 
-    print("计算特征...")
+    print("计算特征(纯30分钟级别, 无日级别特征)...")
 
     for i, (symbol, df) in enumerate(all_data.items()):
         try:
-            # 基础技术特征
+            # P0修复: 只用纯技术特征, 不合并MarketFeatureEngineer
+            # north_surprise等日级别特征将在日线模型中使用
             features = EnhancedFeatureEngineer.calculate_features(df)
-            # 市场/板块特征
-            market_features = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
-            # 合并
-            features = pd.concat([features, market_features], axis=1)
 
             # 记录特征名（仅第一次）
             if feature_names is None and len(features.columns) > 0:
                 feature_names = features.columns.tolist()
                 print(f"  特征数: {len(feature_names)}")
 
-            target = MarketFeatureEngineer.calculate_target(df, horizon=horizon)
+            # P1修复: 自适应阈值(基于波动率)
+            target = MarketFeatureEngineer.calculate_target_adaptive(df, horizon=horizon)
 
             # NaN处理: 不整行丢弃(会丢太多), 改为前向填充+填充0
             # 长周期特征(ma120/vol100)前120行都是NaN, 整行丢会丢90%数据
@@ -538,7 +574,6 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
                 success_count += 1
             else:
                 fail_count += 1
-                print(f"  数据不足 {symbol}: 有效样本{len(features_valid)}条(需>50)")
 
         except Exception as e:
             print(f"  特征计算失败 {symbol}: {type(e).__name__}: {e}")
@@ -707,7 +742,6 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
     final_model = models[-1]
     
     # 整体评估 - 只用后20%验证数据(不是全部数据, 否则90%是虚假的)
-    # 之前用全部数据评估导致CV 70% vs 整体90%的20%差距(过拟合假象)
     valid_start = int(len(X) * 0.8)
     X_valid_all = X[valid_start:]
     y_valid_all = y[valid_start:]
@@ -716,6 +750,68 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
     print(f"  准确率: {accuracy_score(y_valid_all, y_pred_valid):.2%}")
     print(f"\n分类报告:")
     print(classification_report(y_valid_all, y_pred_valid, target_names=['下跌', '上涨']))
+    
+    # ====== P0修复: 训练时做特征选择, 去掉零重要度特征 ======
+    # 问题: 之前训练时包含price_above_ma5~120等无用特征,
+    #       推理时在forecast_routes.py硬编码ZERO_IMP_FEATURES删掉 → 前后不一致
+    # 修复: 用SelectFromModel在训练时过滤, 保存过滤后的特征名
+    if feature_names is not None and len(feature_names) > 0:
+        from sklearn.feature_selection import SelectFromModel
+        
+        # 用完整训练数据做特征选择
+        X_full_train = X[:valid_start]
+        y_full_train = y[:valid_start]
+        
+        selector = SelectFromModel(final_model, threshold='median', prefit=False)
+        # 重新训练一个用于特征选择的model
+        selector_model = lgb.LGBMClassifier(**best_lgbm_params)
+        selector_model.fit(X_full_train[:-50], y_full_train[:-50],
+                          eval_set=[(X_full_train[-50:], y_full_train[-50:])],
+                          callbacks=[lgb.early_stopping(30, verbose=False)])
+        selector = SelectFromModel(selector_model, threshold='median', prefit=True)
+        X_selected = selector.transform(X)
+        selected_mask = selector.get_support()
+        
+        original_count = len(feature_names)
+        selected_feature_names = [fn for fn, mask in zip(feature_names, selected_mask) if mask]
+        removed_features = [fn for fn, mask in zip(feature_names, selected_mask) if not mask]
+        
+        print(f"\n特征选择 (threshold=median):")
+        print(f"  保留: {len(selected_feature_names)}/{original_count} 个特征")
+        print(f"  删除: {', '.join(removed_features[:10])}" + 
+              (f' ...等{len(removed_features)}个' if len(removed_features) > 10 else ''))
+        
+        # P0修复: 更新feature_names为选择后的, 推理时直接用这个
+        feature_names = selected_feature_names
+        
+        # 用选择后的特征重新做5折交叉验证
+        print(f"\n用{len(selected_feature_names)}个精选特征做5折交叉验证...")
+        cv_scores_new = []
+        fold_up_new, fold_down_new = [], []
+        for fold, (train_idx, test_idx) in enumerate(tscv.split(X_selected)):
+            X_tr, X_te = X_selected[train_idx], X_selected[test_idx]
+            y_tr, y_te = y[train_idx], y[test_idx]
+            
+            model_new = lgb.LGBMClassifier(**best_lgbm_params)
+            model_new.fit(X_tr, y_tr, eval_set=[(X_te, y_te)],
+                         callbacks=[lgb.early_stopping(50, verbose=False)])
+            y_pred_new = model_new.predict(X_te)
+            cv_scores_new.append(accuracy_score(y_te, y_pred_new))
+            fold_up_new.append(np.sum((y_pred_new == 1) & (y_te == 1)) / max(np.sum(y_te == 1), 1))
+            fold_down_new.append(np.sum((y_pred_new == 0) & (y_te == 0)) / max(np.sum(y_te == 0), 1))
+            print(f"  Fold {fold + 1}: Accuracy={cv_scores_new[-1]:.4f}")
+        
+        print(f"\n特征选择后: 平均CV={np.mean(cv_scores_new):.4f} (原始: {avg_accuracy:.4f})")
+        avg_accuracy = np.mean(cv_scores_new)
+        fold_up_recalls = fold_up_new
+        fold_down_recalls = fold_down_new
+        cv_scores = cv_scores_new
+        
+        # 用精选特征重新训练最终模型
+        final_model = lgb.LGBMClassifier(**best_lgbm_params)
+        final_model.fit(X_selected[:valid_start], y[:valid_start],
+                       eval_set=[(X_selected[valid_start:], y[valid_start:])],
+                       callbacks=[lgb.early_stopping(50, verbose=False)])
     
     # 特征重要性（用实际特征名）
     if feature_names and len(feature_names) == len(final_model.feature_importances_):
@@ -734,22 +830,50 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         'fold_down_recalls': fold_down_recalls,
         'feature_importance': feature_importance,
         'feature_names': feature_names,
+        'selected_features': selected_feature_names if 'selected_feature_names' in dir() else feature_names,
         'params': best_lgbm_params,
         'optuna_study': study,
         'train_samples': len(X),
-        'train_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        'train_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'model_version': 'v8',
+        'description': 'v8: 纯30分钟级别特征(无日级别)+自适应阈值+训练时特征选择'
     }
 
 def save_model(model_data: Dict, model_dir: str):
-    """保存模型"""
+    """保存模型 (P1修复: 带版本号)"""
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
+    # 主模型文件
     model_path = os.path.join(model_dir, 'model.pkl')
     with open(model_path, 'wb') as f:
         pickle.dump(model_data, f)
+    
+    # 版本化备份 (P1修复: 模型版本管理)
+    version = model_data.get('model_version', 'unknown')
+    backup_path = os.path.join(model_dir, f'model_{version}.pkl')
+    with open(backup_path, 'wb') as f:
+        pickle.dump(model_data, f)
+    
+    # 保存版本元信息
+    import json
+    meta_path = os.path.join(model_dir, f'model_{version}_meta.json')
+    meta = {
+        'version': version,
+        'train_time': model_data.get('train_time', ''),
+        'cv_accuracy': model_data.get('cv_accuracy', 0),
+        'feature_count': len(model_data.get('feature_names', [])),
+        'train_samples': model_data.get('train_samples', 0),
+        'description': model_data.get('description', ''),
+        'params': {k: v for k, v in model_data.get('params', {}).items() 
+                   if not callable(v)},
+    }
+    with open(meta_path, 'w') as f:
+        json.dump(meta, f, indent=2, default=str)
 
-    print(f"\n模型已保存到: {model_path}")
+    print(f"\n模型已保存: {model_path}")
+    print(f"  备份: {backup_path}")
+    print(f"  元信息: {meta_path}")
 
 
 def main():
