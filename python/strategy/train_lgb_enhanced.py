@@ -220,19 +220,15 @@ class EnhancedFeatureEngineer:
         features['cci'] = (tp - tp.rolling(20).mean()) / (0.015 * tp.rolling(20).std())
 
         # ========================================
-        # 13. 时间特征 (5个)
+        # 13. 交易时段特征 (3个，去掉伪规律日历特征)
         # ========================================
         if 'date' in df.columns:
             dates = pd.to_datetime(df['date'])
-            features['hour'] = dates.dt.hour
-            features['minute'] = dates.dt.minute
-            features['day_of_week'] = dates.dt.dayofweek
-            features['day_of_month'] = dates.dt.day
-            features['is_month_end'] = dates.dt.is_month_end.astype(int)
-
-            # 交易时段
+            # 只保留交易时段（早盘/尾盘行为确实不同）和月末效应
             features['morning_session'] = ((dates.dt.hour >= 9) & (dates.dt.hour < 12)).astype(int)
             features['afternoon_session'] = ((dates.dt.hour >= 13) & (dates.dt.hour < 15)).astype(int)
+            features['is_month_end'] = dates.dt.is_month_end.astype(int)
+            # 去掉 hour/minute/day_of_week/day_of_month（v1时排Top6-8，是伪规律）
 
         # ========================================
         # 14. 趋势强度 (3个)
