@@ -626,8 +626,8 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
             print(f"    {k}: {v}")
     
     # ====== 第二阶段: Optuna搜索量化专属参数 ======
-    print("\n🔍 第二阶段: Optuna搜索量化专属参数 (30轮)")
-    print("  搜索: learning_rate, scale_pos_weight, min_gain_to_split, extra_trees, path_smooth, up_weight")
+    print("\n🔍 第二阶段: Optuna搜索量化专属参数 (100轮, 最佳实践)")
+    print("  搜索: learning_rate, scale_pos_weight, min_gain_to_split, extra_trees, path_smooth")
     
     # 用第一阶段的参数作为基础，补充量化参数
     def objective_quant(trial):
@@ -666,7 +666,7 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         return np.mean(scores)
     
     study = optuna.create_study(direction='maximize')
-    study.optimize(objective_quant, n_trials=30, show_progress_bar=True)
+    study.optimize(objective_quant, n_trials=100, show_progress_bar=True)
     
     quant_best = study.best_params
     quant_best.pop('up_weight', None)  # up_weight不是LGBM参数
