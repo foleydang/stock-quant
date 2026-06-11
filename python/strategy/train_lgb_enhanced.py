@@ -562,18 +562,24 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
 
 
 def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -> Dict:
-    """训练模型（v4: Optuna超参数搜索）
+    """训练模型（v4: Optuna超参数搜索 + 最佳实践）
     
-    不再手动猜参数，用Optuna自动搜索最优配置。
-    搜索目标: 加权recall（上涨recall权重更高，因为实盘赚钱靠抓上涨）
+    改进点:
+    1. 搜索空间覆盖LightGBM所有重要超参数（包括min_gain_to_split）
+    2. n_estimators不搜（设上限2000，靠early_stopping自动停）
+    3. learning_rate范围扩大（0.005-0.3）
+    4. 搜索目标: 自定义加权指标（上涨重要，但权重也纳入搜索）
+    5. 100轮搜索（11+参数的最佳实践）
+    6. 3折快速评估 + 最终5折验证
     """
     import optuna
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     
     tscv = TimeSeriesSplit(n_splits=5)
     
-    # ====== Optuna 超参数搜索 ======
-    print("\n🔍 Optuna超参数搜索 (50轮, 目标=加权recall)...")
+    # ====== Optuna超参数搜索 ======
+    print("\n🔍 Optuna超参数搜索 (100轮, 目标=加权指标)...")
+    print("  搜索空间: 14个参数（含min_gain_to_split/up_weight）")
     
     # 用前80%数据搜索，后20%验证
     split_idx = int(len(X) * 0.8)
@@ -588,18 +594,31 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
             'n_jobs': -1,
             'random_state': 42,
             
-            # ====== Optuna搜索的参数 ======
-            'num_leaves': trial.suggest_int('num_leaves', 20, 80),
-            'max_depth': trial.suggest_int('max_depth', 4, 10),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.05, log=True),
-            'n_estimators': trial.suggest_int('n_estimators', 300, 1000),
-            'feature_fraction': trial.suggest_float('feature_fraction', 0.5, 0.9),
-            'bagging_fraction': trial.suggest_float('bagging_fraction', 0.6, 0.9),
-            'bagging_freq': trial.suggest_int('bagging_freq', 3, 7),
-            'min_child_samples': trial.suggest_int('min_child_samples', 20, 100),
-            'reg_alpha': trial.suggest_float('reg_alpha', 0.01, 1.0, log=True),
-            'reg_lambda': trial.suggest_float('reg_lambda', 0.01, 1.0, log=True),
-            'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.8, 2.0),  # 关键: 自动搜索上涨权重
+            # ====== 树结构参数（防过拟合核心）======
+            'num_leaves': trial.suggest_int('num_leaves', 20, 127),
+            'max_depth': trial.suggest_int('max_depth', 3, 12),
+            'min_child_samples': trial.suggest_int('min_child_samples', 10, 200),
+            'min_gain_to_split': trial.suggest_float('min_gain_to_split', 0.0, 5.0),
+            
+            # ====== 训练参数 ======
+            'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.3, log=True),
+            'n_estimators': 2000,  # 不搜！上限2000，靠early_stopping自动停
+            
+            # ====== 采样参数（防单一特征垄断）======
+            'feature_fraction': trial.suggest_float('feature_fraction', 0.4, 1.0),
+            'bagging_fraction': trial.suggest_float('bagging_fraction', 0.4, 1.0),
+            'bagging_freq': trial.suggest_int('bagging_freq', 1, 7),
+            
+            # ====== 正则化参数 ======
+            'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 10.0, log=True),
+            'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 10.0, log=True),
+            
+            # ====== 非对称损失（实盘核心）======
+            'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.5, 3.0),
+            
+            # ====== 其他 ======
+            'extra_trees': trial.suggest_categorical('extra_trees', [True, False]),
+            'path_smooth': trial.suggest_float('path_smooth', 0.0, 10.0),
         }
         
         # 3折快速评估
@@ -611,37 +630,48 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
             
             model = lgb.LGBMClassifier(**params)
             model.fit(X_tr, y_tr, eval_set=[(X_te, y_te)],
-                      callbacks=[lgb.early_stopping(30, verbose=False)])
+                      callbacks=[lgb.early_stopping(50, verbose=False)])
             y_pred = model.predict(X_te)
             
-            # 目标函数: 加权recall (上涨recall权重1.5, 因为赚钱靠抓上涨)
+            # 目标函数: 上涨recall × up_weight + 下跌recall
+            # up_weight也纳入搜索，自动找到最优权重
+            up_weight = trial.suggest_float('up_weight', 1.0, 3.0)
             up_recall = np.sum((y_pred == 1) & (y_te == 1)) / (np.sum(y_te == 1) + 1e-10)
             down_recall = np.sum((y_pred == 0) & (y_te == 0)) / (np.sum(y_te == 0) + 1e-10)
-            weighted_recall = 1.5 * up_recall + 1.0 * down_recall  # 上涨更重要
-            scores.append(weighted_recall)
+            weighted_score = up_weight * up_recall + 1.0 * down_recall
+            scores.append(weighted_score)
         
         return np.mean(scores)  # Optuna最大化这个值
     
     study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=50, show_progress_bar=True)
+    study.optimize(objective, n_trials=100, show_progress_bar=True)
     
     best_params = study.best_params
     best_value = study.best_value
+    # up_weight是目标函数的参数，不是LGBM的参数
+    best_up_weight = best_params.pop('up_weight', 1.5)
+    
     print(f"\n✅ Optuna搜索完成!")
-    print(f"  最优加权recall: {best_value:.4f}")
-    print(f"  最优参数:")
+    print(f"  最优加权指标: {best_value:.4f}")
+    print(f"  上涨权重(up_weight): {best_up_weight:.2f}")
+    print(f"  最优LGBM参数:")
     for k, v in best_params.items():
-        print(f"    {k}: {v}")
+        if isinstance(v, float):
+            print(f"    {k}: {v:.6f}")
+        else:
+            print(f"    {k}: {v}")
     
     # ====== 用最优参数做完整5折训练 ======
-    best_params.update({
+    best_lgbm_params = {
         'objective': 'binary',
         'metric': 'binary_logloss',
         'boosting_type': 'gbdt',
         'verbose': -1,
         'n_jobs': -1,
         'random_state': 42,
-    })
+        'n_estimators': 2000,
+    }
+    best_lgbm_params.update(best_params)
     
     print(f"\n用最优参数做5折交叉验证...")
     
@@ -654,7 +684,7 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
         
-        model = lgb.LGBMClassifier(**best_params)
+        model = lgb.LGBMClassifier(**best_lgbm_params)
         model.fit(
             X_train, y_train,
             eval_set=[(X_test, y_test)],
@@ -700,9 +730,12 @@ def train_model(X: np.ndarray, y: np.ndarray, feature_names: List[str] = None) -
         'model': final_model,
         'cv_accuracy': avg_accuracy,
         'cv_scores': cv_scores,
+        'fold_up_recalls': fold_up_recalls,
+        'fold_down_recalls': fold_down_recalls,
         'feature_importance': feature_importance,
         'feature_names': feature_names,
-        'params': best_params,
+        'params': best_lgbm_params,
+        'up_weight': best_up_weight,
         'optuna_study': study,
         'train_samples': len(X),
         'train_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
