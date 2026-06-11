@@ -42,22 +42,25 @@ FEISHU_TARGET_CHAT_ID = os.environ.get("FEISHU_TARGET_CHAT_ID", "")
 
 
 def _search_stock_news_brief(symbol: str, name: str) -> Optional[dict]:
-    """搜索个股相关新闻（优先百度，备用DuckDuckGo）"""
+    """搜索个股相关新闻（优先百度，备用DuckDuckGo），带当前日期过滤"""
+    today_str = datetime.now().strftime('%Y年%m月')  # 例：2026年06月
     # 方案1: 百度新闻搜索（中文效果最好）
     try:
         import requests, re
         short_name = name.replace('股份', '').replace('集团', '').replace('有限', '').replace('-W', '')
         url = 'https://news.baidu.com/ns'
-        params = {'word': short_name, 'tn': 'news', 'ie': 'utf-8', 'rn': 8}
+        params = {'word': f'{short_name} {today_str}', 'tn': 'news', 'ie': 'utf-8', 'rn': 8}
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         r = requests.get(url, params=params, headers=headers, timeout=10)
         titles = re.findall(r'<h3[^>]*>.*?<a[^>]*>(.*?)</a>', r.text, re.DOTALL)
         titles = [re.sub(r'<[^>]+>', '', t).strip() for t in titles if t.strip()]
-        # 过滤行情页面
+        # 过滤行情页面和过期旧闻
         skip_patterns = ['最新价格', '行情_走势图', '净申购', '净赎回', '份额增长', '份额减少', '资金流向']
+        # 过滤明显过期的话题（双十一、年报、季报等与当前月份不匹配的）
+        stale_patterns = ['双十一', '双11', '618', '年报', '季报', '中期报告', '分红方案', '股东大会']
         headlines = []
         for t in titles[:8]:
-            if t and len(t) > 15 and not any(p in t for p in skip_patterns):
+            if t and len(t) > 15 and not any(p in t for p in skip_patterns) and not any(p in t for p in stale_patterns):
                 headlines.append({'title': t, 'snippet': '', 'url': ''})
         if headlines:
             return {'headlines': headlines[:5], 'keyword': name}
@@ -68,9 +71,10 @@ def _search_stock_news_brief(symbol: str, name: str) -> Optional[dict]:
     try:
         from search import search
         short_name = name.replace('股份', '').replace('集团', '').replace('有限', '').replace('-W', '')
-        results = search(f"{short_name} 利好 利空 最新消息", count=5)
+        today_yyyy = datetime.now().strftime('%Y')
+        results = search(f"{short_name} 利好 利空 最新消息 {today_yyyy}", count=5)
         if not results:
-            results = search(f"{short_name} 新闻 股价", count=5)
+            results = search(f"{short_name} 新闻 股价 {today_yyyy}", count=5)
         if not results:
             return None
         headlines = []
@@ -94,25 +98,31 @@ def _llm_analyze_alert(alert: dict, ta: dict, news: Optional[dict] = None, posit
         if not is_available():
             return _generate_action_hint(alert, ta, position_info)  # 退回规则引擎
 
+        # 港股标识
+        is_hk = alert.get('symbol', '').endswith('.HK') or ta.get('is_hk', False)
+        currency = ta.get('currency', 'HK$' if is_hk else '¥')
+
         # 构建上下文
         context_parts = []
         is_etf = alert.get('is_etf', False)
         context_parts.append(f"股票: {alert.get('name', '')} ({alert.get('symbol', '')})")
         if is_etf:
             context_parts.append("类型: ETF基金")
+        if is_hk:
+            context_parts.append("类型: 港股（货币单位港币HK$，非人民币¥）")
         context_parts.append(f"异动类型: {alert['type']}")
         context_parts.append(f"详情: {alert.get('details', '')}")
         context_parts.append(f"涨跌幅: {ta.get('change_pct', 0):.2f}%")
         context_parts.append(f"量比: {ta.get('volume_ratio', 1.0):.1f}")
-        context_parts.append(f"当前价: ¥{ta.get('current', 0):.2f}")
+        context_parts.append(f"当前价: {currency}{ta.get('current', 0):.2f}")
 
         if ta.get('signals'):
             context_parts.append(f"技术信号: {', '.join(ta.get('signals', [])[:5])}")
 
         if ta.get('supports'):
-            context_parts.append(f"支撑位: {', '.join([f'¥{s:.2f}' for s in ta.get('supports', [])[:3]])}")
+            context_parts.append(f"支撑位: {', '.join([f'{currency}{s:.2f}' for s in ta.get('supports', [])[:3]])}")
         if ta.get('resistances'):
-            context_parts.append(f"压力位: {', '.join([f'¥{r:.2f}' for r in ta.get('resistances', [])[:3]])}")
+            context_parts.append(f"压力位: {', '.join([f'{currency}{r:.2f}' for r in ta.get('resistances', [])[:3]])}")
 
         if ta.get('rsi'):
             context_parts.append(f"RSI: {ta.get('rsi', 0):.1f}")
@@ -123,7 +133,7 @@ def _llm_analyze_alert(alert: dict, ta: dict, news: Optional[dict] = None, posit
             profit_pct = position_info.get('profit_pct', 0)
             cost_price = position_info.get('cost_price', 0)
             shares = position_info.get('shares', 0)
-            context_parts.append(f"持仓: {shares}股，成本价¥{cost_price:.2f}")
+            context_parts.append(f"持仓: {shares}股，成本价{currency}{cost_price:.2f}")
             context_parts.append(f"浮亏/浮盈: {profit_pct:.1f}%")
             if profit_pct <= -20:
                 context_parts.append("⚠️ 深度浮亏，不建议止损割肉")
@@ -139,7 +149,7 @@ def _llm_analyze_alert(alert: dict, ta: dict, news: Optional[dict] = None, posit
         context = '\n'.join(context_parts)
 
         system_prompt = (
-            "你是A股操盘助手，根据技术面+消息面给出精准操作建议。\n"
+            "你是操盘助手，根据技术面+消息面给出精准操作建议。\n"
             "规则：\n"
             "1. 只给1-2条最关键的操作建议，简洁有力\n"
             "2. 必须明确说具体动作\n"
@@ -155,9 +165,18 @@ def _llm_analyze_alert(alert: dict, ta: dict, news: Optional[dict] = None, posit
                 "   - 不建议止损清仓，ETF适合长期持有+波段操作\n"
                 "   - 强调'定投'和'逢低布局'而非'买入/卖出'\n"
             )
+        elif is_hk:
+            system_prompt += (
+                "6. 港股操作建议规则：\n"
+                "   - 港股无涨跌幅限制，波动更大，注意风险控制\n"
+                "   - 明确说'加仓/减仓/止损/持有/观望'\n"
+                "   - 港股T+0可日内交易，但建议分批操作\n"
+                "   - 价格单位是港币(HK$)，不是人民币(¥)\n"
+                "   - 深度浮亏(>20%)优先建议'持有观望'而非'止损'\n"
+            )
         else:
             system_prompt += (
-                "6. 个股操作建议：明确说'加仓/减仓/止损/持有/观望'\n"
+                "6. A股个股操作建议：明确说'加仓/减仓/止损/持有/观望'\n"
                 "7. 如果是持仓股且深度浮亏(>20%)，优先建议'持有观望'而非'止损'\n"
             )
 
@@ -179,6 +198,8 @@ def _llm_analyze_alert(alert: dict, ta: dict, news: Optional[dict] = None, posit
 def _generate_action_hint(alert: dict, ta: dict, position_info: dict = None) -> str:
     """规则引擎生成操作建议（LLM不可用时的备用方案）"""
     is_etf = alert.get('is_etf', False) or 'ETF' in alert.get('name', '')
+    is_hk = alert.get('symbol', '').endswith('.HK') or ta.get('is_hk', False)
+    currency = ta.get('currency', 'HK$' if is_hk else '¥')
     action_hints = []
     alert_type = alert['type']
     signals = alert.get('signals', []) or ta.get('signals', [])
@@ -201,7 +222,7 @@ def _generate_action_hint(alert: dict, ta: dict, position_info: dict = None) -> 
                 if any('超卖' in s for s in signals):
                     action_hints.append('💡 RSI超卖，等反弹补仓机会')
                 if supports and current < supports[0] * 1.02:
-                    action_hints.append(f'🛡️ 接近支撑位¥{supports[0]:.2f}，观察企稳信号')
+                    action_hints.append(f'🛡️ 接近支撑位{currency}{supports[0]:.2f}，观察企稳信号')
                 if not action_hints:
                     action_hints.append(f'📉 浮亏{profit_pct:.0f}%，持有观望等反弹')
                 return '\n'.join(action_hints)
@@ -253,11 +274,37 @@ def _generate_action_hint(alert: dict, ta: dict, position_info: dict = None) -> 
             action_hints.append('📊 ETF异动，关注波段定投机会')
         return '\n'.join(action_hints)
 
-    # ===== 个股逻辑 =====
+    # ===== 港股个股逻辑 =====
+    if is_hk and not is_etf:
+        if alert_type in ('大跌', '放量大跌', '缩量大跌') and change_pct < 0:
+            action_hints.append('🔴 港股大跌，注意无涨跌幅限制风险')
+            if supports and current < supports[0] * 1.02:
+                action_hints.append(f'🛡️ 接近支撑位{currency}{supports[0]:.2f}')
+            if any('超卖' in s for s in signals):
+                action_hints.append('💡 RSI超卖，可能有反弹机会')
+            if not action_hints:
+                action_hints.append('📉 港股弱势，持有观望')
+            return '\n'.join(action_hints)
+        elif alert_type in ('大涨', '放量大涨', '缩量大涨') and change_pct > 0:
+            if resistances and current > resistances[0] * 0.98:
+                action_hints.append(f'🚧 接近压力位{currency}{resistances[0]:.2f}')
+            if any('超买' in s for s in signals):
+                action_hints.append('⚠️ RSI超买，注意回调')
+            if not action_hints:
+                action_hints.append('📈 港股强势，可持有观察')
+            return '\n'.join(action_hints)
+        elif alert_type == '接近支撑位':
+            action_hints.append(f'🛡️ 港股接近支撑位{currency}{supports[0]:.2f}，可关注企稳信号')
+            return '\n'.join(action_hints)
+        elif alert_type == '接近压力位':
+            action_hints.append(f'🚧 港股接近压力位{currency}{resistances[0]:.2f}')
+            return '\n'.join(action_hints)
+
+    # ===== A股个股逻辑 =====
     # 大涨类
     if alert_type in ('大涨', '放量大涨', '缩量大涨') and change_pct > 0:
         if resistances and current > resistances[0] * 0.98:
-            action_hints.append(f'🚧 接近压力位¥{resistances[0]:.2f}，考虑分批止盈')
+            action_hints.append(f'🚧 接近压力位{currency}{resistances[0]:.2f}，考虑分批止盈')
         if any('超买' in s for s in signals):
             action_hints.append('⚠️ RSI超买，短期有回调风险，可减仓1/3')
         if any('死叉' in s for s in signals):
@@ -270,7 +317,7 @@ def _generate_action_hint(alert: dict, ta: dict, position_info: dict = None) -> 
     # 大跌类
     elif alert_type in ('大跌', '放量大跌', '缩量大跌') and change_pct < 0:
         if supports and current < supports[0] * 1.02:
-            action_hints.append(f'🛡️ 接近支撑位¥{supports[0]:.2f}，若有效跌破需止损')
+            action_hints.append(f'🛡️ 接近支撑位{currency}{supports[0]:.2f}，若有效跌破需止损')
         if any('超卖' in s for s in signals):
             action_hints.append('💡 RSI超卖，可能有技术反弹机会')
         if alert_type == '放量大跌':
@@ -357,18 +404,38 @@ def morning_alert():
 
 
 
-# ========== 异动去重：同一股票同一方向，5分钟内不重复推送 ==========
-_recent_alerts = {}  # {(symbol, alert_type): timestamp}
-_ALERT_COOLDOWN_SEC = 300  # 5分钟冷却
+# ========== 异动去重：同一股票同一方向，每天最多推3次，跌幅须加深1%+ ==========
+_recent_alerts = {}  # {(symbol, alert_type): [(timestamp, change_pct), ...]}
+_ALERT_MAX_PER_DAY = 3  # 同方向每天最多推3次
+_ALERT_DEEPEN_THRESHOLD = 1.0  # 跌幅/涨幅须比上次加深1%以上才再推
 
-def _is_alert_duplicate(symbol: str, alert_type: str) -> bool:
-    """判断是否重复异动（5分钟内同方向不重推）"""
+def _is_alert_duplicate(symbol: str, alert_type: str, change_pct: float) -> bool:
+    """判断是否重复异动
+    规则：
+    1. 同方向每天最多推3次
+    2. 跌幅/涨幅须比上次推送加深1%以上才再推
+    """
     import time
     key = (symbol, alert_type)
-    last_time = _recent_alerts.get(key)
-    if last_time and (time.time() - last_time) < _ALERT_COOLDOWN_SEC:
+    records = _recent_alerts.get(key, [])
+
+    # 规则1：次数上限
+    if len(records) >= _ALERT_MAX_PER_DAY:
         return True
-    _recent_alerts[key] = time.time()
+
+    # 规则2：跌幅/涨幅必须加深
+    if records:
+        last_pct = records[-1][1]
+        # 大跌类：跌幅须更深（更负）1%以上
+        if '跌' in alert_type and change_pct > last_pct + _ALERT_DEEPEN_THRESHOLD:
+            return True  # 跌幅没加深，不推
+        # 大涨类：涨幅须更高1%以上
+        if '涨' in alert_type and change_pct < last_pct - _ALERT_DEEPEN_THRESHOLD:
+            return True  # 涨幅没加深，不推
+
+    # 记录本次推送
+    records.append((time.time(), change_pct))
+    _recent_alerts[key] = records
     return False
 
 
@@ -387,8 +454,8 @@ def intraday_alert_monitor():
             return
 
         for a in move_alerts[:3]:
-            if _is_alert_duplicate(a['symbol'], a['type']):
-                logger.debug(f"异动去重: {a['name']} {a['type']} 5分钟内已推送")
+            if _is_alert_duplicate(a['symbol'], a['type'], a.get('change_pct', 0)):
+                logger.debug(f"异动去重: {a['name']} {a['type']} {a.get('change_pct', 0):.2f}% 已推送或跌幅未加深")
                 continue
 
             try:
@@ -541,6 +608,88 @@ def _push_card(card: dict):
         logger.error(f"推送飞书卡片失败: {e}")
 
 
+def v8_intraday_push():
+    """v8 模型盘中推送 — 每30分钟预测排名 + 持仓加减仓建议"""
+    logger.info("v8 模型预测推送触发")
+
+    try:
+        from v8_predictor import get_predictor, format_feishu_message, TOP_N_CANDIDATES
+        predictor = get_predictor()
+
+        if not predictor.is_loaded():
+            logger.info("v8 模型未就绪，跳过推送")
+            return
+
+        # 获取持仓
+        positions = []
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT symbol, name, shares, cost_price, current_price FROM positions WHERE shares > 0")
+            for row in cursor.fetchall():
+                positions.append({
+                    'symbol': row[0],
+                    'name': row[1] or row[0],
+                    'shares': int(row[2]),
+                    'cost_price': float(row[3]),
+                    'current_price': float(row[4]),
+                    'profit_pct': (float(row[4]) - float(row[3])) / float(row[3]) * 100 if float(row[3]) > 0 else 0,
+                })
+            conn.close()
+        except Exception as e:
+            logger.warning(f"获取持仓失败: {e}")
+
+        # 获取全市场排名
+        rankings = predictor.predict_all()
+        if not rankings:
+            logger.info("无有效预测")
+            return
+
+        # 获取买入候选
+        held_symbols = [p['symbol'] for p in positions]
+        buy_candidates = predictor.get_buy_candidates(existing_positions=held_symbols)
+
+        # 获取持仓建议
+        position_advice = predictor.get_position_advice(positions) if positions else []
+
+        # 构建飞书消息
+        spearman = predictor.model_data.get('final_spearman') if predictor.model_data else None
+
+        lines = ["**📊 v8 回归模型 — 盘中预测**\n"]
+
+        # 买入候选
+        if buy_candidates:
+            lines.append("**🔥 买入候选**")
+            for r in buy_candidates[:TOP_N_CANDIDATES]:
+                lines.append(f"  {r['rank']}. **{r['name']}** — 预期收益 {r['predicted_return']:.2%}")
+            lines.append("")
+
+        # 持仓建议
+        if position_advice:
+            lines.append("**💼 持仓操作建议**")
+            for p in position_advice[:10]:
+                profit = p.get('profit_pct', 0)
+                profit_str = f" (累计{profit:+.1f}%)" if profit else ""
+                lines.append(f"  {p['name']}: {p['signal_text']}{profit_str}")
+            lines.append("")
+
+        # 信号统计
+        strong_buy = sum(1 for r in rankings if r['signal'] == 'strong_buy')
+        buy = sum(1 for r in rankings if r['signal'] == 'buy')
+        sell = sum(1 for r in rankings if r['signal'] in ('sell', 'strong_sell'))
+        lines.append(f"📈 信号: 🔥{strong_buy}只看涨 📈{buy}只关注 📉{sell}只看跌")
+        if spearman:
+            lines.append(f"*Spearman: {spearman:.4f}*")
+
+        from card_templates import make_text_card
+        card = make_text_card(''.join(lines))
+        _push_card(card)
+        logger.info(f"v8预测推送完成: {len(buy_candidates)}候选, {len(position_advice)}持仓")
+
+    except Exception as e:
+        logger.error(f"v8预测推送失败: {e}")
+
+
 def setup_scheduler():
     """配置定时任务"""
     # 盘前提醒 9:25 —— 集合竞价阶段，提供今日关注点
@@ -593,7 +742,31 @@ def setup_scheduler():
         misfire_grace_time=120
     )
 
-    logger.info("定时任务已配置: 盘前9:25, 上午开盘9:30, 下午开盘13:00, 盘后15:05, 异动轮询每5分钟")
+    # v8 模型预测推送 — 交易时段每30分钟 (10:00起, 15:00收尾)
+    scheduler.add_job(
+        v8_intraday_push,
+        CronTrigger(hour='10-11', minute='0,30', day_of_week='mon-fri'),
+        id='v8_intraday_am',
+        name='v8模型预测(上午)',
+        misfire_grace_time=120
+    )
+    scheduler.add_job(
+        v8_intraday_push,
+        CronTrigger(hour='13-14', minute='0,30', day_of_week='mon-fri'),
+        id='v8_intraday_pm',
+        name='v8模型预测(下午)',
+        misfire_grace_time=120
+    )
+    scheduler.add_job(
+        v8_intraday_push,
+        CronTrigger(hour='15', minute='0', day_of_week='mon-fri'),
+        id='v8_intraday_close',
+        name='v8模型预测(收盘)',
+        misfire_grace_time=120
+    )
+
+    logger.info("定时任务已配置: 盘前9:25, 上午开盘9:30, 下午开盘13:00, "
+               "盘后15:05, 异动轮询每5分钟, v8预测每30分钟")
 
 
 def start_scheduler():
