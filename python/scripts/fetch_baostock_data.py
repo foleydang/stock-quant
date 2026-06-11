@@ -20,7 +20,7 @@ import argparse
 from datetime import datetime
 from collections import Counter
 
-DB_PATH = '/root/github/stock-quant/python/data/stock_data.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'stock_data.db')
 SLEEP_BETWEEN_STOCKS = 3  # 每只股票之间sleep秒数
 
 
@@ -305,8 +305,8 @@ def verify():
     conn = sqlite3.connect(DB_PATH)
     
     import sys, os
-    sys.path.insert(0, '/root/github/stock-quant/python')
-    sys.path.insert(0, '/root/github/stock-quant/python/strategy')
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..'))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'strategy'))
     from strategy.train_lgb_enhanced import MarketFeatureEngineer
     import pandas as pd
     

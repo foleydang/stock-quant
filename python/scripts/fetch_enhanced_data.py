@@ -12,7 +12,7 @@ Step 1 + Step 2: 数据增强 - 北向资金 + 板块映射 + 指数日线
 - 板块映射：等Tushare限频后拉stock_basic的industry字段
 - 行业指数：东方财富批量拉（需要分批、带延迟）
 
-DB_PATH: /root/github/stock-quant/python/data/stock_data.db
+DB_PATH: <project>/python/data/stock_data.db
 """
 
 import sqlite3
@@ -22,7 +22,7 @@ import time
 import os
 from datetime import datetime
 
-DB_PATH = '/root/github/stock-quant/python/data/stock_data.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'stock_data.db')
 
 
 def create_tables(conn):

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """拉取北向资金历史数据（东方财富 datacenter API）
 
 数据源: 东方财富 RPT_MUTUAL_DEAL_HISTORY
@@ -12,7 +13,7 @@ import requests
 import sqlite3
 from datetime import datetime
 
-DB_PATH = '/root/github/stock-quant/python/data/stock_data.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'stock_data.db')
 
 # 东方财富 datacenter API 的有效类型
 # 002=沪股通, 006=深股通 (001/003/005返回全None, 004=北向合计)

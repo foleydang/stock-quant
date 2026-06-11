@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+import os
 """补全沪深300指数日线数据(2014-2022)"""
 import tushare as ts, sqlite3, time
 
 ts.set_token('***REMOVED***')
 pro = ts.pro_api()
-conn = sqlite3.connect('/root/github/stock-quant/python/data/stock_data.db')
+conn = sqlite3.connect(DB_PATH)
 
 for year in range(2014, 2023):
     try:

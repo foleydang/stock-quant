@@ -11,7 +11,9 @@ if ! flock -n 200; then
     exit 0
 fi
 
-cd /root/github/stock-quant/python
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PYTHON_DIR"
 /root/miniconda3/bin/python -c "
 import sys
 sys.path.insert(0, '.')

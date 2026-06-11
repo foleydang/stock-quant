@@ -11,7 +11,7 @@ import time
 import json
 import os
 
-DB_PATH = '/root/github/stock-quant/python/data/stock_data.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'stock_data.db')
 PROGRESS_FILE = '/tmp/daily_progress.json'
 
 conn = sqlite3.connect(DB_PATH)

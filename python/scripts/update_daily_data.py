@@ -15,7 +15,7 @@ import sqlite3
 import time
 from datetime import datetime, timedelta
 
-PROJECT_ROOT = '/root/github/stock-quant'
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PYTHON_DIR = os.path.join(PROJECT_ROOT, 'python')
 DATA_DIR = os.path.join(PYTHON_DIR, 'data')
 DB_PATH = os.path.join(DATA_DIR, 'stock_data.db')

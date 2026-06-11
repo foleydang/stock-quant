@@ -11,10 +11,10 @@ import time
 import random
 from datetime import datetime, timedelta
 
-BASE_DIR = '/root/github/stock-quant/python'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
-DB_PATH = f'{BASE_DIR}/data/stock_data.db'
+DB_PATH = os.path.join(BASE_DIR, 'data', 'stock_data.db')
 
 from data.data_handler import DataHandler
 

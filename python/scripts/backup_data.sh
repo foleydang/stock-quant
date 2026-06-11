@@ -1,8 +1,10 @@
 #!/bin/bash
 # 数据库备份脚本 - 保护珍贵的历史数据
 
-DB_PATH="/root/github/stock-quant/python/data/stock_data.db"
-BACKUP_DIR="/root/github/stock-quant/python/data/backup"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON_DIR="$(dirname "$SCRIPT_DIR")"
+DB_PATH="$PYTHON_DIR/data/stock_data.db"
+BACKUP_DIR="$PYTHON_DIR/data/backup"
 
 # 创建备份目录
 mkdir -p "$BACKUP_DIR"

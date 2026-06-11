@@ -12,8 +12,8 @@ import time
 import warnings
 warnings.filterwarnings('ignore')
 
-BASE_DIR = "/root/github/stock-quant/python"
-DB_PATH = f"{BASE_DIR}/data/stock_data.db"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, 'data', 'stock_data.db')
 sys.path.insert(0, BASE_DIR)
 from data.data_handler import DataHandler
 
