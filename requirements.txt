@@ -5,6 +5,7 @@
 # === 核心量化 ===
 numpy>=2.0
 pandas>=2.0,<3
+scipy>=1.10
 lightgbm>=4.0
 scikit-learn>=1.8        # 1.8+ 才能兼容 Mac 上 1.9.0 训练的模型
 optuna>=3.0
