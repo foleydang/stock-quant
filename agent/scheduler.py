@@ -356,9 +356,93 @@ def morning_alert():
     _push_card(card)
 
 
+
+# ========== 异动去重：同一股票同一方向，5分钟内不重复推送 ==========
+_recent_alerts = {}  # {(symbol, alert_type): timestamp}
+_ALERT_COOLDOWN_SEC = 300  # 5分钟冷却
+
+def _is_alert_duplicate(symbol: str, alert_type: str) -> bool:
+    """判断是否重复异动（5分钟内同方向不重推）"""
+    import time
+    key = (symbol, alert_type)
+    last_time = _recent_alerts.get(key)
+    if last_time and (time.time() - last_time) < _ALERT_COOLDOWN_SEC:
+        return True
+    _recent_alerts[key] = time.time()
+    return False
+
+
+def intraday_alert_monitor():
+    """盘中异动轮询（每5分钟）- 只推送涨跌异动，技术信号留给开盘全量检查"""
+    logger.info("盘中异动轮询触发")
+
+    try:
+        from technical_indicators import get_smart_alerts
+        alerts = get_smart_alerts()
+        if not alerts:
+            return
+        # 只推送涨跌异动（技术信号留给开盘/盘后全量检查）
+        move_alerts = [a for a in alerts if a['type'] in ('大涨', '大跌', '放量大涨', '放量大跌', '缩量大涨', '缩量大跌')]
+        if not move_alerts:
+            return
+
+        for a in move_alerts[:3]:
+            if _is_alert_duplicate(a['symbol'], a['type']):
+                logger.debug(f"异动去重: {a['name']} {a['type']} 5分钟内已推送")
+                continue
+
+            try:
+                from technical_indicators import get_technical_analysis
+                ta = get_technical_analysis(a['symbol'])
+                ta_ok = 'error' not in ta
+            except Exception:
+                ta_ok = False
+                ta = {}
+
+            # 搜索新闻（跌幅>3%才搜）
+            news = None
+            if abs(a.get('change_pct', 0)) > 3:
+                try:
+                    news = _search_stock_news_brief(a['symbol'], a['name'])
+                except Exception:
+                    pass
+
+            # 查持仓
+            position_info = None
+            try:
+                import sqlite3
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("SELECT shares, cost_price, current_price FROM positions WHERE symbol=?", (a['symbol'],))
+                pos_row = cursor.fetchone()
+                conn.close()
+                if pos_row and pos_row[0] > 0:
+                    position_info = {'shares': int(pos_row[0]), 'cost_price': float(pos_row[1]), 'current_price': float(pos_row[2]), 'profit_pct': (float(pos_row[2]) - float(pos_row[1])) / float(pos_row[1]) * 100 if pos_row[1] > 0 else 0}
+            except Exception:
+                pass
+
+            hint = _llm_analyze_alert(a, ta if ta_ok else {}, news, position_info)
+
+            news_line = ""
+            if news and news.get('headlines'):
+                titles = [h['title'][:40] for h in news['headlines'][:2]]
+                news_line = "\n\n**📰 相关消息**\n" + '\n'.join([f"- {t}" for t in titles])
+
+            from card_templates import make_alert_card_with_hint
+            card = make_alert_card_with_hint(
+                a['type'], a['symbol'], a['name'],
+                a['details'] + news_line, hint,
+                ta_data=ta if ta_ok else None
+            )
+            _push_card(card)
+            logger.info(f"⚡ 异动推送: {a['name']} {a['type']} {a.get('change_pct', 0):.2f}%")
+
+    except Exception as e:
+        logger.error(f"盘中异动轮询失败: {e}")
+
 def intraday_check():
-    """盘中智能监控（每30分钟）- 异动 + 新闻 + LLM操作建议"""
-    logger.info("盘中智能监控触发")
+    """盘中开盘全量检查 - 异动 + 新闻 + LLM操作建议"""
+    logger.info("盘中开盘监控触发")
 
     try:
         from technical_indicators import get_smart_alerts, get_technical_analysis
@@ -459,44 +543,44 @@ def _push_card(card: dict):
 
 def setup_scheduler():
     """配置定时任务"""
-    # 盘前提醒 9:25
+    # 盘前提醒 9:25 —— 集合竞价阶段，提供今日关注点
     scheduler.add_job(
         morning_alert,
         CronTrigger(hour=9, minute=25, day_of_week='mon-fri'),
         id='morning_alert',
-        name='盘前提醒',
+        name='盘前提醒(集合竞价)',
         misfire_grace_time=60
     )
 
-    # 盘中监控 每30分钟（避开午休11:30-13:00和盘前时段）
-    # A股交易时段: 9:30-11:30, 13:00-15:00
-    # 推送时间: 9:30, 10:00, 10:30, 11:00, 13:00, 13:30, 14:00, 14:30
+    # 盘中异动轮询（每5分钟，交易时段）- 实时检测涨跌异动
+    scheduler.add_job(
+        intraday_alert_monitor,
+        CronTrigger(hour='9-11', minute='0/5', day_of_week='mon-fri'),
+        id='intraday_alert_monitor_am',
+        name='盘中异动轮询(上午)',
+        misfire_grace_time=120
+    )
+    scheduler.add_job(
+        intraday_alert_monitor,
+        CronTrigger(hour='13-14', minute='0/5', day_of_week='mon-fri'),
+        id='intraday_alert_monitor_pm',
+        name='盘中异动轮询(下午)',
+        misfire_grace_time=120
+    )
+
+    # 盘中开盘推送 —— 9:30上午开盘 + 13:00下午开盘
     scheduler.add_job(
         intraday_check,
         CronTrigger(hour='9', minute='30', day_of_week='mon-fri'),
         id='intraday_check_0930',
-        name='盘中监控(9:30)',
+        name='上午开盘监控(9:30)',
         misfire_grace_time=120
     )
     scheduler.add_job(
         intraday_check,
-        CronTrigger(hour='10', minute='0,30', day_of_week='mon-fri'),
-        id='intraday_check_10',
-        name='盘中监控(10点)',
-        misfire_grace_time=120
-    )
-    scheduler.add_job(
-        intraday_check,
-        CronTrigger(hour='11', minute='0', day_of_week='mon-fri'),
-        id='intraday_check_1100',
-        name='盘中监控(11:00)',
-        misfire_grace_time=120
-    )
-    scheduler.add_job(
-        intraday_check,
-        CronTrigger(hour='13-14', minute='0,30', day_of_week='mon-fri'),
-        id='intraday_check_pm',
-        name='盘中监控(下午)',
+        CronTrigger(hour='13', minute='0', day_of_week='mon-fri'),
+        id='intraday_check_1300',
+        name='下午开盘监控(13:00)',
         misfire_grace_time=120
     )
 
@@ -509,7 +593,7 @@ def setup_scheduler():
         misfire_grace_time=120
     )
 
-    logger.info("定时任务已配置: 盘前9:25, 盘中9:30/10:00/10:30/11:00/13:00/13:30/14:00/14:30, 盘后15:05")
+    logger.info("定时任务已配置: 盘前9:25, 上午开盘9:30, 下午开盘13:00, 盘后15:05, 异动轮询每5分钟")
 
 
 def start_scheduler():
