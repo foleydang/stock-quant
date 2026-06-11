@@ -519,8 +519,10 @@ def prepare_training_data(all_data: Dict[str, pd.DataFrame], horizon: int = 3) -
 
             target = MarketFeatureEngineer.calculate_target(df, horizon=horizon)
 
-            # 过滤无效数据
-            valid_mask = ~(features.isna().any(axis=1)) & (target >= 0)
+            # NaN处理: 不整行丢弃(会丢太多), 改为前向填充+填充0
+            # 长周期特征(ma120/vol100)前120行都是NaN, 整行丢会丢90%数据
+            features = features.fillna(method='ffill').fillna(0)
+            valid_mask = (target >= 0)
             features_valid = features[valid_mask]
             target_valid = target[valid_mask].astype(int)
 
