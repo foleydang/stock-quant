@@ -353,17 +353,64 @@ def search_stock_news(keyword: str = None) -> Dict:
     """搜索财经要闻 + LLM摘要
     
     如果不指定关键词，搜索持仓股相关新闻
+    优先使用百度新闻搜索，备用 DuckDuckGo
     """
     try:
-        # Try to import search module
+        # ===== 方案1: 百度新闻搜索（中文效果最好） =====
+        try:
+            from scheduler import _search_stock_news_brief
+        except ImportError:
+            _search_stock_news_brief = None
+        
+        # 提取纯股票名
+        stock_symbol = None
+        stock_name = None
+        if keyword:
+            from intent_router import extract_symbol
+            stock_symbol = extract_symbol(keyword)
+            if stock_symbol:
+                # 从数据库查股票名
+                import sqlite3
+                from config import DB_PATH
+                try:
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    c.execute("SELECT name FROM stock_info WHERE symbol=?", (stock_symbol,))
+                    row = c.fetchone()
+                    if row:
+                        stock_name = row[0]
+                    conn.close()
+                except Exception:
+                    pass
+                if not stock_name:
+                    stock_name = keyword
+        
+        # 如果指定了具体股票，先搜百度
+        if _search_stock_news_brief and stock_name:
+            news_data = _search_stock_news_brief(stock_symbol or keyword, stock_name)
+            if news_data and news_data.get('headlines'):
+                items = [{'title': h.get('title', ''), 'content': h.get('snippet', ''),
+                          'time': '', 'url': ''} for h in news_data['headlines']]
+                # LLM情绪分析
+                try:
+                    from llm_client import analyze_news_sentiment
+                    sentiment = analyze_news_sentiment(items)
+                except Exception:
+                    sentiment = {'sentiment': '中性', 'score': 0.5, 'summary': '基于百度新闻'}
+                return {
+                    'news': [{'title': h.get('title', ''), 'snippet': '',
+                             'date': '', 'url': ''} for h in news_data['headlines'][:8]],
+                    'sentiment': sentiment,
+                    'keyword': keyword or stock_name,
+                }
+        
+        # ===== 方案2: DuckDuckGo =====
         try:
             from search import search_duckduckgo
         except ImportError:
-            # search module not available - use web_fetch alternative
             return _search_news_via_api(keyword)
         
         if keyword is None:
-            # 搜索持仓股相关新闻
             positions_data = get_positions_data()
             keywords = []
             if 'error' not in positions_data:
@@ -377,17 +424,16 @@ def search_stock_news(keyword: str = None) -> Dict:
         results = search_duckduckgo(keyword + ' 股市 金融', max_results=8)
         
         if not results:
-            return {'news': [], 'summary': '暂无相关新闻', 'keyword': keyword}
+            return _search_news_via_api(keyword)
 
         # LLM摘要
         try:
             from llm_client import analyze_news_sentiment
             news_items = [{'title': r.get('title', ''), 'content': r.get('snippet', ''), 'time': r.get('date', '')} for r in results[:8]]
             sentiment = analyze_news_sentiment(news_items)
-        except:
+        except Exception:
             sentiment = {'sentiment': '中性', 'score': 0.5, 'summary': '无法分析'}
 
-        # 格式化新闻
         formatted = []
         for r in results[:8]:
             formatted.append({
