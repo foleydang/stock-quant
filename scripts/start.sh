@@ -1,13 +1,6 @@
 #!/bin/bash
 # 股票量化系统启动脚本
-
-# 防止重复运行：用 flock 文件锁
-LOCK_DIR="/tmp/stock-quant-locks"
-mkdir -p "$LOCK_DIR"
-
-# 使用 miniconda Python
-PYTHON="/root/miniconda3/bin/python"
-# 用法: ./start.sh [command]
+# 两端通用：Mac / 服务器均可执行
 
 set -e
 
@@ -16,12 +9,28 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 PYTHON_DIR="$PROJECT_ROOT/python"
 LOG_DIR="$PROJECT_ROOT/logs"
 
+# 自动检测 Python（优先级：miniconda > system python3）
+if [ -x "/root/miniconda3/bin/python" ]; then
+    PYTHON="/root/miniconda3/bin/python"
+elif command -v python3 &>/dev/null; then
+    PYTHON="python3"
+else
+    echo "❌ 找不到 Python"
+    exit 1
+fi
+
+# 防止重复运行：用 flock 文件锁
+LOCK_DIR="/tmp/stock-quant-locks"
+mkdir -p "$LOCK_DIR"
+
 # 创建日志目录
 mkdir -p "$LOG_DIR"
 
 # 加载环境变量
-if [ -f "$PYTHON_DIR/.env" ]; then
-    export $(cat "$PYTHON_DIR/.env" | grep -v '^#' | xargs)
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
 fi
 
 # 帮助信息
