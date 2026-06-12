@@ -60,8 +60,8 @@ CONFIG_30M = {
     'search_early_stopping': 50,      # Optuna搜索时早停
     'search_sample': 0.25,            # Optuna搜索时采样比例 (25%)
     'num_class': 3,                   # 3分类: 0=持有 1=买入 2=卖出
-    'objective': 'binary',
-    'metric': 'binary_logloss',
+    'objective': 'multiclass',
+    'metric': 'multi_logloss',
     'time_features': ['day_of_week', 'day_of_month', 'hour', 'minute',
                       'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour'],
     'zero_imp_features': [
@@ -78,26 +78,26 @@ CONFIG_30M = {
         'horizon':          (1, 10),         # 预测未来N根K线
         'threshold':        (0.005, 0.03),   # 涨跌幅阈值
         # 树结构
-        'num_leaves':       (31, 255),       # 树复杂度 (#1重要)
-        'max_depth':        (5, 15),         # 深度限制
-        'min_child_samples': (20, 200),      # 叶子最小样本
+        'num_leaves':       (63, 511),       # 更大模型
+        'max_depth':        (6, 15),         # 更深
+        'min_child_samples': (10, 150),      # 减少叶子样本
         # 采样
         'subsample':        (0.5, 0.95),     # 行采样
         'colsample_bytree': (0.5, 0.95),     # 列采样
         # 正则化
-        'learning_rate':    (0.005, 0.1),    # 学习率 (#2重要)
-        'reg_alpha':        (0.0, 2.0),      # L1 正则
+        'learning_rate':    (0.003, 0.05),   # 更低=更多树
+        'reg_alpha':        (0.0, 1.0),      # 减少正则化
     },
     # 无Optuna时的默认参数 (基于历史训练最优值)
     'default_params': {
-        'num_leaves': 63, 'max_depth': 9,
-        'min_child_samples': 60,
-        'subsample': 0.85,
-        'colsample_bytree': 0.67,
-        'learning_rate': 0.02, 'reg_alpha': 0.6,
+        'num_leaves': 255, 'max_depth': 12,
+        'min_child_samples': 30,
+        'subsample': 0.8,
+        'colsample_bytree': 0.6,
+        'learning_rate': 0.01, 'reg_alpha': 0.3,
         'min_split_gain': 0.01, 'subsample_freq': 5,
-        'max_bin': 255, 'reg_lambda': 0.5,
-        'num_class': 2, 'objective': 'binary', 'metric': 'binary_logloss',
+        'max_bin': 255, 'reg_lambda': 0.3,
+        'num_class': 3, 'objective': 'multiclass', 'metric': 'multi_logloss',
     },
 }
 
@@ -113,8 +113,8 @@ CONFIG_DAILY = {
     'n_bagging': 3,
     'min_history': 120,
     'min_samples': 200,
-    'n_estimators': 1000,              # 最终训练树数
-    'early_stopping_rounds': 100,     # 最终训练早停
+    'n_estimators': 2000,              # 最终训练树数
+    'early_stopping_rounds': 80,      # 最终训练早停
     'search_n_estimators': 500,       # Optuna搜索时树数 (加速)
     'search_early_stopping': 50,      # Optuna搜索时早停
     'search_sample': 0.5,             # Optuna搜索时采样比例 (50%, 日线数据少)
@@ -130,25 +130,25 @@ CONFIG_DAILY = {
         'horizon':          (5, 15),         # 预测未来N个交易日
         'threshold':        (0.02, 0.05),    # 涨跌幅阈值 (2%~5%, 极端行情)
         # 树结构 — 比30m保守
-        'num_leaves':       (15, 127),       # 上限更低
-        'max_depth':        (3, 10),         # 更浅，防过拟合
-        'min_child_samples': (30, 300),      # 叶子样本更多
+        'num_leaves':       (31, 255),       # 上限更高，模型更大
+        'max_depth':        (5, 12),         # 更深，增加容量
+        'min_child_samples': (20, 200),      # 减少叶子样本=更多叶子
         # 采样
         'subsample':        (0.5, 0.9),      # 采样范围偏保守
         'colsample_bytree': (0.5, 0.9),
         # 正则化 — 更强
-        'learning_rate':    (0.01, 0.15),
-        'reg_alpha':        (0.0, 3.0),      # L1 范围更大
+        'learning_rate':    (0.005, 0.08),   # 更低学习率=更多树
+        'reg_alpha':        (0.0, 1.0),      # 减少正则化=更大模型
     },
     # 无Optuna时的默认参数
     'default_params': {
-        'num_leaves': 31, 'max_depth': 6,
-        'min_child_samples': 100,
+        'num_leaves': 127, 'max_depth': 10,
+        'min_child_samples': 50,
         'subsample': 0.8,
-        'colsample_bytree': 0.7,
-        'learning_rate': 0.03, 'reg_alpha': 0.5,
+        'colsample_bytree': 0.6,
+        'learning_rate': 0.01, 'reg_alpha': 0.3,
         'min_split_gain': 0.01, 'subsample_freq': 3,
-        'max_bin': 127, 'reg_lambda': 0.5,
+        'max_bin': 127, 'reg_lambda': 0.3,
         'num_class': 2, 'objective': 'binary', 'metric': 'binary_logloss',
     },
 }
