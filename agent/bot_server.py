@@ -204,7 +204,6 @@ def process_message(text: str) -> dict:
                 logger.warning(f"LGBM预测注入失败 {symbol}: {e}")
             # 注入操作建议
             try:
-                from advanced_analysis import get_action_recommendations
                 rec_data = get_action_recommendations(symbol)
                 recs = rec_data.get('recommendations', [])
                 if recs:
