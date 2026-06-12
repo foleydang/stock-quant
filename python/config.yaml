@@ -9,7 +9,7 @@ base:
 
 # 数据库
 database:
-  path: /root/github/stock-quant/python/data/stock_data.db
+  path: /root/github/stock-quant/python/data/trading.db
   backup_dir: /root/github/stock-quant/python/data/backup
 
 # API配置
