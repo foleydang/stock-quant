@@ -92,12 +92,19 @@ class LGBMBacktesterOptimized:
         self.feature_names = self.model_data.get('feature_names', []) if self.model_data else []
         self.keep_features = self.model_data.get('keep_features', []) if self.model_data else []
 
-        # H5 双确认模型 (备用)
-        h5_path = model_path.replace('lgb_hs300', 'lgb_hs300_h5')
-        if os.path.exists(h5_path):
-            with open(h5_path, 'rb') as f:
-                self.model_data_h5 = pickle.load(f)
-            self.models_h5 = self.model_data_h5.get('models', [])
+        logger.info(f"📊 30分钟模型: {len(self.models)} 个子模型")
+
+        # 日线模型 — 双层架构第一层，判断趋势方向
+        self.daily_model_data = None
+        self.daily_models = []
+        daily_path = os.path.join(os.path.dirname(__file__), 'models/lgb_daily/model.pkl')
+        if os.path.exists(daily_path):
+            self.daily_model_data = self._load_model(daily_path)
+            self.daily_models = self.daily_model_data.get('models', []) if self.daily_model_data else []
+            logger.info(f"📊 日线模型: {len(self.daily_models)} 个子模型 (双层架构)")
+            logger.info(f"   日线准确率: {self.daily_model_data.get('cv_accuracy', '?')}")
+        else:
+            logger.info(f"⚠️ 日线模型未找到 ({daily_path})，使用单层30分钟模型")
 
         # 参数 - 短线策略
         self.position_pct = 0.30  # 仓位比例
@@ -115,6 +122,50 @@ class LGBMBacktesterOptimized:
         # 时间索引映射
         self.time_index_map: Dict[str, Dict[datetime, int]] = {}
 
+    def _preload_daily_features(self, all_data: Dict[str, pd.DataFrame]):
+        """预计算日线特征 (双层架构第一层)"""
+        logger.info("\n预计算日线特征...")
+        import sqlite3
+        from config_loader import get_db_path
+        from strategy.train import DailyFeatureEngineer
+
+        self.daily_features_cache = {}
+        db_path = get_db_path()
+
+        daily_feature_names = self.daily_model_data.get('feature_names', [])
+
+        symbols = list(all_data.keys())
+        for symbol in symbols:
+            try:
+                conn = sqlite3.connect(db_path)
+                df = pd.read_sql_query(
+                    'SELECT date, open, high, low, close, volume FROM kline_daily WHERE symbol=? ORDER BY date',
+                    conn, params=(symbol,)
+                )
+                conn.close()
+
+                if len(df) < 60:
+                    continue
+
+                df['date'] = pd.to_datetime(df['date'])
+                for col in ['open', 'high', 'low', 'close', 'volume']:
+                    df[col] = df[col].astype(float)
+
+                features = DailyFeatureEngineer.calculate_features(df)
+                features = features.fillna(0)
+
+                if daily_feature_names:
+                    missing = [c for c in daily_feature_names if c not in features.columns]
+                    for c in missing:
+                        features[c] = 0
+                    features = features[daily_feature_names]
+
+                self.daily_features_cache[symbol] = features
+            except Exception:
+                pass
+
+        logger.info(f"日线特征预计算完成，共 {len(self.daily_features_cache)} 只股票")
+
     def _load_model(self, model_path: str) -> Optional[Dict]:
         """加载模型"""
         if not os.path.exists(model_path):
@@ -128,7 +179,7 @@ class LGBMBacktesterOptimized:
             return None
 
     def _get_model_prediction(self, symbol: str, local_idx: int) -> Tuple[float, str]:
-        """获取模型预测"""
+        """获取30分钟模型预测"""
         if not self.models:
             return 0.5, "模型未加载"
 
@@ -150,32 +201,52 @@ class LGBMBacktesterOptimized:
                     probs.append(0.5)
 
             avg_prob = float(np.mean(probs))
-            return avg_prob, f"上涨概率:{avg_prob:.1%}(3LGBM ensemble)"
+            return avg_prob, f"上涨概率:{avg_prob:.1%}({len(self.models)}LGBM)"
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
 
-    def _get_model_prediction_h5(self, symbol: str, local_idx: int) -> float:
-        """获取H5模型的上涨概率 (双确认用)"""
-        if not self.models_h5:
-            return 0.5
+    def _get_daily_trend(self, symbol: str, current_time: datetime) -> Tuple[float, str]:
+        """获取日线模型趋势判断 — 双层架构第一层"""
+        if not self.daily_models:
+            return 0.5, "无日线模型"
 
-        features = self.features_cache.get(symbol)
-        if features is None or local_idx >= len(features):
-            return 0.5
+        # 日线数据缓存
+        if not hasattr(self, 'daily_features_cache'):
+            self.daily_features_cache = {}
 
+        features = self.daily_features_cache.get(symbol)
+        if features is None:
+            return 0.5, "无日线特征"
+
+        # 找到当前时间对应的最近一个交易日
         try:
-            last_row = features.iloc[local_idx]
+            current_date = pd.Timestamp(current_time).normalize()
+            # 在日线特征中找 <= current_date 的最近一条
+            dates = pd.to_datetime(features.index)
+            mask = dates <= current_date
+            if not mask.any():
+                return 0.5, "日期超出范围"
+            daily_idx = mask.sum() - 1  # 最后一个 <= current_date 的索引
+            if daily_idx < 0:
+                return 0.5, "无历史日线"
+
+            last_row = features.iloc[daily_idx]
             if last_row.isna().any():
-                return 0.5
+                last_row = last_row.fillna(0)
 
             probs = []
-            for model in self.models_h5:
-                p = model.predict_proba([last_row.values])[0]
-                probs.append(p[1] if len(p) > 1 else p[0])
-            return np.mean(probs)
-        except Exception:
-            return 0.5
+            for model in self.daily_models:
+                try:
+                    p = model.predict_proba([last_row.values])[0]
+                    probs.append(p[1] if len(p) > 1 else p[0])
+                except Exception:
+                    probs.append(0.5)
+
+            daily_prob = float(np.mean(probs))
+            return daily_prob, f"日线趋势:{daily_prob:.1%}"
+        except Exception as e:
+            return 0.5, f"日线错误:{e}"
 
     def load_data(self, symbol: str) -> pd.DataFrame:
         """加载数据 - 优先从数据库读取"""
@@ -249,7 +320,11 @@ class LGBMBacktesterOptimized:
             self.features_cache[symbol] = all_features
             # 建立时间到索引的映射
             self.time_index_map[symbol] = {row['date']: idx for idx, row in df.iterrows()}
-        logger.info(f"特征预计算完成，共 {len(self.features_cache)} 只股票")
+        logger.info(f"30分钟特征预计算完成，共 {len(self.features_cache)} 只股票")
+
+        # 双层架构: 预计算日线特征
+        if self.daily_models:
+            self._preload_daily_features(all_data)
 
     def _get_stock_local_idx(self, symbol: str, time: datetime) -> Optional[int]:
         """获取股票在指定时间的局部索引"""
@@ -261,13 +336,16 @@ class LGBMBacktesterOptimized:
     def run_backtest(self, stocks: List[Dict], start_date: Optional[str] = None, end_date: Optional[str] = None):
         """执行回测 - 支持日期范围"""
         logger.info("=" * 70)
-        logger.info("LGBM 模型回测系统 (优化版)")
+        logger.info("LGBM 双层模型回测系统")
         logger.info("=" * 70)
         logger.info(f"初始资金: {self.initial_capital:.2f} 元")
         if self.model_data:
-            logger.info(f"模型准确率: {self.model_data.get('cv_accuracy', 0):.2%}")
+            logger.info(f"30分钟模型准确率: {self.model_data.get('cv_accuracy', 0):.2%}")
+        if self.daily_model_data:
+            logger.info(f"日线模型准确率: {self.daily_model_data.get('cv_accuracy', 0):.2%}")
+            logger.info(f"双层架构: 日线趋势过滤 + 30分钟信号")
         else:
-            logger.warning("模型未加载")
+            logger.warning("日线模型未加载，使用单层30分钟模型")
         logger.info(f"买入阈值: 上涨概率 > {self.buy_threshold:.0%}")
         logger.info("=" * 70)
 
@@ -416,7 +494,7 @@ class LGBMBacktesterOptimized:
             return 'neutral'
 
     def _check_buy_ml(self, all_data: Dict, current_time: datetime, stocks: List[Dict]):
-        """检查买入 - 加入多时间框架确认"""
+        """检查买入 — 双层架构: 日线趋势确认 + 30分钟信号"""
         if len(self.positions) >= self.max_positions:
             return
 
@@ -434,6 +512,19 @@ class LGBMBacktesterOptimized:
                 continue
 
             up_prob, reason = self._get_model_prediction(symbol, current_idx)
+
+            # 双层架构: 日线模型过滤
+            if self.daily_models:
+                daily_prob, daily_reason = self._get_daily_trend(symbol, current_time)
+                if daily_prob < 0.45:  # 日线看跌 → 禁止买入
+                    logger.debug(f"{symbol} 日线看跌({daily_prob:.1%})，跳过买入")
+                    continue
+                elif daily_prob < 0.52:  # 日线偏弱 → 提高买入门槛
+                    if up_prob < self.buy_threshold + 0.05:  # 门槛提高5%
+                        continue
+                    reason += f" + {daily_reason}"
+                else:
+                    reason += f" + {daily_reason}"
 
             if up_prob > self.buy_threshold:
                 # 置信度决定仓位比例
@@ -606,7 +697,30 @@ WATCHLIST = [
 
 
 def main():
-    backtester = LGBMBacktesterOptimized(initial_capital=500000)  # 50万初始资金
+    import argparse
+    parser = argparse.ArgumentParser(description='LGBM 双层模型回测系统')
+    parser.add_argument('--model', type=str, default=None,
+                        help='30分钟模型路径 (默认: models/lgb_hs300/model.pkl)')
+    parser.add_argument('--daily-model', type=str, default=None,
+                        help='日线模型路径 (默认: models/lgb_daily/model.pkl)')
+    parser.add_argument('--capital', type=float, default=500000, help='初始资金 (默认: 50万)')
+    parser.add_argument('--no-daily', action='store_true', help='禁用日线模型，只用30分钟模型')
+    args = parser.parse_args()
+
+    # 30分钟模型路径
+    if args.model:
+        model_path = args.model
+    else:
+        model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_hs300/model.pkl')
+
+    backtester = LGBMBacktesterOptimized(initial_capital=args.capital, model_path=model_path)
+
+    # 如果指定了 --no-daily，清除日线模型
+    if args.no_daily:
+        backtester.daily_model_data = None
+        backtester.daily_models = []
+        logger.info("日线模型已禁用")
+
     backtester.run_backtest(WATCHLIST)
 
 
