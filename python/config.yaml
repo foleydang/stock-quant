@@ -3,8 +3,7 @@
 
 # 数据库（相对路径，config.py 自动拼到项目根目录）
 database:
-  path: python/data/trading.db
-  kline_path: python/data/stock_data.db
+  path: python/data/stock_data.db
   backup_dir: python/data/backup
 
 # API 地址

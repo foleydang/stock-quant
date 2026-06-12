@@ -80,7 +80,6 @@ OSS_BUCKET = _env("OSS_BUCKET", "yanten-data")
 # ========== 数据库 ==========
 
 DB_PATH = _resolve_path(_config.get('database', {}).get('path', 'python/data/stock_data.db'))
-KLINE_DB_PATH = _resolve_path(_config.get('database', {}).get('kline_path', 'python/data/stock_data.db'))
 BACKUP_DIR = _resolve_path(_config.get('database', {}).get('backup_dir', 'python/data/backup'))
 
 # ========== 邮件 ==========
