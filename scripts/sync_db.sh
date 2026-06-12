@@ -51,20 +51,42 @@ if [ "$DAILY_COUNT" -lt 100 ]; then
     echo ""
     echo "⬇️ 正在从 OSS 下载..."
     python3 -c "
-import oss2, sys, os
+import oss2, sys, os, time
+
 endpoint = os.environ.get('OSS_ENDPOINT', 'https://oss-cn-hangzhou.aliyuncs.com')
 bucket_name = os.environ.get('OSS_BUCKET', '')
 ak = os.environ.get('OSS_ACCESS_KEY_ID', '')
 sk = os.environ.get('OSS_ACCESS_KEY_SECRET', '')
 if not bucket_name: sys.exit('❌ 缺少 OSS_BUCKET 环境变量')
+
 auth = oss2.Auth(ak, sk)
 bucket = oss2.Bucket(auth, endpoint, bucket_name)
 key = os.environ.get('OSS_BUCKET_KEY', '$OSS_KEY')
-print(f'  下载: {key}')
-bucket.get_object_to_file(key, '$DB')
-import os as _os
-sz = _os.path.getsize('$DB')
-print(f'✅ 下载完成: {sz/1024/1024:.0f}MB')
+
+# 获取文件大小
+meta = bucket.get_object_meta(key)
+total = meta.content_length
+print(f'  文件: {key} ({total/1024/1024:.0f}MB)')
+
+# 进度回调
+last = [0, time.time()]
+def progress(consumed, total_bytes):
+    if total_bytes:
+        pct = consumed * 100 // total_bytes
+        mb = consumed / 1024 / 1024
+        elapsed = time.time() - last[1]
+        if elapsed > 0.3 or pct >= 100:  # 每秒更新~3次
+            speed = (consumed - last[0]) / 1024 / 1024 / elapsed if elapsed > 0 else 0
+            bar_len = 30
+            filled = int(bar_len * consumed / total_bytes)
+            bar = '█' * filled + '░' * (bar_len - filled)
+            sys.stdout.write(f'\r  [{bar}] {pct:3d}% {mb:5.0f}MB' + (f' {speed:.1f}MB/s' if speed > 0.1 else '          '))
+            sys.stdout.flush()
+            last[0] = consumed
+            last[1] = time.time()
+
+bucket.get_object_to_file(key, '$DB', progress_callback=progress)
+print(f'\n✅ 下载完成')
 "
     echo "✅ 同步完成"
 else
