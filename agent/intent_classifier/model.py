@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-意图分类模型推理器 v3 - 纯本地 TF-IDF + LogisticRegression
-
-零 API 调用，推理 < 1ms，模型 < 200KB
+意图分类模型推理器 v5 - 纯 TF-IDF + LR
+纯本地，< 1ms，~300KB
 """
 
 import json, os, pickle
+import numpy as np
 from typing import Tuple, Dict, Optional
 
 
@@ -17,27 +17,33 @@ class IntentClassifier:
         model_path = os.path.join(model_dir, 'intent_classifier.pkl')
         label_path = os.path.join(model_dir, 'label_map.json')
         
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"模型不存在: {model_path}，请先运行 train.py")
-        
         with open(model_path, 'rb') as f:
-            self.pipeline = pickle.load(f)
+            components = pickle.load(f)
+        
+        self.tfidf = components['tfidf']
+        self.clf = components['clf']
+        self.le = components['le']
+        
         with open(label_path, 'r') as f:
             self.label_map = json.load(f)
-        
         self.idx_to_label = {int(k): v for k, v in self.label_map.items()}
     
     def predict(self, text: str) -> Tuple[str, float, Dict[str, float]]:
-        """预测意图: (intent, confidence, {intent: prob})"""
-        proba = self.pipeline.predict_proba([text])[0]
+        x = self.tfidf.transform([text])
+        
+        if hasattr(self.clf, 'predict_proba'):
+            proba = self.clf.predict_proba(x)[0]
+        else:
+            scores = self.clf.decision_function(x)[0]
+            e = np.exp(scores - scores.max())
+            proba = e / e.sum()
+        
         idx = proba.argmax()
         intent = self.idx_to_label[idx]
         confidence = float(proba[idx])
         probs = {self.idx_to_label[i]: float(p) for i, p in enumerate(proba)}
         return intent, confidence, probs
 
-
-# ========== Singleton ==========
 
 _classifier: Optional[IntentClassifier] = None
 
