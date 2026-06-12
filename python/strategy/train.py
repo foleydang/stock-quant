@@ -68,33 +68,32 @@ CONFIG_30M = {
         'ma5_cross_ma10', 'ma10_cross_ma20', 'ma20_cross_ma60', 'ma60_cross_ma120',
         'macd_cross', 'kdj_cross_signal', 'inside_bar', 'breakout_20', 'trend_direction',
     ],
-    # Optuna 搜索参数 — 13个参数 (11模型超参 + horizon + threshold), 默认130次搜索
+    # Optuna 搜索参数 — 9个核心参数，默认100次搜索
+    # 固定值: min_split_gain=0.01, subsample_freq=5, max_bin=255, reg_lambda=0.5
     'optuna_params': {
         # 预测目标
-        'horizon':          (1, 10),         # 预测未来N根K线 (30分钟~5小时)
-        'threshold':        (0.005, 0.03),   # 涨跌幅阈值 (0.5%~3%)
+        'horizon':          (1, 10),         # 预测未来N根K线
+        'threshold':        (0.005, 0.03),   # 涨跌幅阈值
         # 树结构
-        'num_leaves':       (31, 255),       # 大数据集允许更深
+        'num_leaves':       (31, 255),       # 树复杂度 (#1重要)
         'max_depth':        (5, 15),         # 深度限制
         'min_child_samples': (20, 200),      # 叶子最小样本
-        'min_split_gain':   (0.0, 0.5),      # 分裂最小增益
         # 采样
-        'subsample':        (0.5, 0.95),     # 行采样 (bagging)
-        'subsample_freq':   (1, 10),         # bagging 频率
+        'subsample':        (0.5, 0.95),     # 行采样
         'colsample_bytree': (0.5, 0.95),     # 列采样
-        'max_bin':          (127, 511),      # 特征分箱数
         # 正则化
-        'learning_rate':    (0.005, 0.1),    # 学习率 (log scale)
+        'learning_rate':    (0.005, 0.1),    # 学习率 (#2重要)
         'reg_alpha':        (0.0, 2.0),      # L1 正则
-        'reg_lambda':       (0.0, 2.0),      # L2 正则
     },
     # 无Optuna时的默认参数 (基于历史训练最优值)
     'default_params': {
         'num_leaves': 63, 'max_depth': 9,
-        'min_child_samples': 60, 'min_split_gain': 0.01,
-        'subsample': 0.85, 'subsample_freq': 5,
-        'colsample_bytree': 0.67, 'max_bin': 255,
-        'learning_rate': 0.02, 'reg_alpha': 0.6, 'reg_lambda': 0.8,
+        'min_child_samples': 60,
+        'subsample': 0.85,
+        'colsample_bytree': 0.67,
+        'learning_rate': 0.02, 'reg_alpha': 0.6,
+        'min_split_gain': 0.01, 'subsample_freq': 5,
+        'max_bin': 255, 'reg_lambda': 0.5,
         'num_class': 3, 'objective': 'multiclass', 'metric': 'multi_logloss',
     },
 }
@@ -117,33 +116,32 @@ CONFIG_DAILY = {
     'metric': 'multi_logloss',
     'time_features': ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start'],
     'zero_imp_features': [],
-    # Optuna 搜索参数 — 13个参数 (11模型超参 + horizon + threshold), 默认130次搜索
+    # Optuna 搜索参数 — 9个核心参数，默认100次搜索
+    # 固定值: min_split_gain=0.01, subsample_freq=3, max_bin=127, reg_lambda=0.5
     'optuna_params': {
         # 预测目标 — 日线周期更长
-        'horizon':          (3, 20),         # 预测未来N个交易日 (3天~1个月)
-        'threshold':        (0.01, 0.05),    # 涨跌幅阈值 (1%~5%)
+        'horizon':          (3, 20),         # 预测未来N个交易日
+        'threshold':        (0.01, 0.05),    # 涨跌幅阈值
         # 树结构 — 比30m保守
         'num_leaves':       (15, 127),       # 上限更低
         'max_depth':        (3, 10),         # 更浅，防过拟合
         'min_child_samples': (30, 300),      # 叶子样本更多
-        'min_split_gain':   (0.0, 0.5),
         # 采样
         'subsample':        (0.5, 0.9),      # 采样范围偏保守
-        'subsample_freq':   (1, 10),
         'colsample_bytree': (0.5, 0.9),
-        'max_bin':          (63, 255),       # 数据少，bin不需要太多
         # 正则化 — 更强
-        'learning_rate':    (0.01, 0.15),    # 数据少时学习率可稍高
+        'learning_rate':    (0.01, 0.15),
         'reg_alpha':        (0.0, 3.0),      # L1 范围更大
-        'reg_lambda':       (0.0, 3.0),      # L2 范围更大
     },
     # 无Optuna时的默认参数
     'default_params': {
         'num_leaves': 31, 'max_depth': 6,
-        'min_child_samples': 100, 'min_split_gain': 0.01,
-        'subsample': 0.8, 'subsample_freq': 3,
-        'colsample_bytree': 0.7, 'max_bin': 127,
-        'learning_rate': 0.03, 'reg_alpha': 0.5, 'reg_lambda': 1.0,
+        'min_child_samples': 100,
+        'subsample': 0.8,
+        'colsample_bytree': 0.7,
+        'learning_rate': 0.03, 'reg_alpha': 0.5,
+        'min_split_gain': 0.01, 'subsample_freq': 3,
+        'max_bin': 127, 'reg_lambda': 0.5,
         'num_class': 3, 'objective': 'multiclass', 'metric': 'multi_logloss',
     },
 }
@@ -320,72 +318,91 @@ def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np
 # ============ Optuna 超参搜索 ============
 def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
                          model_type: str, feature_names: List[str],
-                         n_trials: int = 130) -> Dict:
-    """Optuna 超参数搜索 (13个参数: 11模型 + horizon + threshold)
+                         n_trials: int = 100) -> Dict:
+    """Optuna 超参数搜索 (9个参数: 7模型 + horizon + threshold)
     
+    使用 TPESampler + MedianPruner 剪枝，2折CV加速搜索
     X: 预计算的特征矩阵 (不变)
     all_closes: 各股票的原始收盘价列表 (用于按 trial 的 horizon/threshold 重算目标)
-    返回 best_params, 同时返回 best_y (供后续训练用)
+    返回 (best_params, best_y)
     """
     if not HAS_OPTUNA:
         print("⚠ optuna 未安装，使用默认参数")
         cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
         return {**cfg['default_params'], 'horizon': cfg['horizon'], 'threshold': cfg['threshold'],
-                'n_estimators': cfg['n_estimators'],
-                'objective': 'binary', 'metric': 'binary_logloss',
-                'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}, None
+                'n_estimators': cfg['n_estimators']}, None
 
     cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
     ps = cfg['optuna_params']
-    tscv = TimeSeriesSplit(n_splits=3)
+    # 搜索时用2折CV加速，最终训练才用5折
+    tscv = TimeSeriesSplit(n_splits=2)
     n_params = len(ps)
     target_fn = calculate_target_30m if model_type == '30m' else calculate_target_daily
 
     def objective(trial):
-        # 1. 获取 trial 参数
+        # 1. 预测目标
         horizon = trial.suggest_int('horizon', *ps['horizon'])
         threshold = trial.suggest_float('threshold', *ps['threshold'])
 
         # 2. 用 trial 的 horizon/threshold 重新计算目标
         y_trial = _rebuild_targets(all_closes, horizon, threshold, target_fn)
-        X_trial = X[:len(y_trial)]  # 对齐 X 和 y
+        X_trial = X[:len(y_trial)]
 
-        # 3. 模型参数
+        # 3. 模型参数 (7个核心 + 2个固定值)
         params = {
             'num_leaves': trial.suggest_int('num_leaves', *ps['num_leaves']),
             'max_depth': trial.suggest_int('max_depth', *ps['max_depth']),
             'min_child_samples': trial.suggest_int('min_child_samples', *ps['min_child_samples']),
-            'min_split_gain': trial.suggest_float('min_split_gain', *ps['min_split_gain']),
             'subsample': trial.suggest_float('subsample', *ps['subsample']),
-            'subsample_freq': trial.suggest_int('subsample_freq', *ps['subsample_freq']),
             'colsample_bytree': trial.suggest_float('colsample_bytree', *ps['colsample_bytree']),
-            'max_bin': trial.suggest_int('max_bin', *ps['max_bin']),
             'learning_rate': trial.suggest_float('learning_rate', *ps['learning_rate'], log=True),
             'reg_alpha': trial.suggest_float('reg_alpha', *ps['reg_alpha']),
-            'reg_lambda': trial.suggest_float('reg_lambda', *ps['reg_lambda']),
+            # 固定值 (影响小，不参与搜索)
+            'min_split_gain': 0.01,
+            'subsample_freq': 5,
+            'max_bin': 255 if model_type == '30m' else 127,
+            'reg_lambda': 0.5,
+            # 固定参数
             'n_estimators': cfg['n_estimators'],
             'num_class': cfg['num_class'],
             'objective': cfg['objective'], 'metric': cfg['metric'],
             'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1, 'random_state': 42,
         }
 
-        # 4. 交叉验证 (F1-macro 对多分类更公平)
+        # 4. 2折交叉验证 (带剪枝: 每折结束后报告中间值)
         scores = []
-        for train_idx, test_idx in tscv.split(X_trial):
+        for fold, (train_idx, test_idx) in enumerate(tscv.split(X_trial)):
             X_train, X_test = X_trial[train_idx], X_trial[test_idx]
             y_train, y_test = y_trial[train_idx], y_trial[test_idx]
             model = lgb.LGBMClassifier(**params)
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
                       callbacks=[lgb.early_stopping(cfg['early_stopping_rounds'], verbose=False),
                                  lgb.log_evaluation(period=0)])
-            scores.append(f1_score(y_test, model.predict(X_test), average='macro'))
+            fold_score = f1_score(y_test, model.predict(X_test), average='macro')
+            scores.append(fold_score)
+            # 报告给Optuna，支持剪枝
+            trial.report(fold_score, step=fold)
+            if trial.should_prune():
+                raise optuna.TrialPruned()
         return np.mean(scores)
 
-    print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数: 11模型 + horizon + threshold)...")
-    study = optuna.create_study(direction='maximize')
+    # 采样器: TPE + 多变量核密度估计
+    sampler = optuna.samplers.TPESampler(seed=42, multivariate=True, n_startup_trials=10)
+    # 剪枝器: 低于中位数就停
+    pruner = optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=1)
+
+    print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数, 2折CV, 带剪枝)...")
+    study = optuna.create_study(direction='maximize', sampler=sampler, pruner=pruner)
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 
+    pruned = len([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED])
+    print(f"  完成: {len(study.trials)}/{n_trials} (剪枝: {pruned})")
+
     best = dict(study.best_params)
+    best['min_split_gain'] = 0.01
+    best['subsample_freq'] = 5
+    best['max_bin'] = 255 if model_type == '30m' else 127
+    best['reg_lambda'] = 0.5
     best['n_estimators'] = cfg['n_estimators']
     best['num_class'] = cfg['num_class']
     best['objective'] = cfg['objective']
@@ -554,8 +571,8 @@ def main():
                         help='数据起始日期 (YYYY-MM-DD)')
     parser.add_argument('--end', type=str, default=None,
                         help='数据截止日期 (YYYY-MM-DD)')
-    parser.add_argument('--trials', type=int, default=130,
-                        help='Optuna 搜索次数 (13个参数, 默认: 130)')
+    parser.add_argument('--trials', type=int, default=100,
+                        help='Optuna 搜索次数 (9个参数, 默认: 100)')
     parser.add_argument('--quick', action='store_true',
                         help='快速模式 (20次 Optuna, 快速验证用)')
     parser.add_argument('--no-optuna', action='store_true',
