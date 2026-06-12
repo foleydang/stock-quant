@@ -307,7 +307,7 @@ def verify():
     import sys, os
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..'))
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'strategy'))
-    from strategy.train_lgb_enhanced import MarketFeatureEngineer
+    from strategy.features import MarketFeatureEngineer
     import pandas as pd
     
     # 1. 各表数据量

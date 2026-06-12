@@ -98,67 +98,7 @@ CONFIG_DAILY = {
 
 
 # ============ 30分钟特征工程 (复用) ============
-from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
-
-class AdvancedFeatureEngineer:
-    """30分钟高级特征"""
-
-    @staticmethod
-    def calculate_advanced_features(df: pd.DataFrame) -> pd.DataFrame:
-        adv = pd.DataFrame(index=df.index)
-        close = df['close'].values.astype(float)
-        high = df['high'].values.astype(float)
-        low = df['low'].values.astype(float)
-        volume = df['volume'].values.astype(float)
-        open_price = df['open'].values.astype(float)
-
-        for period in [3, 5, 10, 20]:
-            ret = pd.Series(close).pct_change(period)
-            adv[f'momentum_accel_{period}'] = ret.diff(3)
-        mom_short = pd.Series(close).pct_change(5)
-        mom_long = pd.Series(close).pct_change(20)
-        adv['momentum_decay'] = mom_short - mom_long
-
-        vol = pd.Series(volume)
-        for period in [5, 10, 20]:
-            vol_ma = vol.rolling(period).mean()
-            adv[f'vol_ratio_{period}'] = volume / vol_ma.values
-            adv[f'vol_std_{period}'] = vol.rolling(period).std() / vol_ma.values
-        adv['vol_trend'] = vol.rolling(5).mean() / vol.rolling(20).mean().values
-        price_up = (pd.Series(close).diff() > 0).astype(int)
-        vol_up = (vol.diff() > 0).astype(int)
-        adv['vol_price_divergence'] = (price_up != vol_up).rolling(5).mean()
-
-        prev_high = pd.Series(high).shift(1)
-        prev_low = pd.Series(low).shift(1)
-        adv['inside_bar'] = ((high <= prev_high) & (low >= prev_low)).astype(int)
-        adv['outside_bar'] = ((high > prev_high) & (low < prev_low)).astype(int)
-        body = close - open_price
-        total_range = high - low + 1e-10
-        adv['body_ratio'] = body / total_range
-        adv['adv_upper_shadow'] = (high - np.maximum(close, open_price)) / total_range
-
-        returns = pd.Series(close).pct_change()
-        vol20 = returns.rolling(20).std()
-        vol5 = returns.rolling(5).std()
-        adv['vol_ratio_5_20'] = vol5 / vol20.values
-        vol_ma = vol20.rolling(60).mean()
-        adv['vol_vs_mean'] = vol20 / vol_ma.values
-        vol_median = vol20.rolling(120).median()
-        adv['high_vol_state'] = (vol20 > vol_median).astype(int)
-
-        for period in [20, 60]:
-            period_high = pd.Series(high).rolling(period).max()
-            period_low = pd.Series(low).rolling(period).min()
-            period_range = period_high - period_low + 1e-10
-            adv[f'adv_price_position_{period}'] = (close - period_low) / period_range.values
-        adv['breakout_20'] = (close > pd.Series(high).rolling(20).max().shift(1)).astype(int)
-
-        up_days = pd.Series(close).diff()
-        adv['consecutive_up'] = (up_days > 0).rolling(5).sum()
-        adv['consecutive_down'] = (up_days < 0).rolling(5).sum()
-
-        return adv
+from strategy.features import EnhancedFeatureEngineer, AdvancedFeatureEngineer
 
 
 # ============ 日线特征工程 ============

@@ -150,7 +150,7 @@ print("=" * 50)
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'strategy'))
-from strategy.train_lgb_enhanced import MarketFeatureEngineer
+from strategy.features import MarketFeatureEngineer
 
 # 各表数据量
 for table in ['north_flow', 'stock_sector', 'hs300_daily', 'kline_daily']:

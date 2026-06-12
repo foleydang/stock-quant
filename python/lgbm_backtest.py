@@ -20,8 +20,7 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from collections import Counter
 
-from strategy.train_lgb_enhanced import EnhancedFeatureEngineer, MarketFeatureEngineer
-from strategy.train_lgb_v3 import AdvancedFeatureEngineer, ZERO_IMP_FEATURES, TIME_FEATURES
+from strategy.features import EnhancedFeatureEngineer, MarketFeatureEngineer, AdvancedFeatureEngineer, ZERO_IMP_FEATURES, TIME_FEATURES
 
 # 配置日志
 logger = logging.getLogger(__name__)  

@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, '..')
 import pandas as pd
 
-from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+from strategy.features import EnhancedFeatureEngineer
 
 class TestStrategy(unittest.TestCase):
     """策略测试"""

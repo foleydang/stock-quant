@@ -40,7 +40,7 @@ print(f"    共 {len(stocks)} 只股票")
 
 # 3. 导入特征工程
 sys.path.insert(0, BASE_DIR)
-from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+from strategy.features import EnhancedFeatureEngineer
 
 # 4. 回测
 print("\n[3] 执行回测...")
