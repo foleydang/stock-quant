@@ -54,8 +54,11 @@ CONFIG_30M = {
     'n_bagging': 3,
     'min_history': 150,
     'min_samples': 200,
-    'n_estimators': 2000,             # 大树数，靠 early_stopping 截断
-    'early_stopping_rounds': 100,     # 连续100轮不提升则停止
+    'n_estimators': 2000,             # 最终训练树数
+    'early_stopping_rounds': 100,     # 最终训练早停
+    'search_n_estimators': 500,       # Optuna搜索时树数 (加速)
+    'search_early_stopping': 50,      # Optuna搜索时早停
+    'search_sample': 0.25,            # Optuna搜索时采样比例 (25%)
     'num_class': 3,                   # 3分类: 0=持有 1=买入 2=卖出
     'objective': 'multiclass',
     'metric': 'multi_logloss',
@@ -109,8 +112,11 @@ CONFIG_DAILY = {
     'n_bagging': 3,
     'min_history': 120,
     'min_samples': 200,
-    'n_estimators': 1000,              # 日线数据少，不需要太多树
-    'early_stopping_rounds': 100,
+    'n_estimators': 1000,              # 最终训练树数
+    'early_stopping_rounds': 100,     # 最终训练早停
+    'search_n_estimators': 500,       # Optuna搜索时树数 (加速)
+    'search_early_stopping': 50,      # Optuna搜索时早停
+    'search_sample': 0.5,             # Optuna搜索时采样比例 (50%, 日线数据少)
     'num_class': 3,                   # 3分类: 0=震荡 1=上涨 2=下跌
     'objective': 'multiclass',
     'metric': 'multi_logloss',
@@ -348,7 +354,13 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
         y_trial = _rebuild_targets(all_closes, horizon, threshold, target_fn)
         X_trial = X[:len(y_trial)]
 
-        # 3. 模型参数 (7个核心 + 2个固定值)
+        # 3. 搜索时降采样加速 (数据量够大，参数排名不变)
+        if cfg.get('search_sample', 0) < 1.0 and len(X_trial) > 100000:
+            n_sample = int(len(X_trial) * cfg['search_sample'])
+            idx = np.random.RandomState(42 + trial.number).choice(len(X_trial), n_sample, replace=False)
+            X_trial, y_trial = X_trial[idx], y_trial[idx]
+
+        # 4. 模型参数 (7个核心 + 固定值)
         params = {
             'num_leaves': trial.suggest_int('num_leaves', *ps['num_leaves']),
             'max_depth': trial.suggest_int('max_depth', *ps['max_depth']),
@@ -357,30 +369,29 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
             'colsample_bytree': trial.suggest_float('colsample_bytree', *ps['colsample_bytree']),
             'learning_rate': trial.suggest_float('learning_rate', *ps['learning_rate'], log=True),
             'reg_alpha': trial.suggest_float('reg_alpha', *ps['reg_alpha']),
-            # 固定值 (影响小，不参与搜索)
+            # 固定值
             'min_split_gain': 0.01,
             'subsample_freq': 5,
             'max_bin': 255 if model_type == '30m' else 127,
             'reg_lambda': 0.5,
-            # 固定参数
-            'n_estimators': cfg['n_estimators'],
+            # 搜索时用更少的树和更快的早停
+            'n_estimators': cfg.get('search_n_estimators', 500),
             'num_class': cfg['num_class'],
             'objective': cfg['objective'], 'metric': cfg['metric'],
             'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1, 'random_state': 42,
         }
 
-        # 4. 2折交叉验证 (带剪枝: 每折结束后报告中间值)
+        # 5. 2折交叉验证 (带剪枝)
         scores = []
         for fold, (train_idx, test_idx) in enumerate(tscv.split(X_trial)):
             X_train, X_test = X_trial[train_idx], X_trial[test_idx]
             y_train, y_test = y_trial[train_idx], y_trial[test_idx]
             model = lgb.LGBMClassifier(**params)
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
-                      callbacks=[lgb.early_stopping(cfg['early_stopping_rounds'], verbose=False),
+                      callbacks=[lgb.early_stopping(cfg.get('search_early_stopping', 50), verbose=False),
                                  lgb.log_evaluation(period=0)])
             fold_score = f1_score(y_test, model.predict(X_test), average='macro')
             scores.append(fold_score)
-            # 报告给Optuna，支持剪枝
             trial.report(fold_score, step=fold)
             if trial.should_prune():
                 raise optuna.TrialPruned()
@@ -391,7 +402,7 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
     # 剪枝器: 低于中位数就停
     pruner = optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=1)
 
-    print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数, 2折CV, 带剪枝)...")
+    print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数, 2折CV, 采样{cfg.get('search_sample',1)*100:.0f}%, 带剪枝)...")
     study = optuna.create_study(direction='maximize', sampler=sampler, pruner=pruner)
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 
