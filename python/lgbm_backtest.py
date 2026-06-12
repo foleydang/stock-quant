@@ -101,7 +101,7 @@ class LGBMBacktesterOptimized:
             self.daily_model_data = self._load_model(daily_path)
             self.daily_models = self.daily_model_data.get('models', []) if self.daily_model_data else []
             logger.info(f"📊 日线模型: {len(self.daily_models)} 个子模型 (双层架构)")
-            logger.info(f"   日线准确率: {self.daily_model_data.get('cv_accuracy', '?')}")
+            logger.info(f"   日线F1: {self.daily_model_data.get('cv_f1', '?')}")
         else:
             logger.info(f"⚠️ 日线模型未找到 ({daily_path})，使用单层30分钟模型")
 
@@ -200,12 +200,13 @@ class LGBMBacktesterOptimized:
             for model in self.models:
                 try:
                     p = model.predict_proba([last_row.values])[0]
-                    probs.append(p[1] if len(p) > 1 else p[0])
+                    # 3分类: p[0]=持有 p[1]=买入 p[2]=卖出
+                    probs.append(p[1] if len(p) > 2 else (p[1] if len(p) > 1 else p[0]))
                 except Exception:
-                    probs.append(0.5)
+                    probs.append(0.33)
 
             avg_prob = float(np.mean(probs))
-            return avg_prob, f"上涨概率:{avg_prob:.1%}({len(self.models)}LGBM)"
+            return avg_prob, f"买入概率:{avg_prob:.1%}({len(self.models)}LGBM)"
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
@@ -243,9 +244,10 @@ class LGBMBacktesterOptimized:
             for model in self.daily_models:
                 try:
                     p = model.predict_proba([last_row.values])[0]
+                    # 3分类: p[0]=震荡 p[1]=上涨 p[2]=下跌
                     probs.append(p[1] if len(p) > 1 else p[0])
                 except Exception:
-                    probs.append(0.5)
+                    probs.append(0.33)
 
             daily_prob = float(np.mean(probs))
             return daily_prob, f"日线趋势:{daily_prob:.1%}"
@@ -344,9 +346,9 @@ class LGBMBacktesterOptimized:
         logger.info("=" * 70)
         logger.info(f"初始资金: {self.initial_capital:.2f} 元")
         if self.model_data:
-            logger.info(f"30分钟模型准确率: {self.model_data.get('cv_accuracy', 0):.2%}")
+            logger.info(f"30分钟模型F1: {self.model_data.get('cv_f1', 0):.2%}")
         if self.daily_model_data:
-            logger.info(f"日线模型准确率: {self.daily_model_data.get('cv_accuracy', 0):.2%}")
+            logger.info(f"日线模型F1: {self.daily_model_data.get('cv_f1', 0):.2%}")
             logger.info(f"双层架构: 日线趋势过滤 + 30分钟信号")
         else:
             logger.warning("日线模型未加载，使用单层30分钟模型")
@@ -517,13 +519,14 @@ class LGBMBacktesterOptimized:
 
             up_prob, reason = self._get_model_prediction(symbol, current_idx)
 
-            # 双层架构: 日线模型过滤
+            # 双层架构: 日线模型过滤 (3分类)
             if self.daily_models:
                 daily_prob, daily_reason = self._get_daily_trend(symbol, current_time)
-                if daily_prob < 0.45:  # 日线看跌 → 禁止买入
-                    logger.debug(f"{symbol} 日线看跌({daily_prob:.1%})，跳过买入")
+                # P(上涨) < 0.35 → 震荡/下跌趋势，禁止买入
+                if daily_prob < 0.35:
+                    logger.debug(f"{symbol} 日线看跌/震荡(P(up)={daily_prob:.1%})，跳过买入")
                     continue
-                elif daily_prob < 0.52:  # 日线偏弱 → 提高买入门槛
+                elif daily_prob < 0.45:  # 日线偏弱 → 提高买入门槛
                     if up_prob < self.buy_threshold + 0.05:  # 门槛提高5%
                         continue
                     reason += f" + {daily_reason}"
