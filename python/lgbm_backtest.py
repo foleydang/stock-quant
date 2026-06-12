@@ -147,7 +147,7 @@ class LGBMBacktesterOptimized:
                 if len(df) < 60:
                     continue
 
-                df['date'] = pd.to_datetime(df['date'])
+                df["date"] = pd.to_datetime(df["date"], format="mixed")
                 for col in ['open', 'high', 'low', 'close', 'volume']:
                     df[col] = df[col].astype(float)
 
@@ -273,7 +273,7 @@ class LGBMBacktesterOptimized:
                 
                 if rows:
                     df = pd.DataFrame(rows, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
-                    df['date'] = pd.to_datetime(df['date'])
+                    df["date"] = pd.to_datetime(df["date"], format="mixed")
                     df = df.sort_values('date').reset_index(drop=True)
                     return df
             except Exception as e:

@@ -181,7 +181,7 @@ def load_data(db_path: str, table: str, start_date: str = None, end_date: str = 
             df = pd.read_sql_query(sql, conn, params=([symbol] + params))
             conn.close()
             if len(df) > 200:
-                df['date'] = pd.to_datetime(df['date'])
+                df['date'] = pd.to_datetime(df['date'], format='mixed')
                 for col in ['open', 'high', 'low', 'close', 'volume']:
                     df[col] = df[col].astype(float)
                 all_data[symbol] = df
