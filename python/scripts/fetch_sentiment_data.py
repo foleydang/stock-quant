@@ -98,80 +98,72 @@ def create_tables(conn):
     conn.commit()
 
 
-def fetch_lhb_data(conn, start_year=2012, end_year=2026):
-    """拉取龙虎榜数据 (按月)"""
+def fetch_lhb_data(conn, start_year=2015, end_year=2026):
+    """拉取龙虎榜数据 (按年，比按月快12倍)"""
     import akshare as ak
 
     total = 0
-    failed_months = []
+    failed_years = []
 
     for year in range(start_year, end_year + 1):
-        for month in range(1, 13):
-            # 跳过未来月份
-            now = datetime.now()
-            if year > now.year or (year == now.year and month > now.month):
-                break
+        now = datetime.now()
+        if year > now.year:
+            break
 
-            last_day = 28
-            if month in [1, 3, 5, 7, 8, 10, 12]:
-                last_day = 31
-            elif month in [4, 6, 9, 11]:
-                last_day = 30
-            else:
-                last_day = 29 if year % 4 == 0 else 28
+        start_date = f"{year}0101"
+        end_date = f"{year}1231"
 
-            start_date = f"{year}{month:02d}01"
-            end_date = f"{year}{month:02d}{last_day}"
-
-            try:
-                df = ak.stock_lhb_detail_em(start_date=start_date, end_date=end_date)
-                if len(df) == 0:
-                    continue
-
-                records = []
-                for _, row in df.iterrows():
-                    symbol = row.get('代码', '')
-                    records.append((
-                        symbol,
-                        row.get('名称', ''),
-                        row.get('上榜日', ''),
-                        float(row.get('收盘价', 0) or 0),
-                        float(row.get('涨跌幅', 0) or 0),
-                        float(row.get('龙虎榜净买额', 0) or 0),
-                        float(row.get('龙虎榜买入额', 0) or 0),
-                        float(row.get('龙虎榜卖出额', 0) or 0),
-                        float(row.get('龙虎榜成交额', 0) or 0),
-                        float(row.get('市场总成交额', 0) or 0),
-                        float(row.get('净买额占总成交比', 0) or 0),
-                        float(row.get('换手率', 0) or 0),
-                        str(row.get('上榜原因', '')),
-                        float(row.get('上榜后1日', 0) or 0),
-                        float(row.get('上榜后2日', 0) or 0),
-                        float(row.get('上榜后5日', 0) or 0),
-                        float(row.get('上榜后10日', 0) or 0),
-                    ))
-
-                conn.executemany(
-                    """INSERT OR REPLACE INTO sentiment_lhb
-                    (symbol, name, trade_date, close, pct_chg, lhb_net_buy, lhb_buy, lhb_sell,
-                     lhb_amount, total_amount, net_buy_ratio, turnover, reason,
-                     ret_1d, ret_2d, ret_5d, ret_10d)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    records
-                )
-                conn.commit()
-                total += len(records)
-
-            except Exception as e:
-                failed_months.append(f"{start_date}-{end_date}: {str(e)[:60]}")
+        try:
+            print(f"  拉取 {year}年...", end=' ', flush=True)
+            df = ak.stock_lhb_detail_em(start_date=start_date, end_date=end_date)
+            if len(df) == 0:
+                print("0条")
                 continue
 
-            time.sleep(0.1)  # 限速
+            records = []
+            for _, row in df.iterrows():
+                symbol = row.get('代码', '')
+                records.append((
+                    symbol,
+                    row.get('名称', ''),
+                    row.get('上榜日', ''),
+                    float(row.get('收盘价', 0) or 0),
+                    float(row.get('涨跌幅', 0) or 0),
+                    float(row.get('龙虎榜净买额', 0) or 0),
+                    float(row.get('龙虎榜买入额', 0) or 0),
+                    float(row.get('龙虎榜卖出额', 0) or 0),
+                    float(row.get('龙虎榜成交额', 0) or 0),
+                    float(row.get('市场总成交额', 0) or 0),
+                    float(row.get('净买额占总成交比', 0) or 0),
+                    float(row.get('换手率', 0) or 0),
+                    str(row.get('上榜原因', '')),
+                    float(row.get('上榜后1日', 0) or 0),
+                    float(row.get('上榜后2日', 0) or 0),
+                    float(row.get('上榜后5日', 0) or 0),
+                    float(row.get('上榜后10日', 0) or 0),
+                ))
+
+            conn.executemany(
+                """INSERT OR REPLACE INTO sentiment_lhb
+                (symbol, name, trade_date, close, pct_chg, lhb_net_buy, lhb_buy, lhb_sell,
+                 lhb_amount, total_amount, net_buy_ratio, turnover, reason,
+                 ret_1d, ret_2d, ret_5d, ret_10d)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                records
+            )
+            conn.commit()
+            total += len(records)
+            print(f"{len(records)}条")
+
+        except Exception as e:
+            failed_years.append(f"{year}: {str(e)[:60]}")
+            print(f"❌")
+            continue
 
     print(f"龙虎榜: {total} 条记录")
-    if failed_months:
-        print(f"  失败月份: {len(failed_months)}")
-        for f in failed_months[:5]:
+    if failed_years:
+        print(f"  失败年: {len(failed_years)}")
+        for f in failed_years[:5]:
             print(f"    {f}")
     return total
 

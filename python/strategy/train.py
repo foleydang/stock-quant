@@ -1,664 +1,344 @@
 #!/usr/bin/env python3
 """
-LGBM 统一训练脚本 (Mac 本地训练)
+LGBM 统一训练脚本 — 回归 + 截面排序
+
+双层架构:
+  日线模型 → 预测N日收益率 → 截面排序选股 (α层)
+  30分钟模型 → 预测90分钟收益率 → 截面排序择时 (γ层)
+
+评估指标: Rank IC (Spearman 排序相关性)
 
 用法:
-  python train.py --model 30m                    # 30分钟模型 (默认)
-  python train.py --model daily                  # 日线模型
-  python train.py --model 30m --quick            # 快速模式 (20次Optuna)
-  python train.py --model daily --trials 200     # 指定Optuna搜索次数
-  python train.py --model 30m --start 2025-01-01 --end 2026-05-31  # 日期过滤
-
-输出:
-  30m  → models/lgb_hs300/model.pkl   (双层架构第二层)
-  daily → models/lgb_daily/model.pkl  (双层架构第一层)
+  python strategy/train.py --model daily
+  python strategy/train.py --model 30m
+  python strategy/train.py --model daily --quick
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import argparse
-import pandas as pd
+import sys, os, argparse, pickle, json, sqlite3, warnings
 import numpy as np
-import pickle
-import json
-import sqlite3
-import warnings
-from datetime import datetime
-from typing import Dict, List, Tuple, Optional
-from collections import Counter
-
-warnings.filterwarnings('ignore')
-
+import pandas as pd
 import lightgbm as lgb
+from datetime import datetime
+from typing import Dict, List, Tuple
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import accuracy_score, f1_score, classification_report, roc_auc_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.feature_selection import SelectFromModel
+from scipy.stats import spearmanr
 
-try:
-    import optuna
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
-    HAS_OPTUNA = True
-except ImportError:
-    HAS_OPTUNA = False
-    print("⚠ optuna 未安装，跳过超参搜索。安装: pip install optuna")
-
-# ============ 30分钟模型配置 ============
-# 数据: kline_30m, ~410万条, ~110个特征 (Enhanced+Advanced, 无Market)
-# 数据量大，模型可以更深更复杂，Optuna搜索范围宽
-CONFIG_30M = {
-    'db_table': 'kline_30m',
-    'model_dir': 'models/lgb_hs300',
-    'horizon': 3,
-    'threshold': 0.010,
-    'n_bagging': 3,
-    'min_history': 150,
-    'min_samples': 200,
-    'n_estimators': 2000,             # 最终训练树数
-    'early_stopping_rounds': 100,     # 最终训练早停
-    'search_n_estimators': 500,       # Optuna搜索时树数 (加速)
-    'search_early_stopping': 50,      # Optuna搜索时早停
-    'search_sample': 0.25,            # Optuna搜索时采样比例 (25%)
-    'num_class': 3,                   # 3分类: 0=持有 1=买入 2=卖出
-    'objective': 'multiclass',
-    'metric': 'multi_logloss',
-    'time_features': ['day_of_week', 'day_of_month', 'hour', 'minute',
-                      'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour'],
-    'zero_imp_features': [
-        'price_above_ma5', 'price_above_ma10', 'price_above_ma20',
-        'price_above_ma30', 'price_above_ma60', 'price_above_ma80',
-        'price_above_ma100', 'price_above_ma120',
-        'ma5_cross_ma10', 'ma10_cross_ma20', 'ma20_cross_ma60', 'ma60_cross_ma120',
-        'macd_cross', 'kdj_cross_signal', 'inside_bar', 'breakout_20', 'trend_direction',
-    ],
-    # Optuna 搜索参数 — 9个核心参数，默认100次搜索
-    # 固定值: min_split_gain=0.01, subsample_freq=5, max_bin=255, reg_lambda=0.5
-    'optuna_params': {
-        # 预测目标
-        'horizon':          (1, 10),         # 预测未来N根K线
-        'threshold':        (0.005, 0.03),   # 涨跌幅阈值
-        # 树结构
-        'num_leaves':       (63, 511),       # 更大模型
-        'max_depth':        (6, 15),         # 更深
-        'min_child_samples': (10, 150),      # 减少叶子样本
-        # 采样
-        'subsample':        (0.5, 0.95),     # 行采样
-        'colsample_bytree': (0.5, 0.95),     # 列采样
-        # 正则化
-        'learning_rate':    (0.003, 0.05),   # 更低=更多树
-        'reg_alpha':        (0.0, 1.0),      # 减少正则化
-    },
-    # 无Optuna时的默认参数 (基于历史训练最优值)
-    'default_params': {
-        'num_leaves': 255, 'max_depth': 12,
-        'min_child_samples': 30,
-        'subsample': 0.8,
-        'colsample_bytree': 0.6,
-        'learning_rate': 0.01, 'reg_alpha': 0.3,
-        'min_split_gain': 0.01, 'subsample_freq': 5,
-        'max_bin': 255, 'reg_lambda': 0.3,
-        'num_class': 3, 'objective': 'multiclass', 'metric': 'multi_logloss',
-    },
-}
-
-# ============ 日线模型配置 ============
-# 数据: kline_daily, ~97万条, ~120个特征 (Enhanced+Advanced+Market, 含北向资金)
-# 2分类极值预测: 只学涨>threshold vs 跌<-threshold, 中间震荡过滤掉
-# 信号更干净，避免3分类在日线上的噪声问题
-CONFIG_DAILY = {
-    'db_table': 'kline_daily',
-    'model_dir': 'models/lgb_daily',
-    'horizon': 5,
-    'threshold': 0.025,
-    'n_bagging': 3,
-    'min_history': 120,
-    'min_samples': 200,
-    'n_estimators': 2000,              # 最终训练树数
-    'early_stopping_rounds': 80,      # 最终训练早停
-    'search_n_estimators': 500,       # Optuna搜索时树数 (加速)
-    'search_early_stopping': 50,      # Optuna搜索时早停
-    'search_sample': 0.5,             # Optuna搜索时采样比例 (50%, 日线数据少)
-    'num_class': 2,                   # 2分类: 0=下跌 1=上涨 (极值)
-    'objective': 'binary',
-    'metric': 'binary_logloss',
-    'time_features': ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start'],
-    'zero_imp_features': [],
-    # Optuna 搜索参数 — 9个核心参数，默认100次搜索
-    # 固定值: min_split_gain=0.01, subsample_freq=3, max_bin=127, reg_lambda=0.5
-    'optuna_params': {
-        # 预测目标 — 日线周期更长
-        'horizon':          (5, 15),         # 预测未来N个交易日
-        'threshold':        (0.02, 0.05),    # 涨跌幅阈值 (2%~5%, 极端行情)
-        # 树结构 — 比30m保守
-        'num_leaves':       (31, 255),       # 上限更高，模型更大
-        'max_depth':        (5, 12),         # 更深，增加容量
-        'min_child_samples': (20, 200),      # 减少叶子样本=更多叶子
-        # 采样
-        'subsample':        (0.5, 0.9),      # 采样范围偏保守
-        'colsample_bytree': (0.5, 0.9),
-        # 正则化 — 更强
-        'learning_rate':    (0.005, 0.08),   # 更低学习率=更多树
-        'reg_alpha':        (0.0, 1.0),      # 减少正则化=更大模型
-    },
-    # 无Optuna时的默认参数
-    'default_params': {
-        'num_leaves': 127, 'max_depth': 10,
-        'min_child_samples': 50,
-        'subsample': 0.8,
-        'colsample_bytree': 0.6,
-        'learning_rate': 0.01, 'reg_alpha': 0.3,
-        'min_split_gain': 0.01, 'subsample_freq': 3,
-        'max_bin': 127, 'reg_lambda': 0.3,
-        'num_class': 2, 'objective': 'binary', 'metric': 'binary_logloss',
-    },
-}
-
-
-# ============ 特征工程 (复用) ============
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from strategy.features import EnhancedFeatureEngineer, AdvancedFeatureEngineer, MarketFeatureEngineer
 
-# 日线独有: 北向资金+大盘特征 (命名与基础特征不冲突，直接合并)
-# 30分钟线: 不含 Market (北向资金是日级别的，分到每根30分钟K线无意义)
+warnings.filterwarnings('ignore')
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data/stock_data.db')
+
+# ============ 配置 ============
+CONFIG_30M = {
+    'db_table': 'kline_30m', 'model_dir': 'models/lgb_30m', 'label': '30分钟',
+    'horizon': 3, 'min_history': 150, 'min_samples': 200,
+    'n_estimators': 2000, 'early_stopping': 80,
+    'search_sample': 0.25, 'search_estimators': 500,
+    'optuna_trials': 100,
+    'features': 'enhanced+advanced',  # 纯30分钟特征
+    'purged_gap': 3,
+}
+
+CONFIG_DAILY = {
+    'db_table': 'kline_daily', 'model_dir': 'models/lgb_daily', 'label': '日线',
+    'horizon': 5, 'min_history': 120, 'min_samples': 200,
+    'n_estimators': 1500, 'early_stopping': 80,
+    'search_sample': 0.5, 'search_estimators': 500,
+    'optuna_trials': 100,
+    'features': 'enhanced+advanced+market',  # 日线含北向资金+情绪
+    'purged_gap': 1,
+}
+
+
+# ============ 特征 ============
+def compute_features(df: pd.DataFrame, symbol: str, cfg: dict) -> pd.DataFrame:
+    base = EnhancedFeatureEngineer.calculate_features(df)
+    adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
+    feats = pd.concat([base, adv], axis=1)
+    if 'market' in cfg['features']:
+        market = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
+        feats = pd.concat([feats, market], axis=1)
+    time_cols = ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start',
+                 'hour', 'minute', 'is_morning', 'is_afternoon']
+    return feats.drop(columns=[c for c in time_cols if c in feats.columns], errors='ignore')
+
+
+def load_sentiment(conn) -> pd.DataFrame:
+    try:
+        df = pd.read_sql("SELECT symbol, trade_date as date, lhb_flag, lhb_net_buy, "
+                         "lhb_net_buy_ratio, lhb_ret_5d, is_limit_up, is_limit_down, "
+                         "vol_ratio_20, abnormal_ret, consecutive_limit_up FROM sentiment_daily", conn)
+        if len(df) > 0:
+            df['date'] = pd.to_datetime(df['date'], format='mixed').dt.strftime('%Y-%m-%d')
+            return df
+    except Exception:
+        pass
+    return pd.DataFrame()
 
 
 # ============ 数据加载 ============
-def load_data(db_path: str, table: str, start_date: str = None, end_date: str = None) -> Dict[str, pd.DataFrame]:
-    """从数据库加载数据，支持日期过滤"""
+def load_data(db_path: str, table: str) -> Dict[str, pd.DataFrame]:
     conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT DISTINCT symbol FROM {table}")
-    symbols = [r[0] for r in cursor.fetchall()]
-    conn.close()
-
-    # 构建 SQL
-    sql = f'SELECT date, open, high, low, close, volume FROM {table} WHERE symbol=?'
-    params = []
-    if start_date:
-        sql += ' AND date >= ?'
-        params.append(start_date)
-    if end_date:
-        sql += ' AND date <= ?'
-        params.append(end_date)
-    sql += ' ORDER BY date'
-
-    all_data = {}
-    for symbol in symbols:
+    symbols = [r[0] for r in conn.execute(f"SELECT DISTINCT symbol FROM {table}")]
+    data = {}
+    for sym in symbols:
         try:
-            conn = sqlite3.connect(db_path)
-            df = pd.read_sql_query(sql, conn, params=([symbol] + params))
-            conn.close()
-            if len(df) > 200:
+            df = pd.read_sql(f"SELECT * FROM {table} WHERE symbol=? ORDER BY date", conn, params=(sym,))
+            if len(df) >= 120:
                 df['date'] = pd.to_datetime(df['date'], format='mixed')
-                for col in ['open', 'high', 'low', 'close', 'volume']:
-                    df[col] = df[col].astype(float)
-                all_data[symbol] = df
-        except Exception as e:
-            print(f"  ⚠ 跳过 {symbol}: {e}")
-
-    print(f"加载了 {len(all_data)} 只股票 (表: {table})")
-    if start_date or end_date:
-        print(f"  日期范围: {start_date or '不限'} ~ {end_date or '不限'}")
-    return all_data
-
-
-# ============ 特征计算 ============
-def compute_features_30m(df: pd.DataFrame) -> pd.DataFrame:
-    """30分钟特征: Enhanced + Advanced (无Market,北向资金是日级别不适配)"""
-    base = EnhancedFeatureEngineer.calculate_features(df)
-    adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
-    all_f = pd.concat([base, adv], axis=1)
-    drop = CONFIG_30M['time_features'] + CONFIG_30M['zero_imp_features']
-    keep = [c for c in all_f.columns if c not in drop]
-    return all_f[keep]
-
-
-def compute_features_daily(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame:
-    """日线特征: Enhanced + Advanced + Market (北向资金+大盘可对齐日线)"""
-    base = EnhancedFeatureEngineer.calculate_features(df)
-    adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
-    market = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
-    all_f = pd.concat([base, adv, market], axis=1)
-    drop = CONFIG_DAILY['time_features'] + CONFIG_DAILY['zero_imp_features']
-    keep = [c for c in all_f.columns if c not in drop]
-    return all_f[keep]
-
-
-# ============ 目标计算 (3分类: 0=平/1=涨/2=跌) ============
-def calculate_target_30m(df: pd.DataFrame, horizon: int = None, threshold: float = None) -> np.ndarray:
-    """30分钟3分类目标: 0=持有 1=买入 2=卖出
-    ret > +threshold → 1 (买入), ret < -threshold → 2 (卖出), 其余 → 0 (持有)
-    """
-    if horizon is None: horizon = CONFIG_30M['horizon']
-    if threshold is None: threshold = CONFIG_30M['threshold']
-    close = df['close'].values.astype(float)
-    target = np.full(len(close), -1)
-    returns = pd.Series(close).pct_change()
-    vol = returns.rolling(20).std().values
-    median_vol = np.nanmedian(vol)
-    for i in range(len(close) - horizon - 1):
-        if i < 20 or np.isnan(vol[i]):
-            continue
-        adj_threshold = threshold * (vol[i] / median_vol) if median_vol > 0 else threshold
-        future_ret = (close[i + horizon] - close[i]) / close[i]
-        if future_ret > adj_threshold:
-            target[i] = 1   # 买入
-        elif future_ret < -adj_threshold:
-            target[i] = 2   # 卖出
-        else:
-            target[i] = 0   # 持有
-    return target
-
-
-def calculate_target_daily(df: pd.DataFrame, horizon: int = None, threshold: float = None) -> np.ndarray:
-    """日线2分类极值: 1=涨超阈值 0=跌超阈值 -1=震荡(训练时过滤)
-    只学极端行情，中间震荡不参与训练，信号更干净
-    """
-    if horizon is None: horizon = CONFIG_DAILY['horizon']
-    if threshold is None: threshold = CONFIG_DAILY['threshold']
-    close = df['close'].values.astype(float)
-    target = np.full(len(close), -1)
-    for i in range(len(close) - horizon):
-        future_ret = (close[i + horizon] - close[i]) / close[i]
-        if future_ret > threshold:
-            target[i] = 1   # 上涨
-        elif future_ret < -threshold:
-            target[i] = 0   # 下跌
-        # 中间震荡 → -1, 训练时过滤
-    return target
-
-
-# ============ 数据准备 ============
-def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np.ndarray, np.ndarray, List[str], List[np.ndarray]]:
-    """准备训练数据, 返回 (X, y, feature_names, raw_closes)
-    raw_closes 用于 Optuna 搜索 horizon/threshold 时重新计算目标
-    """
-    cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
-    target_fn = calculate_target_30m if model_type == '30m' else calculate_target_daily
-
-    sample_df = list(all_data.values())[0]
-    first_symbol = list(all_data.keys())[0]
-    if model_type == 'daily':
-        sample_features = compute_features_daily(sample_df, symbol=first_symbol)
-    else:
-        sample_features = compute_features_30m(sample_df)
-    feature_names = list(sample_features.columns)
-    print(f"特征数: {len(feature_names)}")
-    if model_type == 'daily':
-        market_feats = [c for c in feature_names if c.startswith('north_') or c.startswith('market_') or c.startswith('sector_')]
-        if market_feats:
-            print(f"  含北向/市场特征: {market_feats}")
-
-    all_X, all_y, all_closes = [], [], []
-    for i, (symbol, df) in enumerate(all_data.items()):
-        try:
-            if model_type == 'daily':
-                features = compute_features_daily(df, symbol=symbol)
-            else:
-                features = compute_features_30m(df)
-            target = target_fn(df)
-            mask_features = features.isna().any(axis=1).values
-            mask_target = (target >= 0)
-            valid_mask = ~mask_features & mask_target
-            features_valid = features.iloc[valid_mask].iloc[cfg['min_history']:]
-            target_valid = target[valid_mask][cfg['min_history']:]
-            closes_valid = df['close'].values.astype(float)[valid_mask][cfg['min_history']:]
-            features_valid = features_valid.fillna(0)
-            if len(features_valid) > 30:
-                all_X.append(features_valid.values)
-                all_y.append(target_valid)
-                all_closes.append(closes_valid)
+                df = df.sort_values('date').reset_index(drop=True)
+                data[sym] = df
         except Exception:
-            pass
+            continue
+    conn.close()
+    print(f"加载了 {len(data)} 只股票 (表: {table})")
+    return data
+
+
+def prepare_data(data: Dict, cfg: dict, conn) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """准备回归训练数据 — 目标为连续收益率"""
+    X_list, y_list, feature_names = [], [], None
+    sent_df = load_sentiment(conn)
+    has_sent = len(sent_df) > 0
+    if has_sent:
+        print(f" 含情绪特征")
+    success = 0
+    horizon = cfg['horizon']
+
+    for i, (sym, df) in enumerate(data.items()):
+        try:
+            feats = compute_features(df, sym, cfg)
+            if feature_names is None:
+                feature_names = list(feats.columns)
+
+            close = df['close'].values.astype(float)
+            target = np.full(len(close), np.nan)
+            for j in range(len(close) - horizon):
+                target[j] = (close[j + horizon] - close[j]) / close[j]
+
+            # 合并情绪特征
+            if has_sent:
+                dates = df['date'].dt.strftime('%Y-%m-%d')
+                sent = sent_df[sent_df['symbol'] == sym].set_index('date')
+                for col in sent.columns:
+                    if col not in ('symbol', 'date'):
+                        feats[f'sent_{col}'] = dates.map(lambda d: sent.loc[d, col] if d in sent.index else 0).fillna(0).values
+                feature_names = list(feats.columns)
+
+            feats = feats.fillna(method='ffill').fillna(0)
+            valid = ~np.isnan(target)
+            feats_v, target_v = feats[valid], target[valid]
+            if len(feats_v) > cfg['min_history']:
+                feats_v, target_v = feats_v.iloc[cfg['min_history']:], target_v[cfg['min_history']:]
+            if len(feats_v) > 50:
+                X_list.append(feats_v.values)
+                y_list.append(target_v)
+                success += 1
+        except Exception:
+            continue
         if (i + 1) % 100 == 0:
-            print(f"  处理 {i+1}/{len(all_data)} 只股票...")
+            print(f"  处理 {i+1}/{len(data)} 只 (成功{success})")
 
-    X = np.vstack(all_X)
-    y = np.concatenate(all_y)
-    unique, counts = np.unique(y, return_counts=True)
-    dist = {int(k): int(v) for k, v in zip(unique, counts)}
-    print(f"\n训练数据: {len(X)} 条")
-    print(f"  类别分布: {dist}")
-    return X, y, feature_names, all_closes
+    if not X_list:
+        return None, None, None
+    X = np.vstack(X_list)
+    y = np.concatenate(y_list)
+    valid = np.abs(y) < 0.15
+    X, y = X[valid], y[valid]
+
+    print(f"\n训练数据: {len(X):,}条, 特征: {len(feature_names)}, "
+          f"目标: mean={y.mean():.4f}, std={y.std():.4f}")
+    return X, y, feature_names
 
 
-# ============ Optuna 超参搜索 ============
-def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
-                         model_type: str, feature_names: List[str],
-                         n_trials: int = 100) -> Dict:
-    """Optuna 超参数搜索 (9个参数: 7模型 + horizon + threshold)
-    
-    使用 TPESampler + MedianPruner 剪枝，2折CV加速搜索
-    X: 预计算的特征矩阵 (不变)
-    all_closes: 各股票的原始收盘价列表 (用于按 trial 的 horizon/threshold 重算目标)
-    返回 (best_params, best_y)
-    """
-    if not HAS_OPTUNA:
-        print("⚠ optuna 未安装，使用默认参数")
-        cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
-        return {**cfg['default_params'], 'horizon': cfg['horizon'], 'threshold': cfg['threshold'],
-                'n_estimators': cfg['n_estimators']}, None
+# ============ 模型训练 ============
+def train(X: np.ndarray, y: np.ndarray, feature_names: List[str],
+          cfg: dict, quick: bool = False) -> Dict:
+    import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-    cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
-    ps = cfg['optuna_params']
-    # 搜索时用2折CV加速，最终训练才用5折
-    tscv = TimeSeriesSplit(n_splits=2)
-    n_params = len(ps)
-    target_fn = calculate_target_30m if model_type == '30m' else calculate_target_daily
+    n_trials = 20 if quick else cfg['optuna_trials']
+    tscv = TimeSeriesSplit(n_splits=5, gap=cfg['purged_gap'])
+
+    print(f"\nOptuna超参搜索 ({n_trials}次, "
+          f"5折PurgedCV(gap={cfg['purged_gap']}), 目标=Spearman)...")
+
+    # 搜索用80%数据
+    split = int(len(X) * 0.8)
+    X_s, y_s = X[:split], y[:split]
 
     def objective(trial):
-        # 1. 预测目标
-        horizon = trial.suggest_int('horizon', *ps['horizon'])
-        threshold = trial.suggest_float('threshold', *ps['threshold'])
-
-        # 2. 用 trial 的 horizon/threshold 重新计算目标
-        y_trial = _rebuild_targets(all_closes, horizon, threshold, target_fn)
-        X_trial = X[:len(y_trial)]
-
-        # 3. 搜索时降采样加速 (数据量够大，参数排名不变)
-        if cfg.get('search_sample', 0) < 1.0 and len(X_trial) > 100000:
-            n_sample = int(len(X_trial) * cfg['search_sample'])
-            idx = np.random.RandomState(42 + trial.number).choice(len(X_trial), n_sample, replace=False)
-            X_trial, y_trial = X_trial[idx], y_trial[idx]
-
-        # 4. 模型参数 (7个核心 + 固定值)
-        params = {
-            'num_leaves': trial.suggest_int('num_leaves', *ps['num_leaves']),
-            'max_depth': trial.suggest_int('max_depth', *ps['max_depth']),
-            'min_child_samples': trial.suggest_int('min_child_samples', *ps['min_child_samples']),
-            'subsample': trial.suggest_float('subsample', *ps['subsample']),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', *ps['colsample_bytree']),
-            'learning_rate': trial.suggest_float('learning_rate', *ps['learning_rate'], log=True),
-            'reg_alpha': trial.suggest_float('reg_alpha', *ps['reg_alpha']),
-            # 固定值
-            'min_split_gain': 0.01,
-            'subsample_freq': 5,
-            'max_bin': 255 if model_type == '30m' else 127,
-            'reg_lambda': 0.5,
-            # 搜索时用更少的树和更快的早停
-            'n_estimators': cfg.get('search_n_estimators', 500),
-            'num_class': cfg['num_class'],
-            'objective': cfg['objective'], 'metric': cfg['metric'],
-            'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1, 'random_state': 42,
+        p = {
+            'objective': 'regression_l1', 'metric': 'mae',
+            'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1,
+            'random_state': 42, 'n_estimators': cfg['search_estimators'],
+            'num_leaves': trial.suggest_int('num_leaves', 31, 255),
+            'max_depth': trial.suggest_int('max_depth', 5, 12),
+            'min_child_samples': trial.suggest_int('min_child_samples', 10, 200),
+            'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.1, log=True),
+            'subsample': trial.suggest_float('subsample', 0.5, 0.95),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.4, 0.95),
+            'subsample_freq': trial.suggest_int('subsample_freq', 1, 7),
+            'reg_alpha': trial.suggest_float('reg_alpha', 1e-4, 1.0, log=True),
+            'reg_lambda': trial.suggest_float('reg_lambda', 1e-4, 1.0, log=True),
+            'min_split_gain': trial.suggest_float('min_split_gain', 0.0, 1.0),
         }
+        # 采样加速
+        if cfg['search_sample'] < 1.0 and len(X_s) > 100000:
+            n = int(len(X_s) * cfg['search_sample'])
+            idx = np.random.RandomState(42 + trial.number).choice(len(X_s), n, replace=False)
+            Xt, yt = X_s[idx], y_s[idx]
+        else:
+            Xt, yt = X_s, y_s
 
-        # 5. 2折交叉验证 (带剪枝)
         scores = []
-        for fold, (train_idx, test_idx) in enumerate(tscv.split(X_trial)):
-            X_train, X_test = X_trial[train_idx], X_trial[test_idx]
-            y_train, y_test = y_trial[train_idx], y_trial[test_idx]
-            model = lgb.LGBMClassifier(**params)
-            model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
-                      callbacks=[lgb.early_stopping(cfg.get('search_early_stopping', 50), verbose=False),
-                                 lgb.log_evaluation(period=0)])
-            fold_score = f1_score(y_test, model.predict(X_test), average='macro') if cfg['num_class'] > 2 else accuracy_score(y_test, model.predict(X_test))
-            scores.append(fold_score)
-            trial.report(fold_score, step=fold)
-            if trial.should_prune():
-                raise optuna.TrialPruned()
-        return np.mean(scores)
+        for tr, te in TimeSeriesSplit(n_splits=3, gap=cfg['purged_gap']).split(Xt):
+            m = lgb.LGBMRegressor(**p)
+            m.fit(Xt[tr], yt[tr], eval_set=[(Xt[te], yt[te])],
+                  callbacks=[lgb.early_stopping(30, verbose=False)])
+            pred = m.predict(Xt[te])
+            if len(pred) > 2:
+                corr, _ = spearmanr(pred, yt[te])
+                scores.append(corr if not np.isnan(corr) else 0)
+            else:
+                scores.append(0)
+        return np.mean(scores) if scores else 0
 
-    # 采样器: TPE + 多变量核密度估计
-    sampler = optuna.samplers.TPESampler(seed=42, multivariate=True, n_startup_trials=10)
-    # 剪枝器: 低于中位数就停
-    pruner = optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=1)
-
-    print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数, 2折CV, 采样{cfg.get('search_sample',1)*100:.0f}%, 带剪枝)...")
-    study = optuna.create_study(direction='maximize', sampler=sampler, pruner=pruner)
+    study = optuna.create_study(direction='maximize', pruner=optuna.pruners.MedianPruner())
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 
-    pruned = len([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED])
-    print(f"  完成: {len(study.trials)}/{n_trials} (剪枝: {pruned})")
+    best_val = study.best_value
+    print(f"\n最优Spearman: {best_val:.4f}")
+    for k, v in study.best_params.items():
+        print(f"  {k}: {v}")
 
-    best = dict(study.best_params)
-    best['min_split_gain'] = 0.01
-    best['subsample_freq'] = 5
-    best['max_bin'] = 255 if model_type == '30m' else 127
-    best['reg_lambda'] = 0.5
-    best['n_estimators'] = cfg['n_estimators']
-    best['num_class'] = cfg['num_class']
-    best['objective'] = cfg['objective']
-    best['metric'] = cfg['metric']
-    best['boosting_type'] = 'gbdt'
-    best['verbosity'] = -1
-    best['n_jobs'] = -1
+    # ====== 5折CV ======
+    final_p = {
+        'objective': 'regression_l1', 'metric': 'mae',
+        'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1,
+        'random_state': 42, 'n_estimators': cfg['n_estimators'],
+    }
+    final_p.update(study.best_params)
 
-    # 用最优 horizon/threshold 重建最终 y
-    best_y = _rebuild_targets(all_closes, best['horizon'], best['threshold'], target_fn)
+    print(f"\n5折Purged交叉验证...")
+    cv_s, cv_r, cv_m, models = [], [], [], []
+    for fold, (tr, te) in enumerate(tscv.split(X)):
+        m = lgb.LGBMRegressor(**final_p)
+        m.fit(X[tr], y[tr], eval_set=[(X[te], y[te])],
+              callbacks=[lgb.early_stopping(cfg['early_stopping'], verbose=False)])
+        pred = m.predict(X[te])
+        rmse = np.sqrt(mean_squared_error(y[te], pred))
+        mae = mean_absolute_error(y[te], pred)
+        corr, _ = spearmanr(pred, y[te])
+        if np.isnan(corr): corr = 0
+        cv_s.append(corr); cv_r.append(rmse); cv_m.append(mae); models.append(m)
+        print(f"  Fold {fold+1}: Spearman={corr:.4f}, RMSE={rmse:.4f}, MAE={mae:.4f}")
 
-    print(f"\n最优参数 ({model_type}):")
-    for k in sorted(ps.keys()):
-        print(f"  {k}: {best[k]}")
-    print(f"最优CV F1-macro: {study.best_value:.4f}")
-    unique, counts = np.unique(best_y, return_counts=True)
-    print(f"最终训练样本: {len(best_y)} 条, 分布: {dict(zip(unique.astype(int), counts))}")
-    return best, best_y
+    avg_s, avg_r, avg_m = np.mean(cv_s), np.mean(cv_r), np.mean(cv_m)
+    print(f"\n平均: Spearman={avg_s:.4f}, RMSE={avg_r:.4f}, MAE={avg_m:.4f}")
 
+    # ====== 特征选择 ======
+    if len(feature_names) > 20:
+        v = int(len(X) * 0.8)
+        Xp = X[:v]
+        # 去冗余
+        cm = np.corrcoef(Xp.T)
+        rm = set()
+        for i in range(len(feature_names)):
+            for j in range(i + 1, len(feature_names)):
+                if abs(cm[i, j]) > 0.95 and i not in rm and j not in rm:
+                    rm.add(j)
+        if rm:
+            keep = np.ones(len(feature_names), dtype=bool)
+            keep[list(rm)] = False
+            X, feature_names = X[:, keep], [fn for fn, m in zip(feature_names, keep) if m]
+            print(f"特征去冗余: {sum(keep)}/{sum(keep)+len(rm)}")
 
-def _rebuild_targets(all_closes: List[np.ndarray], horizon: int, threshold: float,
-                     target_fn) -> np.ndarray:
-    """用新的 horizon/threshold 重建目标变量"""
-    all_y = []
-    for closes in all_closes:
-        # 构造临时 DataFrame 用于 target_fn
-        df = pd.DataFrame({'close': closes})
-        target = target_fn(df, horizon=horizon, threshold=threshold)
-        # 过滤无效标签
-        valid = target >= 0
-        all_y.append(target[valid])
-    return np.concatenate(all_y)
+        # SelectFromModel
+        sel = lgb.LGBMRegressor(**final_p)
+        sel.fit(Xp[:-50], y[:v][:-50], eval_set=[(Xp[-50:], y[:v][-50:])],
+                callbacks=[lgb.early_stopping(30, verbose=False)])
+        sf = SelectFromModel(sel, threshold='median', prefit=True)
+        X = sf.transform(X)
+        feature_names = [fn for fn, m in zip(feature_names, sf.get_support()) if m]
+        print(f"特征选择: {len(feature_names)} 个")
 
-
-# ============ Bagging 集成训练 ============
-def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: List[str],
-                   model_type: str) -> Dict:
-    """训练 Bagging 集成"""
-    cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
-    n_models = cfg['n_bagging']
-    print(f"\n=== 训练 Bagging 集成 ({n_models} 个子模型) ===")
-
-    tscv = TimeSeriesSplit(n_splits=5)
-    models = []
-    best_iterations = []
-
-    for m_idx in range(n_models):
-        print(f"\n子模型 {m_idx + 1}/{n_models}:")
-        model_params = params.copy()
-        model_params['random_state'] = 42 + m_idx * 7
-        # 子模型微调列采样率增加多样性
-        model_params['colsample_bytree'] = min(0.9, params.get('colsample_bytree', 0.8) + (m_idx % 3) * 0.05)
-
-        cv_scores, fold_iters = [], []
-        for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
-            X_train, X_test = X[train_idx], X[test_idx]
-            y_train, y_test = y[train_idx], y[test_idx]
-            model = lgb.LGBMClassifier(**model_params)
-            model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
-                      callbacks=[lgb.early_stopping(cfg['early_stopping_rounds'], verbose=False),
-                                 lgb.log_evaluation(period=0)])
-            cv_scores.append(f1_score(y_test, model.predict(X_test), average='macro'))
-            fold_iters.append(model.best_iteration_)
-            print(f"  Fold {fold+1}: F1={cv_scores[-1]:.4f}, BestIter={model.best_iteration_}")
-
-        avg_f1 = np.mean(cv_scores)
-        avg_iter = int(np.mean(fold_iters))
-        print(f"  平均: F1={avg_f1:.4f}, BestIter={avg_iter}")
-
-        final_params = model_params.copy()
-        final_params['n_estimators'] = avg_iter
-        final_model = lgb.LGBMClassifier(**final_params)
-        final_model.fit(X, y)
-        models.append(final_model)
-        best_iterations.append(avg_iter)
-
-    # 集成评估
-    print(f"\n=== 集成评估 ===")
-    all_preds = np.array([m.predict(X) for m in models]).T
-    ensemble_pred = np.apply_along_axis(
-        lambda x: Counter(x).most_common(1)[0][0], axis=1, arr=all_preds)
-    
-    is_multiclass = cfg['num_class'] > 2
-    if is_multiclass:
-        ensemble_f1 = f1_score(y, ensemble_pred, average='macro')
-        try:
-            all_probs = np.mean([m.predict_proba(X) for m in models], axis=0)
-            ensemble_auc = roc_auc_score(y, all_probs, multi_class='ovr')
-        except Exception:
-            ensemble_auc = 0.0
-    else:
-        ensemble_f1 = f1_score(y, ensemble_pred)
-        try:
-            probs = np.mean([m.predict_proba(X)[:, 1] for m in models], axis=0)
-            ensemble_auc = roc_auc_score(y, probs)
-        except Exception:
-            ensemble_auc = 0.0
-
-    accs = [accuracy_score(y, all_preds[:, i]) for i in range(all_preds.shape[1])]
-    print(f"  单模型Acc范围: {min(accs):.2%} ~ {max(accs):.2%}")
-    print(f"  集成投票Acc: {accuracy_score(y, ensemble_pred):.2%}, F1: {ensemble_f1:.4f}, AUC: {ensemble_auc:.4f}")
-    if is_multiclass:
-        class_names = ['持有', '买入', '卖出'] if model_type == '30m' else ['震荡', '上涨', '下跌']
-        print(classification_report(y, ensemble_pred, target_names=class_names, zero_division=0))
-    else:
-        print(classification_report(y, ensemble_pred, target_names=['下跌', '上涨'], zero_division=0))
-
-    avg_importance = np.mean([m.feature_importances_ for m in models], axis=0)
-    top_idx = np.argsort(avg_importance)[::-1][:20]
+    # 最终模型
+    final_model = models[-1]
+    imp = final_model.feature_importances_
+    top = np.argsort(imp)[-20:][::-1]
     print(f"\nTop 20 特征:")
-    for i in top_idx:
-        print(f"  {feature_names[i]}: {avg_importance[i]:.0f}")
+    for idx in top:
+        print(f"  {feature_names[idx]}: {imp[idx]:.0f}")
 
-    keep_features = [feature_names[i] for i in range(len(feature_names)) if avg_importance[i] >= 1]
-    print(f"建议保留特征: {len(keep_features)}/{len(feature_names)}")
-
-    # 全部存到 model_data 里
-    cv_metric = np.mean([f1_score(y, all_preds[:, i], average='macro' if is_multiclass else 'binary') for i in range(all_preds.shape[1])])
     return {
-        'models': models,
-        'cv_f1': round(cv_metric, 4),
-        'ensemble_f1': round(ensemble_f1, 4),
-        'ensemble_auc': round(ensemble_auc, 4),
-        'best_iterations': best_iterations,
-        'feature_names': feature_names,
-        'keep_features': keep_features,
-        'n_models': n_models,
-        'horizon': params.get('horizon', cfg['horizon']),
-        'threshold': params.get('threshold', cfg['threshold']),
-        'train_samples': len(X),
-        'train_date': datetime.now().strftime('%Y-%m-%d'),
-        'params': params,
-        'model_type': model_type,
+        'model': final_model, 'feature_names': feature_names,
+        'best_params': study.best_params,
+        'cv_spearman': round(avg_s, 4), 'cv_rmse': round(avg_r, 4),
+        'cv_mae': round(avg_m, 4), 'horizon': cfg['horizon'],
+        'n_features': len(feature_names), 'n_samples': len(X),
     }
 
 
-# ============ 模型保存 ============
-def save_model(model_data: Dict, model_dir: str, model_type: str):
-    """保存模型"""
-    os.makedirs(model_dir, exist_ok=True)
-
-    with open(os.path.join(model_dir, 'model.pkl'), 'wb') as f:
+def save(model_data: Dict, cfg: dict, model_type: str):
+    d = cfg['model_dir']; os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, 'model.pkl'), 'wb') as f:
         pickle.dump(model_data, f)
+    size = os.path.getsize(os.path.join(d, 'model.pkl')) / 1024 / 1024
 
-    labels = {'30m': '30分钟K线', 'daily': '日线K线'}
-    roles = {'30m': '双层架构第二层 — 精确进出场信号', 'daily': '双层架构第一层 — 趋势方向判断'}
-
-    metadata = {
-        "model_name": f"lgb_{model_type}_v1",
-        "version": "1.0",
-        "train_date": model_data['train_date'],
-        "architecture": f"LGBM Bagging ({model_data['n_models']}个子模型投票)",
-        "data": labels.get(model_type, model_type),
-        "target": f"3分类" if is_multiclass else "2分类极值" + f" — 未来{model_data['horizon']}根K线, 阈值±{model_data['threshold']*100}%",
-        "role": roles.get(model_type, ''),
-        "performance": {
-            "cv_f1": model_data['cv_f1'],
-            "ensemble_f1": model_data['ensemble_f1'],
-            "ensemble_auc": model_data['ensemble_auc'],
-        },
-        "n_features": len(model_data['feature_names']),
-        "n_samples": model_data['train_samples'],
+    meta = {
+        'model_type': model_type, 'label': cfg['label'],
+        'horizon': model_data['horizon'],
+        'n_features': model_data['n_features'],
+        'n_samples': model_data['n_samples'],
+        'cv_spearman': model_data['cv_spearman'],
+        'cv_rmse': model_data['cv_rmse'],
+        'cv_mae': model_data['cv_mae'],
+        'best_params': model_data['best_params'],
+        'feature_names': model_data['feature_names'][:50],
+        'trained_at': datetime.now().isoformat(),
+        'role': 'α选股层' if model_type == 'daily' else 'γ择时层',
     }
+    with open(os.path.join(d, 'meta.json'), 'w') as f:
+        json.dump(meta, f, indent=2, ensure_ascii=False)
 
-    with open(os.path.join(model_dir, 'metadata.json'), 'w') as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
-
-    model_size_mb = os.path.getsize(os.path.join(model_dir, 'model.pkl')) / 1024 / 1024
-    print(f"\n✅ 模型已保存到 {model_dir}")
-    print(f"   model.pkl: {model_size_mb:.1f} MB")
+    print(f"\n✅ 模型已保存: {d}/model.pkl ({size:.1f} MB)")
+    print(f"  Rank IC: {model_data['cv_spearman']:.4f}")
 
 
-# ============ 主流程 ============
+# ============ 主入口 ============
 def main():
-    parser = argparse.ArgumentParser(description='LGBM 统一训练脚本')
-    parser.add_argument('--model', type=str, default='30m', choices=['30m', 'daily'],
-                        help='模型类型: 30m=30分钟, daily=日线 (默认: 30m)')
-    parser.add_argument('--start', type=str, default=None,
-                        help='数据起始日期 (YYYY-MM-DD)')
-    parser.add_argument('--end', type=str, default=None,
-                        help='数据截止日期 (YYYY-MM-DD)')
-    parser.add_argument('--trials', type=int, default=100,
-                        help='Optuna 搜索次数 (9个参数, 默认: 100)')
-    parser.add_argument('--quick', action='store_true',
-                        help='快速模式 (20次 Optuna, 快速验证用)')
-    parser.add_argument('--no-optuna', action='store_true',
-                        help='跳过 Optuna 超参搜索')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', choices=['daily', '30m'], default='30m')
+    parser.add_argument('--quick', action='store_true')
     args = parser.parse_args()
 
-    cfg = CONFIG_30M if args.model == '30m' else CONFIG_DAILY
-    model_dir = os.path.join(os.path.dirname(__file__), '..', cfg['model_dir'])
-    model_dir = os.path.abspath(model_dir)
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'data/stock_data.db')
-    db_path = os.path.abspath(db_path)
+    cfg = CONFIG_DAILY if args.model == 'daily' else CONFIG_30M
 
-    label = '30分钟' if args.model == '30m' else '日线'
     print("=" * 60)
-    cls = "3分类" if cfg["num_class"] > 2 else "2分类极值"
-    print(f"  LGBM {label}模型训练 ({cls})")
-    print(f"  数据: {cfg['db_table']} | 预测: 未来{cfg['horizon']}根K线")
-    print(f"  阈值: ±{cfg['threshold']*100}% | 集成: {cfg['n_bagging']}子模型")
+    print(f" LGBM {cfg['label']}模型训练 (回归 + 截面排序)")
+    print(f" 预测未来{cfg['horizon']}根K线收益率 | 评估: Rank IC")
     print("=" * 60)
 
-    # 1. 加载数据
-    print(f"\n数据库: {db_path}")
-    all_data = load_data(db_path, cfg['db_table'], args.start, args.end)
-    if not all_data:
-        print("❌ 未加载到数据")
-        return
+    print(f"\n数据库: {DB_PATH}")
+    data = load_data(DB_PATH, cfg['db_table'])
 
-    # 2. 准备特征 (X不变, closes 供 Optuna 重算目标)
-    X, y, feature_names, all_closes = prepare_data(all_data, args.model)
-    if len(X) < cfg['min_samples']:
-        print(f"❌ 数据不足: {len(X)} 条 (需要≥{cfg['min_samples']})")
-        return
+    conn = sqlite3.connect(DB_PATH)
+    X, y, fn = prepare_data(data, cfg, conn)
+    conn.close()
 
-    # 3. Optuna 超参搜索 (含 horizon/threshold)
-    if args.no_optuna:
-        print("\n跳过 Optuna 搜索，使用默认参数")
-        params = {**cfg['default_params'], 'horizon': cfg['horizon'], 'threshold': cfg['threshold'],
-                  'n_estimators': cfg['n_estimators']}
-        # y 保持 prepare_data 的默认值
-    else:
-        n_trials = 20 if args.quick else args.trials
-        print(f"Optuna 搜索: {n_trials}次 {'(快速)' if args.quick else ''}")
-        params, best_y = optimize_hyperparams(X, all_closes, args.model, feature_names, n_trials=n_trials)
-        if best_y is not None:
-            y = best_y
-            X = X[:len(y)]  # 对齐 X 和 y (horizon 变化导致有效样本数变化)
+    if X is None:
+        print("❌ 数据准备失败"); return
 
-    # 4. 训练
-    model_data = train_ensemble(X, y, params, feature_names, args.model)
-
-    # 5. 保存
-    save_model(model_data, model_dir, args.model)
+    md = train(X, y, fn, cfg, quick=args.quick)
+    save(md, cfg, args.model)
 
     print("\n" + "=" * 60)
-    print("  🎉 训练完成!")
+    print(f" 🎉 完成! Rank IC: {md['cv_spearman']:.4f}")
     print("=" * 60)
-    if args.model == '30m':
-        print(f"\nscp {model_dir}/model.pkl root@47.242.158.242:/root/github/stock-quant/python/models/lgb_hs300/")
-    else:
-        print(f"\nscp {model_dir}/model.pkl root@47.242.158.242:/root/github/stock-quant/python/models/lgb_daily/")
-        print(f"scp strategy/train.py root@47.242.158.242:/root/github/stock-quant/python/strategy/")
-    print(f"\n回测: python lgbm_backtest.py")
 
 
 if __name__ == '__main__':

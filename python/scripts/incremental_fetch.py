@@ -26,6 +26,64 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 TUSHARE_TOKEN = '7a9014b18909e8cbce5109d7175f7b21ce37354eaff2371db0da2c58'
 
 
+def init_schema(conn):
+    """确保所有必要的表存在"""
+    conn.execute('''CREATE TABLE IF NOT EXISTS stock_sector (
+        symbol TEXT PRIMARY KEY,
+        name TEXT,
+        industry TEXT,
+        sector_code TEXT,
+        updated_at TEXT
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS north_flow (
+        trade_date TEXT PRIMARY KEY,
+        north_net REAL,
+        north_buy REAL,
+        north_cum REAL,
+        sz_net REAL,
+        sz_buy REAL,
+        sz_cum REAL,
+        total_net REAL,
+        total_buy REAL,
+        updated_at TEXT
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS hs300_daily (
+        trade_date TEXT PRIMARY KEY,
+        open REAL,
+        close REAL,
+        high REAL,
+        low REAL,
+        volume REAL,
+        amount REAL,
+        pct_chg REAL
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS kline_daily (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL,
+        date TEXT NOT NULL,
+        open REAL,
+        high REAL,
+        low REAL,
+        close REAL,
+        volume REAL,
+        UNIQUE(symbol, date)
+    )''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_kline_daily_symbol ON kline_daily(symbol)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_kline_daily_date ON kline_daily(date)')
+    conn.execute('''CREATE TABLE IF NOT EXISTS kline_30m (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL,
+        time TEXT NOT NULL,
+        open REAL,
+        high REAL,
+        low REAL,
+        close REAL,
+        volume REAL,
+        UNIQUE(symbol, time)
+    )''')
+    conn.commit()
+
+
 def get_status(conn):
     """检查当前数据完成状态"""
     status = {}
@@ -257,6 +315,7 @@ def step_north_flow(conn):
 
 def main():
     conn = sqlite3.connect(DB_PATH)
+    init_schema(conn)
     status = get_status(conn)
     
     print("当前数据状态:")
