@@ -185,8 +185,8 @@ def load_data(db_path: str, table: str, start_date: str = None, end_date: str = 
                 for col in ['open', 'high', 'low', 'close', 'volume']:
                     df[col] = df[col].astype(float)
                 all_data[symbol] = df
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  ⚠ 跳过 {symbol}: {e}")
 
     print(f"加载了 {len(all_data)} 只股票 (表: {table})")
     if start_date or end_date:
