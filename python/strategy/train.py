@@ -60,8 +60,8 @@ CONFIG_30M = {
     'search_early_stopping': 50,      # Optuna搜索时早停
     'search_sample': 0.25,            # Optuna搜索时采样比例 (25%)
     'num_class': 3,                   # 3分类: 0=持有 1=买入 2=卖出
-    'objective': 'multiclass',
-    'metric': 'multi_logloss',
+    'objective': 'binary',
+    'metric': 'binary_logloss',
     'time_features': ['day_of_week', 'day_of_month', 'hour', 'minute',
                       'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour'],
     'zero_imp_features': [
@@ -97,18 +97,19 @@ CONFIG_30M = {
         'learning_rate': 0.02, 'reg_alpha': 0.6,
         'min_split_gain': 0.01, 'subsample_freq': 5,
         'max_bin': 255, 'reg_lambda': 0.5,
-        'num_class': 3, 'objective': 'multiclass', 'metric': 'multi_logloss',
+        'num_class': 2, 'objective': 'binary', 'metric': 'binary_logloss',
     },
 }
 
 # ============ 日线模型配置 ============
-# 数据: kline_daily, ~97万条, ~130个特征 (Enhanced+Advanced+Market, 含北向资金)
-# 数据量小、特征多，偏保守防过拟合，正则化更强
+# 数据: kline_daily, ~97万条, ~120个特征 (Enhanced+Advanced+Market, 含北向资金)
+# 2分类极值预测: 只学涨>threshold vs 跌<-threshold, 中间震荡过滤掉
+# 信号更干净，避免3分类在日线上的噪声问题
 CONFIG_DAILY = {
     'db_table': 'kline_daily',
     'model_dir': 'models/lgb_daily',
     'horizon': 5,
-    'threshold': 0.02,
+    'threshold': 0.025,
     'n_bagging': 3,
     'min_history': 120,
     'min_samples': 200,
@@ -117,17 +118,17 @@ CONFIG_DAILY = {
     'search_n_estimators': 500,       # Optuna搜索时树数 (加速)
     'search_early_stopping': 50,      # Optuna搜索时早停
     'search_sample': 0.5,             # Optuna搜索时采样比例 (50%, 日线数据少)
-    'num_class': 3,                   # 3分类: 0=震荡 1=上涨 2=下跌
-    'objective': 'multiclass',
-    'metric': 'multi_logloss',
+    'num_class': 2,                   # 2分类: 0=下跌 1=上涨 (极值)
+    'objective': 'binary',
+    'metric': 'binary_logloss',
     'time_features': ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start'],
     'zero_imp_features': [],
     # Optuna 搜索参数 — 9个核心参数，默认100次搜索
     # 固定值: min_split_gain=0.01, subsample_freq=3, max_bin=127, reg_lambda=0.5
     'optuna_params': {
         # 预测目标 — 日线周期更长
-        'horizon':          (3, 20),         # 预测未来N个交易日
-        'threshold':        (0.01, 0.05),    # 涨跌幅阈值
+        'horizon':          (5, 15),         # 预测未来N个交易日
+        'threshold':        (0.02, 0.05),    # 涨跌幅阈值 (2%~5%, 极端行情)
         # 树结构 — 比30m保守
         'num_leaves':       (15, 127),       # 上限更低
         'max_depth':        (3, 10),         # 更浅，防过拟合
@@ -148,7 +149,7 @@ CONFIG_DAILY = {
         'learning_rate': 0.03, 'reg_alpha': 0.5,
         'min_split_gain': 0.01, 'subsample_freq': 3,
         'max_bin': 127, 'reg_lambda': 0.5,
-        'num_class': 3, 'objective': 'multiclass', 'metric': 'multi_logloss',
+        'num_class': 2, 'objective': 'binary', 'metric': 'binary_logloss',
     },
 }
 
@@ -249,8 +250,8 @@ def calculate_target_30m(df: pd.DataFrame, horizon: int = None, threshold: float
 
 
 def calculate_target_daily(df: pd.DataFrame, horizon: int = None, threshold: float = None) -> np.ndarray:
-    """日线3分类趋势: 0=震荡 1=上涨趋势 2=下跌趋势
-    ret > +threshold → 1 (上涨), ret < -threshold → 2 (下跌), 其余 → 0 (震荡)
+    """日线2分类极值: 1=涨超阈值 0=跌超阈值 -1=震荡(训练时过滤)
+    只学极端行情，中间震荡不参与训练，信号更干净
     """
     if horizon is None: horizon = CONFIG_DAILY['horizon']
     if threshold is None: threshold = CONFIG_DAILY['threshold']
@@ -259,11 +260,10 @@ def calculate_target_daily(df: pd.DataFrame, horizon: int = None, threshold: flo
     for i in range(len(close) - horizon):
         future_ret = (close[i + horizon] - close[i]) / close[i]
         if future_ret > threshold:
-            target[i] = 1   # 上涨趋势
+            target[i] = 1   # 上涨
         elif future_ret < -threshold:
-            target[i] = 2   # 下跌趋势
-        else:
-            target[i] = 0   # 震荡
+            target[i] = 0   # 下跌
+        # 中间震荡 → -1, 训练时过滤
     return target
 
 
@@ -390,7 +390,7 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
                       callbacks=[lgb.early_stopping(cfg.get('search_early_stopping', 50), verbose=False),
                                  lgb.log_evaluation(period=0)])
-            fold_score = f1_score(y_test, model.predict(X_test), average='macro')
+            fold_score = f1_score(y_test, model.predict(X_test), average='macro') if cfg['num_class'] > 2 else accuracy_score(y_test, model.predict(X_test))
             scores.append(fold_score)
             trial.report(fold_score, step=fold)
             if trial.should_prune():
@@ -495,20 +495,31 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
     all_preds = np.array([m.predict(X) for m in models]).T
     ensemble_pred = np.apply_along_axis(
         lambda x: Counter(x).most_common(1)[0][0], axis=1, arr=all_preds)
-    # 多分类 AUC (OvR)
-    all_probs = np.mean([m.predict_proba(X) for m in models], axis=0)
-    ensemble_f1 = f1_score(y, ensemble_pred, average='macro')
-    try:
-        ensemble_auc = roc_auc_score(y, all_probs, multi_class='ovr')
-    except Exception:
-        ensemble_auc = 0.0
+    
+    is_multiclass = cfg['num_class'] > 2
+    if is_multiclass:
+        ensemble_f1 = f1_score(y, ensemble_pred, average='macro')
+        try:
+            all_probs = np.mean([m.predict_proba(X) for m in models], axis=0)
+            ensemble_auc = roc_auc_score(y, all_probs, multi_class='ovr')
+        except Exception:
+            ensemble_auc = 0.0
+    else:
+        ensemble_f1 = f1_score(y, ensemble_pred)
+        try:
+            probs = np.mean([m.predict_proba(X)[:, 1] for m in models], axis=0)
+            ensemble_auc = roc_auc_score(y, probs)
+        except Exception:
+            ensemble_auc = 0.0
 
-    # 每个模型的准确率 (all_preds.shape = (n_samples, n_models))
     accs = [accuracy_score(y, all_preds[:, i]) for i in range(all_preds.shape[1])]
     print(f"  单模型Acc范围: {min(accs):.2%} ~ {max(accs):.2%}")
-    print(f"  集成投票Acc: {accuracy_score(y, ensemble_pred):.2%}, F1-macro: {ensemble_f1:.4f}, AUC: {ensemble_auc:.4f}")
-    class_names = ['持有', '买入', '卖出'] if model_type == '30m' else ['震荡', '上涨', '下跌']
-    print(classification_report(y, ensemble_pred, target_names=class_names, zero_division=0))
+    print(f"  集成投票Acc: {accuracy_score(y, ensemble_pred):.2%}, F1: {ensemble_f1:.4f}, AUC: {ensemble_auc:.4f}")
+    if is_multiclass:
+        class_names = ['持有', '买入', '卖出'] if model_type == '30m' else ['震荡', '上涨', '下跌']
+        print(classification_report(y, ensemble_pred, target_names=class_names, zero_division=0))
+    else:
+        print(classification_report(y, ensemble_pred, target_names=['下跌', '上涨'], zero_division=0))
 
     avg_importance = np.mean([m.feature_importances_ for m in models], axis=0)
     top_idx = np.argsort(avg_importance)[::-1][:20]
@@ -520,9 +531,10 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
     print(f"建议保留特征: {len(keep_features)}/{len(feature_names)}")
 
     # 全部存到 model_data 里
+    cv_metric = np.mean([f1_score(y, all_preds[:, i], average='macro' if is_multiclass else 'binary') for i in range(all_preds.shape[1])])
     return {
         'models': models,
-        'cv_f1': round(np.mean([f1_score(y, all_preds[:, i], average='macro') for i in range(all_preds.shape[1])]), 4),
+        'cv_f1': round(cv_metric, 4),
         'ensemble_f1': round(ensemble_f1, 4),
         'ensemble_auc': round(ensemble_auc, 4),
         'best_iterations': best_iterations,
@@ -555,7 +567,7 @@ def save_model(model_data: Dict, model_dir: str, model_type: str):
         "train_date": model_data['train_date'],
         "architecture": f"LGBM Bagging ({model_data['n_models']}个子模型投票)",
         "data": labels.get(model_type, model_type),
-        "target": f"3分类 — 未来{model_data['horizon']}根K线, 阈值±{model_data['threshold']*100}%",
+        "target": f"3分类" if is_multiclass else "2分类极值" + f" — 未来{model_data['horizon']}根K线, 阈值±{model_data['threshold']*100}%",
         "role": roles.get(model_type, ''),
         "performance": {
             "cv_f1": model_data['cv_f1'],
@@ -599,7 +611,8 @@ def main():
 
     label = '30分钟' if args.model == '30m' else '日线'
     print("=" * 60)
-    print(f"  LGBM {label}模型训练 (3分类)")
+    cls = "3分类" if cfg["num_class"] > 2 else "2分类极值"
+    print(f"  LGBM {label}模型训练 ({cls})")
     print(f"  数据: {cfg['db_table']} | 预测: 未来{cfg['horizon']}根K线")
     print(f"  阈值: ±{cfg['threshold']*100}% | 集成: {cfg['n_bagging']}子模型")
     print("=" * 60)
