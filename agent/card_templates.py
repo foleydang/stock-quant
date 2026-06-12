@@ -16,6 +16,15 @@ def _fmt_price(value, is_etf=False):
     return f"{value:.2f}"
 
 
+def _fmt_amount(value, is_etf=False):
+    """涨跌额格式化：ETF用3位小数(0.003)，个股用2位(0.52)"""
+    if value is None:
+        return "-"
+    if is_etf or (0 < abs(value) < 1):
+        return f"{abs(value):.3f}"
+    return f"{abs(value):.2f}"
+
+
 
 def make_position_card(summary, positions, t_suggestions=None):
     """持仓概览 - column_set + table布局"""
@@ -129,7 +138,7 @@ def make_stock_card(data):
         {"tag": "column_set", "flex_mode": "none", "background_style": "default",
          "columns": [
              {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**当前价格**\n<font color='{color}'>¥{_fmt_price(price, 'ETF' in name)}</font>"}]},
-             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**涨跌幅**\n<font color='{color}'>{sign}{change_pct:.2f}%</font> ({amount_sign}¥{abs(change_amount):.2f})"}]},
+             {"tag": "column", "width": "weighted", "weight": 1, "elements": [{"tag": "markdown", "content": f"**涨跌幅**\n<font color='{color}'>{sign}{change_pct:.2f}%</font> ({amount_sign}¥{_fmt_amount(change_amount, 'ETF' in name)})"}]},
          ]},
     ]
     if detail:
