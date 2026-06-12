@@ -42,7 +42,7 @@ except ImportError:
     EMAIL_AVAILABLE = False
 
 try:
-    from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+    from strategy.features import EnhancedFeatureEngineer
     FEATURE_ENGINEER_AVAILABLE = True
 except ImportError:
     FEATURE_ENGINEER_AVAILABLE = False
@@ -200,7 +200,7 @@ class TradingMonitor:
 
             # v3 高级特征
             try:
-                from strategy.train_lgb_v3 import AdvancedFeatureEngineer, TIME_FEATURES, ZERO_IMP_FEATURES
+                from strategy.features import AdvancedFeatureEngineer, TIME_FEATURES, ZERO_IMP_FEATURES
                 adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
                 features = pd.concat([features, adv_features], axis=1)
             except Exception:

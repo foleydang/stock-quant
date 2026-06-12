@@ -1,0 +1,558 @@
+#!/usr/bin/env python3
+"""
+增强版 LightGBM 模型训练
+特点：
+1. 更复杂的特征工程（50+特征）
+2. 支持沪深300数据
+3. 交叉验证 + 特征选择
+"""
+
+import os
+import sys
+import numpy as np
+import pandas as pd
+import pickle
+import lightgbm as lgb
+import sqlite3
+from datetime import datetime
+from typing import Dict, List, Tuple, Optional
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.metrics import accuracy_score, classification_report, precision_recall_fscore_support
+from sklearn.feature_selection import SelectFromModel
+import optuna
+from optuna_integration.lightgbm import LightGBMTunerCV
+import warnings
+warnings.filterwarnings('ignore')
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data/stock_data.db')
+
+
+class EnhancedFeatureEngineer:
+    """增强版特征工程"""
+
+    FEATURE_NAMES = None
+
+    @staticmethod
+    def calculate_features(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        计算增强版特征（50+特征）
+        """
+        features = pd.DataFrame(index=df.index)
+
+        close = df['close'].values.astype(float)
+        high = df['high'].values.astype(float)
+        low = df['low'].values.astype(float)
+        volume = df['volume'].values.astype(float)
+        open_price = df['open'].values.astype(float)
+
+        # ========================================
+        # 1. 收益率特征 (10个)
+        # ========================================
+        for period in [1, 2, 3, 5, 10, 15, 20, 30, 40, 60]:
+            features[f'return_{period}'] = pd.Series(close).pct_change(period)
+
+        # ========================================
+        # 2. 对数收益率 (5个)
+        # ========================================
+        for period in [1, 3, 5, 10, 20]:
+            features[f'log_return_{period}'] = np.log(pd.Series(close) / pd.Series(close).shift(period))
+
+        # ========================================
+        # 3. 波动率特征 (8个)
+        # ========================================
+        returns = pd.Series(close).pct_change()
+        for period in [5, 10, 20, 30, 40, 60, 80, 100]:
+            features[f'volatility_{period}'] = returns.rolling(period).std()
+
+        # Parkinson 波动率
+        features['parkinson_vol'] = np.sqrt(
+            (np.log(pd.Series(high) / pd.Series(low)) ** 2).rolling(20).mean() / (4 * np.log(2))
+        )
+
+        # ========================================
+        # 4. 均线系统 (16个)
+        # ========================================
+        for period in [5, 10, 20, 30, 60, 80, 100, 120]:
+            ma = pd.Series(close).rolling(period).mean()
+            features[f'ma{period}_ratio'] = close / ma - 1
+            features[f'price_above_ma{period}'] = (close > ma).astype(int)
+
+        # 均线交叉
+        for fast, slow in [(5, 10), (10, 20), (20, 60), (60, 120)]:
+            ma_fast = pd.Series(close).rolling(fast).mean()
+            ma_slow = pd.Series(close).rolling(slow).mean()
+            features[f'ma{fast}_ma{slow}'] = ma_fast / ma_slow - 1
+            features[f'ma{fast}_cross_ma{slow}'] = ((ma_fast > ma_slow) & (ma_fast.shift(1) <= ma_slow.shift(1))).astype(int)
+
+        # ========================================
+        # 5. RSI 系列 (4个)
+        # ========================================
+        for period in [6, 14, 24, 50]:
+            delta = pd.Series(close).diff()
+            gain = delta.where(delta > 0, 0).rolling(period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+            rs = gain / (loss + 1e-10)
+            features[f'rsi_{period}'] = 100 - (100 / (1 + rs))
+
+        # RSI 背离
+        rsi_14 = features['rsi_14']
+        price_change = pd.Series(close, index=df.index).diff(20)
+        rsi_change = rsi_14.diff(20)
+        features['rsi_divergence'] = np.where(
+            (price_change.values < 0) & (rsi_change.values > 0), 1,
+            np.where((price_change.values > 0) & (rsi_change.values < 0), -1, 0)
+        )
+
+        # ========================================
+        # 6. MACD (4个)
+        # ========================================
+        ema12 = pd.Series(close).ewm(span=12, adjust=False).mean()
+        ema26 = pd.Series(close).ewm(span=26, adjust=False).mean()
+        macd = ema12 - ema26
+        signal = macd.ewm(span=9, adjust=False).mean()
+        histogram = macd - signal
+
+        features['macd'] = macd
+        features['macd_signal'] = signal
+        features['macd_hist'] = histogram
+        features['macd_hist_slope'] = histogram.diff()
+
+        # MACD 交叉信号
+        features['macd_cross'] = ((macd > signal) & (macd.shift(1) <= signal.shift(1))).astype(int)
+
+        # ========================================
+        # 7. KDJ (5个)
+        # ========================================
+        low_min = pd.Series(low).rolling(9).min()
+        high_max = pd.Series(high).rolling(9).max()
+        rsv = (close - low_min) / (high_max - low_min + 1e-10) * 100
+
+        features['kdj_k'] = rsv.ewm(com=2).mean()
+        features['kdj_d'] = features['kdj_k'].ewm(com=2).mean()
+        features['kdj_j'] = 3 * features['kdj_k'] - 2 * features['kdj_d']
+        features['kdj_cross'] = features['kdj_k'] - features['kdj_d']
+        features['kdj_cross_signal'] = ((features['kdj_k'] > features['kdj_d']) &
+                                        (features['kdj_k'].shift(1) <= features['kdj_d'].shift(1))).astype(int)
+
+        # ========================================
+        # 8. 布林带 (5个)
+        # ========================================
+        for period in [20, 30]:
+            ma = pd.Series(close).rolling(period).mean()
+            std = pd.Series(close).rolling(period).std()
+            upper = ma + 2 * std
+            lower = ma - 2 * std
+
+            features[f'bb_upper_{period}'] = (upper - close) / close
+            features[f'bb_lower_{period}'] = (close - lower) / close
+            features[f'bb_width_{period}'] = (upper - lower) / ma
+            features[f'bb_position_{period}'] = (close - lower) / (upper - lower + 1e-10)
+
+        # ========================================
+        # 9. ATR (3个)
+        # ========================================
+        tr = pd.concat([
+            pd.Series(high) - pd.Series(low),
+            pd.Series(high) - pd.Series(close).shift(1),
+            pd.Series(close).shift(1) - pd.Series(low)
+        ], axis=1).max(axis=1)
+
+        for period in [10, 14, 20]:
+            features[f'atr_{period}'] = tr.rolling(period).mean()
+
+        features['atr_ratio'] = features['atr_14'] / pd.Series(close)
+
+        # ========================================
+        # 10. 成交量特征 (10个)
+        # ========================================
+        vol = pd.Series(volume)
+
+        for period in [5, 10, 20, 30, 60]:
+            features[f'volume_ma{period}'] = vol.rolling(period).mean()
+            features[f'volume_ratio_{period}'] = vol / (features[f'volume_ma{period}'] + 1e-10)
+
+        # 成交量变化率
+        features['volume_change'] = vol.pct_change()
+        features['volume_acceleration'] = features['volume_change'].diff()
+
+        # OBV
+        obv = np.zeros(len(close))
+        obv[0] = volume[0]
+        for i in range(1, len(close)):
+            if close[i] > close[i-1]:
+                obv[i] = obv[i-1] + volume[i]
+            elif close[i] < close[i-1]:
+                obv[i] = obv[i-1] - volume[i]
+            else:
+                obv[i] = obv[i-1]
+
+        features['obv_ma10'] = pd.Series(obv).rolling(10).mean()
+        features['obv_ma30'] = pd.Series(obv).rolling(30).mean()
+        features['obv_trend'] = pd.Series(obv).diff(10)
+
+        # ========================================
+        # 11. 价格形态 (8个)
+        # ========================================
+        # 影线
+        features['upper_shadow'] = (high - np.maximum(open_price, close)) / (close + 1e-10)
+        features['lower_shadow'] = (np.minimum(open_price, close) - low) / (close + 1e-10)
+        features['body_size'] = np.abs(close - open_price) / (close + 1e-10)
+
+        # 跳空
+        features['gap'] = (open_price - pd.Series(close).shift(1)) / (pd.Series(close).shift(1) + 1e-10)
+
+        # 价格位置
+        for period in [10, 20, 60]:
+            high_roll = pd.Series(high).rolling(period).max()
+            low_roll = pd.Series(low).rolling(period).min()
+            features[f'price_position_{period}'] = (close - low_roll) / (high_roll - low_roll + 1e-10)
+            features[f'high_{period}_ratio'] = (close - high_roll) / (high_roll + 1e-10)
+
+        # ========================================
+        # 12. 动量指标 (4个)
+        # ========================================
+        # 动量
+        for period in [5, 10, 20]:
+            features[f'momentum_{period}'] = close - pd.Series(close).shift(period)
+
+        # CCI
+        tp = (pd.Series(high) + pd.Series(low) + pd.Series(close)) / 3
+        features['cci'] = (tp - tp.rolling(20).mean()) / (0.015 * tp.rolling(20).std())
+
+        # ========================================
+        # 13. 交易时段特征 (3个，去掉伪规律日历特征)
+        # ========================================
+        if 'date' in df.columns:
+            dates = pd.to_datetime(df['date'])
+            # 只保留交易时段（早盘/尾盘行为确实不同）和月末效应
+            features['morning_session'] = ((dates.dt.hour >= 9) & (dates.dt.hour < 12)).astype(int)
+            features['afternoon_session'] = ((dates.dt.hour >= 13) & (dates.dt.hour < 15)).astype(int)
+            features['is_month_end'] = dates.dt.is_month_end.astype(int)
+            # 去掉 hour/minute/day_of_week/day_of_month（v1时排Top6-8，是伪规律）
+
+        # ========================================
+        # 14. 趋势强度 (3个)
+        # ========================================
+        # ADX
+        plus_dm = pd.Series(high).diff()
+        minus_dm = pd.Series(low).diff() * -1
+        plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0)
+        minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0)
+
+        atr = features['atr_14']
+        plus_di = 100 * (plus_dm.rolling(14).mean() / (atr + 1e-10))
+        minus_di = 100 * (minus_dm.rolling(14).mean() / (atr + 1e-10))
+        dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di + 1e-10)
+        features['adx'] = dx.rolling(14).mean()
+
+        # 趋势方向
+        features['trend_direction'] = np.where(
+            plus_di.values > minus_di.values, 1, np.where(plus_di.values < minus_di.values, -1, 0)
+        )
+
+        # 趋势强度
+        features['trend_strength'] = features['adx'] * features['trend_direction']
+
+        # 缓存特征名称
+        if EnhancedFeatureEngineer.FEATURE_NAMES is None:
+            EnhancedFeatureEngineer.FEATURE_NAMES = features.columns.tolist()
+
+        return features
+
+
+class MarketFeatureEngineer:
+    """市场/板块特征工程
+    从DB中读取北向资金、大盘涨跌、板块数据，
+    合并到30分钟线DataFrame中。
+    """
+
+    MARKET_FEATURE_NAMES = None
+
+    @staticmethod
+    def calculate_market_features(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame:
+        """
+        计算市场/板块特征（v2优化版）
+        
+        v1问题: market_pct_chg等大盘绝对值排Top5，模型本质是预测大盘涨跌
+        v2改进: 
+        - 去掉纯大盘绝对值特征(market_pct_chg/up_ratio/momentum_3)
+        - 北向资金改为相对值: north_surprise(超预期程度)
+        - 强化个股vs大盘超额特征(alpha/contra_market/vol_ratio等)
+        - 去掉伪规律日历特征(day_of_month/day_of_week/hour/minute)
+        
+        Args:
+            df: 30分钟K线DataFrame，必须有 'date' 列
+            symbol: 股票代码（如 '600036.SH'），用于查询板块映射
+        """
+        features = pd.DataFrame(index=df.index)
+
+        # 1. 从date列提取trade_date
+        if 'date' not in df.columns:
+            return features
+
+        df_dates = pd.to_datetime(df['date'])
+        trade_dates_ymd = df_dates.dt.strftime('%Y-%m-%d')
+        trade_dates_raw8 = df_dates.dt.strftime('%Y%m%d')
+
+        # ====== 大盘数据（内部变量，不直接输出为特征）======
+        market_pct = None
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            min_date_raw8 = trade_dates_raw8.min()
+            max_date_raw8 = trade_dates_raw8.max()
+            hs300_df = pd.read_sql(
+                "SELECT trade_date, pct_chg, avg_pct_chg FROM hs300_daily "
+                f"WHERE trade_date >= '{min_date_raw8}' AND trade_date <= '{max_date_raw8}'",
+                conn
+            )
+            conn.close()
+
+            if len(hs300_df) > 0:
+                pct_col = 'pct_chg' if 'pct_chg' in hs300_df.columns else 'avg_pct_chg'
+                hs300_map = dict(zip(hs300_df['trade_date'], hs300_df[pct_col]))
+                market_pct = trade_dates_raw8.map(hs300_map).fillna(0) / 100  # 转为小数
+        except Exception as e:
+            pass
+
+        # ====== 北向资金（改为相对值：超预期程度）======
+        # 之前north_flow绝对值跟大盘涨跌高度相关
+        # 改为: 当日流入 vs 近期均值 的偏离程度(超预期)
+        north_flow_abs = None
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            min_date_ymd = trade_dates_ymd.min()
+            max_date_ymd = trade_dates_ymd.max()
+            north_df = pd.read_sql(
+                "SELECT trade_date, total_net FROM north_flow "
+                "WHERE total_net IS NOT NULL AND total_net != 0 "
+                f"AND trade_date >= '{min_date_ymd}' AND trade_date <= '{max_date_ymd}'",
+                conn
+            )
+            conn.close()
+
+            if len(north_df) > 0:
+                north_df['total_net_billion'] = north_df['total_net'] / 10000
+                north_df = north_df[north_df['total_net_billion'].abs() < 500]
+                north_map = dict(zip(north_df['trade_date'], north_df['total_net_billion']))
+                north_mapped = trade_dates_ymd.map(north_map)
+                coverage = north_mapped.notna().sum() / len(north_mapped)
+                if coverage >= 0.5:
+                    north_flow_abs = north_mapped.fillna(0)
+        except Exception as e:
+            pass
+
+        if north_flow_abs is not None:
+            # 北向超预期: 当日流入 vs 近2日均值(10根30分钟线≈2天)
+            north_ma = north_flow_abs.rolling(10, min_periods=1).mean()
+            features['north_surprise'] = (north_flow_abs - north_ma) / (north_ma.abs() + 1e-6)
+            features['north_surprise_cum'] = features['north_surprise'].rolling(6, min_periods=1).sum()
+            # 北向方向(0/1): 净流入为正=1
+            features['north_direction'] = (north_flow_abs > 0).astype(int)
+        else:
+            features['north_surprise'] = 0
+            features['north_surprise_cum'] = 0
+            features['north_direction'] = 0
+
+        # ====== 个股vs大盘超额特征（核心：这才是个股的"真实信号"）======
+        if 'close' in df.columns and market_pct is not None:
+            stock_pct = df['close'].pct_change()
+
+            # alpha = 个股涨跌幅 - 大盘涨跌幅
+            features['alpha_vs_market'] = stock_pct - market_pct
+            features['alpha_cum_3'] = features['alpha_vs_market'].rolling(6, min_periods=1).sum()
+            features['alpha_cum_5'] = features['alpha_vs_market'].rolling(10, min_periods=1).sum()
+
+            # 个股是否逆势（强信号）
+            features['contra_market_up'] = ((stock_pct > 0) & (market_pct < 0)).astype(int)
+            features['contra_market_down'] = ((stock_pct < 0) & (market_pct > 0)).astype(int)
+
+            # 个股波动vs大盘波动
+            stock_vol = stock_pct.rolling(20, min_periods=1).std()
+            market_vol = market_pct.rolling(20, min_periods=1).std()
+            features['vol_ratio_vs_market'] = stock_vol / (market_vol + 1e-10)
+
+            # 日内alpha: 从开盘到当前的涨跌 vs 大盘同期
+            if 'open' in df.columns:
+                intraday_stock = (df['close'] - df['open']) / (df['open'] + 1e-10)
+                features['intraday_alpha'] = intraday_stock - market_pct
+        else:
+            features['alpha_vs_market'] = 0
+            features['alpha_cum_3'] = 0
+            features['alpha_cum_5'] = 0
+            features['contra_market_up'] = 0
+            features['contra_market_down'] = 0
+            features['vol_ratio_vs_market'] = 0
+            features['intraday_alpha'] = 0
+
+        # ====== 板块信息 ======
+        try:
+            if symbol:
+                conn = sqlite3.connect(DB_PATH)
+                sector_row = conn.execute(
+                    "SELECT industry FROM stock_sector WHERE symbol=?", (symbol,)
+                ).fetchone()
+                conn.close()
+                industry = sector_row[0] if sector_row else '其他'
+            else:
+                industry = '其他'
+        except:
+            industry = '其他'
+
+        is_strong = any(kw in industry for kw in ['电子', '计算机', '通信', '软件', '医药', '医疗', '电力设备', '电气', '军工', '国防', '汽车', '新能源', '半导体', '芯片', '金融', '保险'])
+        features['sector_is_strong'] = 1 if is_strong else 0
+
+        if MarketFeatureEngineer.MARKET_FEATURE_NAMES is None:
+            MarketFeatureEngineer.MARKET_FEATURE_NAMES = features.columns.tolist()
+
+        return features
+
+
+    @staticmethod
+    def calculate_target(df: pd.DataFrame, horizon: int = 3, threshold: float = 0.008) -> np.ndarray:
+        """
+        计算预测目标 (固定阈值版本, 兼容旧调用)
+        horizon: 预测周期（3根K线 = 90分钟）
+        threshold: 涨跌阈值（0.8%）
+        """
+        close = df['close'].values
+        target = np.zeros(len(close))
+
+        for i in range(len(close) - horizon):
+            ret = (close[i + horizon] - close[i]) / close[i]
+            if ret > threshold:
+                target[i] = 1  # 上涨
+            elif ret < -threshold:
+                target[i] = 0  # 下跌
+            else:
+                target[i] = -1  # 震荡（标记为-1，后续过滤）
+
+        return target
+
+    @staticmethod
+    def calculate_target_adaptive(df: pd.DataFrame, horizon: int = 3) -> np.ndarray:
+        """
+        计算预测目标 (P1修复: 自适应阈值)
+        
+        问题: 固定0.8%阈值对大盘股太宽, 对小盘股太窄
+        修复: threshold = volatility_20 * 0.5, 夹在[0.3%, 2%]
+              茅台日波动~1.5% → threshold=0.75%
+              小盘股日波动~3% → threshold=1.5%
+        """
+        close = df['close'].values
+        target = np.zeros(len(close))
+        
+        # 计算20根K线波动率作为自适应阈值基准
+        returns = pd.Series(close).pct_change()
+        vol_20 = returns.rolling(20).std().fillna(0.008).values
+        
+        for i in range(len(close) - horizon):
+            ret = (close[i + horizon] - close[i]) / close[i]
+            # 自适应阈值: 波动率 × 0.5, 夹在0.3%~2%
+            base_threshold = vol_20[i] * 0.5
+            threshold = np.clip(base_threshold, 0.003, 0.02)
+            
+            if ret > threshold:
+                target[i] = 1  # 上涨
+            elif ret < -threshold:
+                target[i] = 0  # 下跌
+            else:
+                target[i] = -1  # 震荡（标记为-1，后续过滤）
+
+        return target
+
+
+
+# ============ 高级特征 (来自 v3) ============
+
+TIME_FEATURES = ['day_of_week', 'day_of_month', 'hour', 'minute',
+                  'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
+
+ZERO_IMP_FEATURES = [
+    'price_above_ma5', 'price_above_ma10', 'price_above_ma20',
+    'price_above_ma30', 'price_above_ma60', 'price_above_ma80',
+    'price_above_ma100', 'price_above_ma120',
+    'ma5_cross_ma10', 'ma10_cross_ma20', 'ma20_cross_ma60', 'ma60_cross_ma120',
+    'macd_cross', 'kdj_cross_signal', 'inside_bar', 'breakout_20', 'trend_direction',
+]
+
+class AdvancedFeatureEngineer:
+    """高级特征工程 - 在EnhancedFeatureEngineer基础上增加"""
+
+    @staticmethod
+    def calculate_advanced_features(df: pd.DataFrame) -> pd.DataFrame:
+        """计算高级特征"""
+        adv = pd.DataFrame(index=df.index)
+        close = df['close'].values.astype(float)
+        high = df['high'].values.astype(float)
+        low = df['low'].values.astype(float)
+        volume = df['volume'].values.astype(float)
+        open_price = df['open'].values.astype(float)
+
+        # === 1. 价格动量加速度 (5个) ===
+        for period in [3, 5, 10, 20]:
+            ret = pd.Series(close).pct_change(period)
+            adv[f'momentum_accel_{period}'] = ret.diff(3)  # 动量加速度
+
+        # 动量衰减 (近期动量 vs 远期动量差异)
+        mom_short = pd.Series(close).pct_change(5)
+        mom_long = pd.Series(close).pct_change(20)
+        adv['momentum_decay'] = mom_short - mom_long
+
+        # === 2. 成交量剖面 (6个) ===
+        vol = pd.Series(volume)
+        for period in [5, 10, 20]:
+            vol_ma = vol.rolling(period).mean()
+            adv[f'vol_ratio_{period}'] = volume / vol_ma.values
+            adv[f'vol_std_{period}'] = vol.rolling(period).std() / vol_ma.values
+
+        # 成交量趋势 (成交量是否在增加)
+        adv['vol_trend'] = vol.rolling(5).mean() / vol.rolling(20).mean().values
+
+        # 成交量价格背离
+        price_up = (pd.Series(close).diff() > 0).astype(int)
+        vol_up = (vol.diff() > 0).astype(int)
+        adv['vol_price_divergence'] = (price_up != vol_up).rolling(5).mean()
+
+        # === 3. 价格形态 (4个) ===
+        # 内包/外包K线
+        prev_high = pd.Series(high).shift(1)
+        prev_low = pd.Series(low).shift(1)
+        adv['inside_bar'] = ((high <= prev_high) & (low >= prev_low)).astype(int)
+        adv['outside_bar'] = ((high > prev_high) & (low < prev_low)).astype(int)
+
+        # K线实体比例 (红/绿K线)
+        body = close - open_price
+        total_range = high - low + 1e-10
+        adv['body_ratio'] = body / total_range
+        adv['adv_upper_shadow'] = (high - np.maximum(close, open_price)) / total_range
+
+        # === 4. 波动率聚类 (3个) ===
+        # 波动率变化率
+        returns = pd.Series(close).pct_change()
+        vol20 = returns.rolling(20).std()
+        vol5 = returns.rolling(5).std()
+        adv['vol_ratio_5_20'] = vol5 / vol20.values
+
+        # 波动率均值回归信号
+        vol_ma = vol20.rolling(60).mean()
+        adv['vol_vs_mean'] = vol20 / vol_ma.values
+
+        # 高低波动率状态 (1=高波动, 0=低波动)
+        vol_median = vol20.rolling(120).median()
+        adv['high_vol_state'] = (vol20 > vol_median).astype(int)
+
+        # === 5. 支撑/压力相对位置 (3个) ===
+        for period in [20, 60]:
+            period_high = pd.Series(high).rolling(period).max()
+            period_low = pd.Series(low).rolling(period).min()
+            period_range = period_high - period_low + 1e-10
+            adv[f'adv_price_position_{period}'] = (close - period_low) / period_range.values
+
+        # 突破信号 (价格突破20日高点)
+        adv['breakout_20'] = (close > pd.Series(high).rolling(20).max().shift(1)).astype(int)
+
+        # === 6. 连续涨跌 (2个) ===
+        up_days = pd.Series(close).diff()
+        adv['consecutive_up'] = (up_days > 0).rolling(5).sum()
