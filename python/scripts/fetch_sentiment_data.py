@@ -98,7 +98,7 @@ def create_tables(conn):
     conn.commit()
 
 
-def fetch_lhb_data(conn, start_year=2010, end_year=2026):
+def fetch_lhb_data(conn, start_year=2012, end_year=2026):
     """拉取龙虎榜数据 (按月)"""
     import akshare as ak
 
@@ -166,7 +166,7 @@ def fetch_lhb_data(conn, start_year=2010, end_year=2026):
                 failed_months.append(f"{start_date}-{end_date}: {str(e)[:60]}")
                 continue
 
-            time.sleep(0.3)  # 限速
+            time.sleep(0.1)  # 限速
 
     print(f"龙虎榜: {total} 条记录")
     if failed_months:
@@ -232,7 +232,7 @@ def fetch_margin_data(conn, start_year=2015, end_year=2026):
                 except Exception:
                     continue
 
-            time.sleep(0.3)
+            time.sleep(0.1)
 
     print(f"融资融券: {total} 条记录, 失败: {failed}")
 
