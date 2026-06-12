@@ -231,7 +231,7 @@ def fetch_margin_data(conn, start_year=2015, end_year=2026):
 
 def compute_kline_sentiment(conn):
     """从 kline_daily 计算情绪指标 (涨跌停/异常量/异常收益)"""
-    df = pd.read_sql("SELECT symbol, date, close, preclose, pct_chg, volume FROM kline_daily", conn)
+    df = pd.read_sql("SELECT symbol, date, open, high, low, close, volume FROM kline_daily", conn)
     if len(df) == 0:
         print("kline_daily 无数据, 跳过")
         return 0

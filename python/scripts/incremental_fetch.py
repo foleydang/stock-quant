@@ -92,7 +92,7 @@ def get_status(conn):
     try:
         total = conn.execute("SELECT COUNT(*) FROM stock_sector").fetchone()[0]
         others = conn.execute("SELECT COUNT(*) FROM stock_sector WHERE industry='其他'").fetchone()[0]
-        status['sector'] = {'total': total, 'others': others, 'done': others < 20}
+        status['sector'] = {'total': total, 'others': others, 'done': total > 100 and others < 20}
     except:
         status['sector'] = {'total': 0, 'others': 0, 'done': False}
     
@@ -230,8 +230,12 @@ def step_kline_daily(conn):
                 continue
             
             # 只写沪深300成分股
-            symbols_in_db = set(r[0] for r in conn.execute("SELECT DISTINCT symbol FROM kline_30m").fetchall())
-            df_filtered = df[df['ts_code'].isin(symbols_in_db)]
+            # 从stock_sector获取股票列表，若为空则不过滤（用全市场数据）
+            symbols_in_db = set(r[0] for r in conn.execute("SELECT DISTINCT symbol FROM stock_sector").fetchall())
+            if symbols_in_db:
+                df_filtered = df[df['ts_code'].isin(symbols_in_db)]
+            else:
+                df_filtered = df
             
             for _, row in df_filtered.iterrows():
                 conn.execute(
