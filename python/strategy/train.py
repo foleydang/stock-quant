@@ -65,18 +65,21 @@ CONFIG_30M = {
         'ma5_cross_ma10', 'ma10_cross_ma20', 'ma20_cross_ma60', 'ma60_cross_ma120',
         'macd_cross', 'kdj_cross_signal', 'inside_bar', 'breakout_20', 'trend_direction',
     ],
-    # Optuna 搜索参数 — 11个参数，默认100次搜索
+    # Optuna 搜索参数 — 13个参数 (11模型超参 + horizon + threshold), 默认130次搜索
     'optuna_params': {
+        # 预测目标
+        'horizon':          (1, 10),         # 预测未来N根K线 (30分钟~5小时)
+        'threshold':        (0.005, 0.03),   # 涨跌幅阈值 (0.5%~3%)
         # 树结构
         'num_leaves':       (31, 255),       # 大数据集允许更深
-        'max_depth':        (5, 15),         # 深度限制，-1也可但容易过拟合
-        'min_child_samples': (20, 200),      # 叶子最小样本，防止过拟合
-        'min_split_gain':   (0.0, 0.5),      # 分裂最小增益，过滤噪声分裂
+        'max_depth':        (5, 15),         # 深度限制
+        'min_child_samples': (20, 200),      # 叶子最小样本
+        'min_split_gain':   (0.0, 0.5),      # 分裂最小增益
         # 采样
         'subsample':        (0.5, 0.95),     # 行采样 (bagging)
         'subsample_freq':   (1, 10),         # bagging 频率
-        'colsample_bytree': (0.5, 0.95),     # 列采样 (feature fraction)
-        'max_bin':          (127, 511),      # 特征分箱数，大数据用更多bin
+        'colsample_bytree': (0.5, 0.95),     # 列采样
+        'max_bin':          (127, 511),      # 特征分箱数
         # 正则化
         'learning_rate':    (0.005, 0.1),    # 学习率 (log scale)
         'reg_alpha':        (0.0, 2.0),      # L1 正则
@@ -107,8 +110,11 @@ CONFIG_DAILY = {
     'early_stopping_rounds': 100,
     'time_features': ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start'],
     'zero_imp_features': [],
-    # Optuna 搜索参数 — 11个参数，默认100次搜索
+    # Optuna 搜索参数 — 13个参数 (11模型超参 + horizon + threshold), 默认130次搜索
     'optuna_params': {
+        # 预测目标 — 日线周期更长
+        'horizon':          (3, 20),         # 预测未来N个交易日 (3天~1个月)
+        'threshold':        (0.01, 0.05),    # 涨跌幅阈值 (1%~5%)
         # 树结构 — 比30m保守
         'num_leaves':       (15, 127),       # 上限更低
         'max_depth':        (3, 10),         # 更浅，防过拟合
@@ -205,30 +211,29 @@ def compute_features_daily(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame
 
 
 # ============ 目标计算 ============
-def calculate_target_30m(df: pd.DataFrame) -> np.ndarray:
-    """30分钟自适应阈值目标"""
+def calculate_target_30m(df: pd.DataFrame, horizon: int = None, threshold: float = None) -> np.ndarray:
+    """30分钟自适应阈值目标 (horizon/threshold 可被Optuna搜索)"""
+    if horizon is None: horizon = CONFIG_30M['horizon']
+    if threshold is None: threshold = CONFIG_30M['threshold']
     close = df['close'].values.astype(float)
-    horizon = CONFIG_30M['horizon']
-    base_threshold = CONFIG_30M['threshold']
     target = np.full(len(close), -1)
     returns = pd.Series(close).pct_change()
     vol = returns.rolling(20).std().values
     median_vol = np.nanmedian(vol)
-
     for i in range(len(close) - horizon - 1):
         if i < 20 or np.isnan(vol[i]):
             continue
-        adj_threshold = base_threshold * (vol[i] / median_vol) if median_vol > 0 else base_threshold
+        adj_threshold = threshold * (vol[i] / median_vol) if median_vol > 0 else threshold
         future_ret = (close[i + horizon] - close[i]) / close[i]
         target[i] = 1 if future_ret > adj_threshold else 0
     return target
 
 
-def calculate_target_daily(df: pd.DataFrame) -> np.ndarray:
-    """日线固定阈值目标"""
+def calculate_target_daily(df: pd.DataFrame, horizon: int = None, threshold: float = None) -> np.ndarray:
+    """日线固定阈值目标 (horizon/threshold 可被Optuna搜索)"""
+    if horizon is None: horizon = CONFIG_DAILY['horizon']
+    if threshold is None: threshold = CONFIG_DAILY['threshold']
     close = df['close'].values.astype(float)
-    horizon = CONFIG_DAILY['horizon']
-    threshold = CONFIG_DAILY['threshold']
     target = np.full(len(close), -1)
     for i in range(len(close) - horizon):
         future_ret = (close[i + horizon] - close[i]) / close[i]
@@ -237,8 +242,10 @@ def calculate_target_daily(df: pd.DataFrame) -> np.ndarray:
 
 
 # ============ 数据准备 ============
-def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-    """准备训练数据"""
+def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np.ndarray, np.ndarray, List[str], List[np.ndarray]]:
+    """准备训练数据, 返回 (X, y, feature_names, raw_closes)
+    raw_closes 用于 Optuna 搜索 horizon/threshold 时重新计算目标
+    """
     cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
     target_fn = calculate_target_30m if model_type == '30m' else calculate_target_daily
 
@@ -255,7 +262,7 @@ def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np
         if market_feats:
             print(f"  含北向/市场特征: {market_feats}")
 
-    all_X, all_y = [], []
+    all_X, all_y, all_closes = [], [], []
     for i, (symbol, df) in enumerate(all_data.items()):
         try:
             if model_type == 'daily':
@@ -268,10 +275,12 @@ def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np
             valid_mask = ~mask_features & mask_target
             features_valid = features.iloc[valid_mask].iloc[cfg['min_history']:]
             target_valid = target[valid_mask][cfg['min_history']:]
+            closes_valid = df['close'].values.astype(float)[valid_mask][cfg['min_history']:]
             features_valid = features_valid.fillna(0)
             if len(features_valid) > 30:
                 all_X.append(features_valid.values)
                 all_y.append(target_valid)
+                all_closes.append(closes_valid)
         except Exception:
             pass
         if (i + 1) % 100 == 0:
@@ -280,16 +289,22 @@ def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np
     X = np.vstack(all_X)
     y = np.concatenate(all_y)
     print(f"\n训练数据: {len(X)} 条, 正样本率: {y.mean():.1%}")
-    return X, y, feature_names
+    return X, y, feature_names, all_closes
 
 
 # ============ Optuna 超参搜索 ============
-def optimize_hyperparams(X: np.ndarray, y: np.ndarray, model_type: str, n_trials: int = 100) -> Dict:
-    """Optuna 超参数搜索 (11个参数)"""
+def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
+                         model_type: str, feature_names: List[str],
+                         n_trials: int = 130) -> Dict:
+    """Optuna 超参数搜索 (13个参数: 11模型 + horizon + threshold)
+    
+    X: 预计算的特征矩阵 (不变)
+    all_closes: 各股票的原始收盘价列表 (用于按 trial 的 horizon/threshold 重算目标)
+    """
     if not HAS_OPTUNA:
         print("⚠ optuna 未安装，使用默认参数")
         cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
-        return {**cfg['default_params'],
+        return {**cfg['default_params'], 'horizon': cfg['horizon'], 'threshold': cfg['threshold'],
                 'n_estimators': cfg['n_estimators'],
                 'objective': 'binary', 'metric': 'binary_logloss',
                 'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}
@@ -298,28 +313,35 @@ def optimize_hyperparams(X: np.ndarray, y: np.ndarray, model_type: str, n_trials
     ps = cfg['optuna_params']
     tscv = TimeSeriesSplit(n_splits=3)
     n_params = len(ps)
+    target_fn = calculate_target_30m if model_type == '30m' else calculate_target_daily
 
     def objective(trial):
+        # 1. 获取 trial 参数
+        horizon = trial.suggest_int('horizon', *ps['horizon'])
+        threshold = trial.suggest_float('threshold', *ps['threshold'])
+
+        # 2. 用 trial 的 horizon/threshold 重新计算目标
+        y = _rebuild_targets(all_closes, horizon, threshold, target_fn)
+
+        # 3. 模型参数
         params = {
-            # 树结构
             'num_leaves': trial.suggest_int('num_leaves', *ps['num_leaves']),
             'max_depth': trial.suggest_int('max_depth', *ps['max_depth']),
             'min_child_samples': trial.suggest_int('min_child_samples', *ps['min_child_samples']),
             'min_split_gain': trial.suggest_float('min_split_gain', *ps['min_split_gain']),
-            # 采样
             'subsample': trial.suggest_float('subsample', *ps['subsample']),
             'subsample_freq': trial.suggest_int('subsample_freq', *ps['subsample_freq']),
             'colsample_bytree': trial.suggest_float('colsample_bytree', *ps['colsample_bytree']),
             'max_bin': trial.suggest_int('max_bin', *ps['max_bin']),
-            # 正则化
             'learning_rate': trial.suggest_float('learning_rate', *ps['learning_rate'], log=True),
             'reg_alpha': trial.suggest_float('reg_alpha', *ps['reg_alpha']),
             'reg_lambda': trial.suggest_float('reg_lambda', *ps['reg_lambda']),
-            # 固定参数
             'n_estimators': cfg['n_estimators'],
             'objective': 'binary', 'metric': 'binary_logloss',
             'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1, 'random_state': 42,
         }
+
+        # 4. 交叉验证
         scores = []
         for train_idx, test_idx in tscv.split(X):
             X_train, X_test = X[train_idx], X[test_idx]
@@ -331,7 +353,7 @@ def optimize_hyperparams(X: np.ndarray, y: np.ndarray, model_type: str, n_trials
             scores.append(accuracy_score(y_test, model.predict(X_test)))
         return np.mean(scores)
 
-    print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数)...")
+    print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数: 11模型 + horizon + threshold)...")
     study = optuna.create_study(direction='maximize')
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 
@@ -348,6 +370,20 @@ def optimize_hyperparams(X: np.ndarray, y: np.ndarray, model_type: str, n_trials
         print(f"  {k}: {best[k]}")
     print(f"最优CV准确率: {study.best_value:.4f}")
     return best
+
+
+def _rebuild_targets(all_closes: List[np.ndarray], horizon: int, threshold: float,
+                     target_fn) -> np.ndarray:
+    """用新的 horizon/threshold 重建目标变量"""
+    all_y = []
+    for closes in all_closes:
+        # 构造临时 DataFrame 用于 target_fn
+        df = pd.DataFrame({'close': closes})
+        target = target_fn(df, horizon=horizon, threshold=threshold)
+        # 过滤无效标签
+        valid = target >= 0
+        all_y.append(target[valid])
+    return np.concatenate(all_y)
 
 
 # ============ Bagging 集成训练 ============
@@ -414,6 +450,7 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
     keep_features = [feature_names[i] for i in range(len(feature_names)) if avg_importance[i] >= 1]
     print(f"建议保留特征: {len(keep_features)}/{len(feature_names)}")
 
+    # 全部存到 model_data 里
     return {
         'models': models,
         'cv_accuracy': round(np.mean([np.mean(accuracy_score(y, p)) for p in all_preds]), 4),
@@ -423,8 +460,8 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
         'feature_names': feature_names,
         'keep_features': keep_features,
         'n_models': n_models,
-        'horizon': cfg['horizon'],
-        'threshold': cfg['threshold'],
+        'horizon': params.get('horizon', cfg['horizon']),
+        'threshold': params.get('threshold', cfg['threshold']),
         'train_samples': len(X),
         'train_date': datetime.now().strftime('%Y-%m-%d'),
         'params': params,
@@ -477,8 +514,8 @@ def main():
                         help='数据起始日期 (YYYY-MM-DD)')
     parser.add_argument('--end', type=str, default=None,
                         help='数据截止日期 (YYYY-MM-DD)')
-    parser.add_argument('--trials', type=int, default=100,
-                        help='Optuna 搜索次数 (8个参数, 默认: 100)')
+    parser.add_argument('--trials', type=int, default=130,
+                        help='Optuna 搜索次数 (13个参数, 默认: 130)')
     parser.add_argument('--quick', action='store_true',
                         help='快速模式 (20次 Optuna, 快速验证用)')
     parser.add_argument('--no-optuna', action='store_true',
@@ -505,23 +542,26 @@ def main():
         print("❌ 未加载到数据")
         return
 
-    # 2. 准备特征
-    X, y, feature_names = prepare_data(all_data, args.model)
+    # 2. 准备特征 (X不变, closes 供 Optuna 重算目标)
+    X, y, feature_names, all_closes = prepare_data(all_data, args.model)
     if len(X) < cfg['min_samples']:
         print(f"❌ 数据不足: {len(X)} 条 (需要≥{cfg['min_samples']})")
         return
 
-    # 3. Optuna 超参搜索
+    # 3. Optuna 超参搜索 (含 horizon/threshold)
     if args.no_optuna:
         print("\n跳过 Optuna 搜索，使用默认参数")
-        params = {**cfg['default_params'],
+        params = {**cfg['default_params'], 'horizon': cfg['horizon'], 'threshold': cfg['threshold'],
                   'n_estimators': cfg['n_estimators'],
                   'objective': 'binary', 'metric': 'binary_logloss',
                   'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}
     else:
         n_trials = 20 if args.quick else args.trials
         print(f"Optuna 搜索: {n_trials}次 {'(快速)' if args.quick else ''}")
-        params = optimize_hyperparams(X, y, args.model, n_trials=n_trials)
+        params = optimize_hyperparams(X, all_closes, args.model, feature_names, n_trials=n_trials)
+        # 用找到的最优 horizon/threshold 重建目标
+        y = _rebuild_targets(all_closes, params['horizon'], params['threshold'],
+                             calculate_target_30m if args.model == '30m' else calculate_target_daily)
 
     # 4. 训练
     model_data = train_ensemble(X, y, params, feature_names, args.model)
