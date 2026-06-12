@@ -110,7 +110,15 @@ MARKET_KEYWORDS = [
 # 对比关键词
 COMPARE_KEYWORDS = [
     '对比', '比较', 'vs', '哪个好', '哪个更强', '哪个强', '比比',
+    '比', '比一比', '比一下', '对比下', '比较下', '对比一下', '比较一下',
+    'pk', '相比', '哪个更', '谁更', '孰优',
 ]
+
+# 关系词（连接两个股票名，暗示对比意图）
+RELATION_WORDS = ['和', '跟', '与', '同', '以及', '还有']
+
+# 单独出现两字股票名也视为可能的对比倾向
+# 例如："茅台五粮液" → 两个股票名连写 → compare
 
 # 帮助关键词
 HELP_KEYWORDS = [
@@ -175,6 +183,35 @@ def extract_symbol(text: str) -> Optional[str]:
     return None
 
 
+def _extract_multi_symbols(text: str) -> list:
+    """从文本中提取所有股票代码（去重）"""
+    symbols = []
+    # 1. 标准代码格式
+    for p in [r'(\d{6}\.SZ)', r'(\d{6}\.SH)', r'(\d{4,5}\.HK)']:
+        for m in re.finditer(p, text):
+            sym = m.group(1)
+            if sym not in symbols:
+                symbols.append(sym)
+    # 2. 纯数字代码
+    for m in re.finditer(r'\d{6}', text):
+        code = m.group(0)
+        if code.startswith(('0', '3', '1')):
+            sym = f"{code}.SZ"
+        elif code.startswith(('5', '6', '9')):
+            sym = f"{code}.SH"
+        else:
+            continue
+        if sym not in symbols:
+            symbols.append(sym)
+    # 3. 中文简称（按名称长度降序，避免短名误匹配长名的一部分）
+    remaining = text
+    for name, sym in sorted(STOCK_NAME_MAP.items(), key=lambda x: -len(x[0])):
+        if name in remaining:
+            symbols.append(sym)
+            remaining = remaining.replace(name, '\n', 1)
+    return symbols
+
+
 def _has_any(text_lower: str, keywords: list) -> bool:
     """检查文本是否包含任一关键词"""
     return any(k in text_lower for k in keywords)
@@ -201,22 +238,27 @@ def classify_intent(text: str) -> Tuple[str, Dict]:
         return 'portfolio', {}
 
     # ===== 3. 对比（先于个股判断，因为可能包含多个股票名） =====
+    # 显式对比关键词
     if _has_any(text_lower, COMPARE_KEYWORDS):
-        symbols = []
-        for name, sym in sorted(STOCK_NAME_MAP.items(), key=lambda x: -len(x[0])):
-            if name in text:
-                symbols.append(sym)
-        num_matches = re.findall(r'\d{6}', text)
-        for code in num_matches:
-            if code.startswith(('0', '3', '1')):
-                sym = f"{code}.SZ"
-            elif code.startswith(('5', '6', '9')):
-                sym = f"{code}.SH"
-            else:
-                continue
-            if sym not in symbols:
-                symbols.append(sym)
+        symbols = _extract_multi_symbols(text)
         return 'compare', {'symbols': symbols}
+
+    # 关系词 + 多股票名（如：茅台和五粮液、茅台跟五粮液）
+    if _has_any(text_lower, RELATION_WORDS):
+        symbols = _extract_multi_symbols(text)
+        if len(symbols) >= 2:
+            return 'compare', {'symbols': symbols}
+
+    # 多股票名连写（如：茅台五粮液）
+    symbols = _extract_multi_symbols(text)
+    if len(symbols) >= 2:
+        # 剔除股票名后再检查深度/新闻关键词（避免"技术"在"汇川技术"中被误判）
+        clean_text = text
+        for name, sym in sorted(STOCK_NAME_MAP.items(), key=lambda x: -len(x[0])):
+            if name in clean_text:
+                clean_text = clean_text.replace(name, ' ', 1)
+        if not _has_any(clean_text.lower(), DEEP_KEYWORDS + NEWS_KEYWORDS):
+            return 'compare', {'symbols': symbols}
 
     # ===== 4. 个股相关（优先于大盘，避免"港股通互联网"被"港股"误抢） =====
     symbol = extract_symbol(text)
