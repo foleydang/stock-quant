@@ -44,6 +44,8 @@ except ImportError:
     print("⚠ optuna 未安装，跳过超参搜索。安装: pip install optuna")
 
 # ============ 30分钟模型配置 ============
+# 数据: kline_30m, ~410万条, ~110个特征 (Enhanced+Advanced, 无Market)
+# 数据量大，模型可以更深更复杂，Optuna搜索范围宽
 CONFIG_30M = {
     'db_table': 'kline_30m',
     'model_dir': 'models/lgb_hs300',
@@ -52,6 +54,8 @@ CONFIG_30M = {
     'n_bagging': 3,
     'min_history': 150,
     'min_samples': 200,
+    'n_estimators': 2000,             # 大树数，靠 early_stopping 截断
+    'early_stopping_rounds': 100,     # 连续100轮不提升则停止
     'time_features': ['day_of_week', 'day_of_month', 'hour', 'minute',
                       'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour'],
     'zero_imp_features': [
@@ -61,21 +65,36 @@ CONFIG_30M = {
         'ma5_cross_ma10', 'ma10_cross_ma20', 'ma20_cross_ma60', 'ma60_cross_ma120',
         'macd_cross', 'kdj_cross_signal', 'inside_bar', 'breakout_20', 'trend_direction',
     ],
+    # Optuna 搜索参数 — 11个参数，默认100次搜索
     'optuna_params': {
-        'num_leaves': (15, 127),
-        'max_depth': (3, 12),
-        'learning_rate': (0.005, 0.1),
-        'min_child_samples': (10, 100),
-        'feature_fraction': (0.5, 1.0),
-        'bagging_fraction': (0.5, 1.0),
-        'reg_alpha': (0.0, 2.0),
-        'reg_lambda': (0.0, 2.0),
+        # 树结构
+        'num_leaves':       (31, 255),       # 大数据集允许更深
+        'max_depth':        (5, 15),         # 深度限制，-1也可但容易过拟合
+        'min_child_samples': (20, 200),      # 叶子最小样本，防止过拟合
+        'min_split_gain':   (0.0, 0.5),      # 分裂最小增益，过滤噪声分裂
+        # 采样
+        'subsample':        (0.5, 0.95),     # 行采样 (bagging)
+        'subsample_freq':   (1, 10),         # bagging 频率
+        'colsample_bytree': (0.5, 0.95),     # 列采样 (feature fraction)
+        'max_bin':          (127, 511),      # 特征分箱数，大数据用更多bin
+        # 正则化
+        'learning_rate':    (0.005, 0.1),    # 学习率 (log scale)
+        'reg_alpha':        (0.0, 2.0),      # L1 正则
+        'reg_lambda':       (0.0, 2.0),      # L2 正则
+    },
+    # 无Optuna时的默认参数 (基于历史训练最优值)
+    'default_params': {
+        'num_leaves': 63, 'max_depth': 9,
+        'min_child_samples': 60, 'min_split_gain': 0.01,
+        'subsample': 0.85, 'subsample_freq': 5,
+        'colsample_bytree': 0.67, 'max_bin': 255,
+        'learning_rate': 0.02, 'reg_alpha': 0.6, 'reg_lambda': 0.8,
     },
 }
 
 # ============ 日线模型配置 ============
-# 特征集: Enhanced + Advanced + Market (北向资金+大盘+板块)
-# 日线数据量较少(~970K条 vs 30m的4.1M)，参数偏保守
+# 数据: kline_daily, ~97万条, ~130个特征 (Enhanced+Advanced+Market, 含北向资金)
+# 数据量小、特征多，偏保守防过拟合，正则化更强
 CONFIG_DAILY = {
     'db_table': 'kline_daily',
     'model_dir': 'models/lgb_daily',
@@ -84,18 +103,34 @@ CONFIG_DAILY = {
     'n_bagging': 3,
     'min_history': 120,
     'min_samples': 200,
+    'n_estimators': 1000,              # 日线数据少，不需要太多树
+    'early_stopping_rounds': 100,
     'time_features': ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start'],
     'zero_imp_features': [],
-    # 日线含北向资金特征，但数据量少，Optuna范围比30m窄
+    # Optuna 搜索参数 — 11个参数，默认100次搜索
     'optuna_params': {
-        'num_leaves': (15, 63),         # 日线数据少，不用太深
-        'max_depth': (3, 8),            # 偏保守防过拟合
-        'learning_rate': (0.01, 0.08),  # 数据少时学习率稍高
-        'min_child_samples': (20, 120), # 叶子最小样本多一点
-        'feature_fraction': (0.5, 0.9),
-        'bagging_fraction': (0.5, 0.9),
-        'reg_alpha': (0.0, 2.0),
-        'reg_lambda': (0.0, 2.0),
+        # 树结构 — 比30m保守
+        'num_leaves':       (15, 127),       # 上限更低
+        'max_depth':        (3, 10),         # 更浅，防过拟合
+        'min_child_samples': (30, 300),      # 叶子样本更多
+        'min_split_gain':   (0.0, 0.5),
+        # 采样
+        'subsample':        (0.5, 0.9),      # 采样范围偏保守
+        'subsample_freq':   (1, 10),
+        'colsample_bytree': (0.5, 0.9),
+        'max_bin':          (63, 255),       # 数据少，bin不需要太多
+        # 正则化 — 更强
+        'learning_rate':    (0.01, 0.15),    # 数据少时学习率可稍高
+        'reg_alpha':        (0.0, 3.0),      # L1 范围更大
+        'reg_lambda':       (0.0, 3.0),      # L2 范围更大
+    },
+    # 无Optuna时的默认参数
+    'default_params': {
+        'num_leaves': 31, 'max_depth': 6,
+        'min_child_samples': 100, 'min_split_gain': 0.01,
+        'subsample': 0.8, 'subsample_freq': 3,
+        'colsample_bytree': 0.7, 'max_bin': 127,
+        'learning_rate': 0.03, 'reg_alpha': 0.5, 'reg_lambda': 1.0,
     },
 }
 
@@ -249,34 +284,41 @@ def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np
 
 
 # ============ Optuna 超参搜索 ============
-def optimize_hyperparams(X: np.ndarray, y: np.ndarray, model_type: str, n_trials: int = 200) -> Dict:
-    """Optuna 超参数搜索"""
+def optimize_hyperparams(X: np.ndarray, y: np.ndarray, model_type: str, n_trials: int = 100) -> Dict:
+    """Optuna 超参数搜索 (11个参数)"""
     if not HAS_OPTUNA:
         print("⚠ optuna 未安装，使用默认参数")
-        return {
-            'num_leaves': 31, 'max_depth': 7, 'learning_rate': 0.05,
-            'min_child_samples': 20, 'feature_fraction': 0.8,
-            'bagging_fraction': 0.8, 'reg_alpha': 0.1, 'reg_lambda': 0.1,
-            'n_estimators': 500, 'objective': 'binary', 'metric': 'binary_logloss',
-            'boosting_type': 'gbdt', 'bagging_freq': 5, 'verbose': -1, 'random_state': 42, 'n_jobs': -1,
-        }
+        cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
+        return {**cfg['default_params'],
+                'n_estimators': cfg['n_estimators'],
+                'objective': 'binary', 'metric': 'binary_logloss',
+                'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}
 
     cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
-    param_space = cfg['optuna_params']
+    ps = cfg['optuna_params']
     tscv = TimeSeriesSplit(n_splits=3)
+    n_params = len(ps)
 
     def objective(trial):
         params = {
-            'num_leaves': trial.suggest_int('num_leaves', *param_space['num_leaves']),
-            'max_depth': trial.suggest_int('max_depth', *param_space['max_depth']),
-            'learning_rate': trial.suggest_float('learning_rate', *param_space['learning_rate'], log=True),
-            'min_child_samples': trial.suggest_int('min_child_samples', *param_space['min_child_samples']),
-            'feature_fraction': trial.suggest_float('feature_fraction', *param_space['feature_fraction']),
-            'bagging_fraction': trial.suggest_float('bagging_fraction', *param_space['bagging_fraction']),
-            'reg_alpha': trial.suggest_float('reg_alpha', *param_space['reg_alpha']),
-            'reg_lambda': trial.suggest_float('reg_lambda', *param_space['reg_lambda']),
-            'n_estimators': 500, 'objective': 'binary', 'metric': 'binary_logloss',
-            'boosting_type': 'gbdt', 'bagging_freq': 5, 'verbose': -1, 'random_state': 42, 'n_jobs': -1,
+            # 树结构
+            'num_leaves': trial.suggest_int('num_leaves', *ps['num_leaves']),
+            'max_depth': trial.suggest_int('max_depth', *ps['max_depth']),
+            'min_child_samples': trial.suggest_int('min_child_samples', *ps['min_child_samples']),
+            'min_split_gain': trial.suggest_float('min_split_gain', *ps['min_split_gain']),
+            # 采样
+            'subsample': trial.suggest_float('subsample', *ps['subsample']),
+            'subsample_freq': trial.suggest_int('subsample_freq', *ps['subsample_freq']),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', *ps['colsample_bytree']),
+            'max_bin': trial.suggest_int('max_bin', *ps['max_bin']),
+            # 正则化
+            'learning_rate': trial.suggest_float('learning_rate', *ps['learning_rate'], log=True),
+            'reg_alpha': trial.suggest_float('reg_alpha', *ps['reg_alpha']),
+            'reg_lambda': trial.suggest_float('reg_lambda', *ps['reg_lambda']),
+            # 固定参数
+            'n_estimators': cfg['n_estimators'],
+            'objective': 'binary', 'metric': 'binary_logloss',
+            'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1, 'random_state': 42,
         }
         scores = []
         for train_idx, test_idx in tscv.split(X):
@@ -284,25 +326,26 @@ def optimize_hyperparams(X: np.ndarray, y: np.ndarray, model_type: str, n_trials
             y_train, y_test = y[train_idx], y[test_idx]
             model = lgb.LGBMClassifier(**params)
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
-                      callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(period=0)])
+                      callbacks=[lgb.early_stopping(cfg['early_stopping_rounds'], verbose=False),
+                                 lgb.log_evaluation(period=0)])
             scores.append(accuracy_score(y_test, model.predict(X_test)))
         return np.mean(scores)
 
-    print(f"\nOptuna 超参搜索 ({n_trials}次, 8个参数)...")
+    print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数)...")
     study = optuna.create_study(direction='maximize')
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 
-    best = study.best_params
-    best['n_estimators'] = 500
+    best = dict(study.best_params)
+    best['n_estimators'] = cfg['n_estimators']
     best['objective'] = 'binary'
     best['metric'] = 'binary_logloss'
     best['boosting_type'] = 'gbdt'
-    best['bagging_freq'] = 5
-    best['verbose'] = -1
-    best['random_state'] = 42
+    best['verbosity'] = -1
     best['n_jobs'] = -1
 
-    print(f"\n最优参数: {best}")
+    print(f"\n最优参数 ({model_type}):")
+    for k in sorted(ps.keys()):
+        print(f"  {k}: {best[k]}")
     print(f"最优CV准确率: {study.best_value:.4f}")
     return best
 
@@ -323,7 +366,8 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
         print(f"\n子模型 {m_idx + 1}/{n_models}:")
         model_params = params.copy()
         model_params['random_state'] = 42 + m_idx * 7
-        model_params['feature_fraction'] = min(0.9, params['feature_fraction'] + (m_idx % 3) * 0.05)
+        # 子模型微调列采样率增加多样性
+        model_params['colsample_bytree'] = min(0.9, params.get('colsample_bytree', 0.8) + (m_idx % 3) * 0.05)
 
         cv_scores, fold_iters = [], []
         for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
@@ -331,7 +375,8 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
             y_train, y_test = y[train_idx], y[test_idx]
             model = lgb.LGBMClassifier(**model_params)
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
-                      callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(period=0)])
+                      callbacks=[lgb.early_stopping(cfg['early_stopping_rounds'], verbose=False),
+                                 lgb.log_evaluation(period=0)])
             cv_scores.append(accuracy_score(y_test, model.predict(X_test)))
             fold_iters.append(model.best_iteration_)
             print(f"  Fold {fold+1}: Acc={cv_scores[-1]:.4f}, BestIter={model.best_iteration_}")
@@ -469,14 +514,10 @@ def main():
     # 3. Optuna 超参搜索
     if args.no_optuna:
         print("\n跳过 Optuna 搜索，使用默认参数")
-        params = {
-            'num_leaves': 31, 'max_depth': 7, 'learning_rate': 0.05,
-            'min_child_samples': 20, 'feature_fraction': 0.8,
-            'bagging_fraction': 0.8, 'reg_alpha': 0.1, 'reg_lambda': 0.1,
-            'n_estimators': 500, 'objective': 'binary', 'metric': 'binary_logloss',
-            'boosting_type': 'gbdt', 'bagging_freq': 5, 'verbose': -1,
-            'random_state': 42, 'n_jobs': -1,
-        }
+        params = {**cfg['default_params'],
+                  'n_estimators': cfg['n_estimators'],
+                  'objective': 'binary', 'metric': 'binary_logloss',
+                  'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}
     else:
         n_trials = 20 if args.quick else args.trials
         print(f"Optuna 搜索: {n_trials}次 {'(快速)' if args.quick else ''}")
