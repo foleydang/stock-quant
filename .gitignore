@@ -43,3 +43,5 @@ python/data/backup/
 # 日志
 logs/
 *.log
+python/data/stock_data.db
+python/data/*.db
