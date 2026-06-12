@@ -433,7 +433,22 @@ def _search_news_via_api(keyword: str) -> Dict:
     positions_data = get_positions_data()
     news_items = []
     if 'error' not in positions_data:
-        for p in positions_data['positions'][:3]:
+        # 如果传了具体股票关键词，只返回该股票的"新闻"
+        target_positions = positions_data['positions']
+        if keyword:
+            # 尝试匹配持仓股
+            target_positions = [
+                p for p in positions_data['positions']
+                if p['stock_name'] in keyword or p['symbol'] in keyword
+            ]
+            if not target_positions:
+                # 没匹配到持仓，可能是自选股，只返回一条通用结果
+                return {
+                    'news': [{'title': f'{keyword} 搜索', 'snippet': f'暂未找到相关新闻，请稍后重试', 'date': datetime.now().strftime('%Y-%m-%d'), 'url': ''}],
+                    'sentiment': {'summary': '无法获取最新新闻', 'score': 0.5},
+                    'keyword': keyword,
+                }
+        for p in target_positions[:3]:
             news_items.append({
                 'title': f'{p["stock_name"]} 最新行情',
                 'snippet': f'{p["stock_name"]}({p["symbol"]}) 当前¥{p["current_price"]:.2f}, 盈亏{p["profit_pct"]:.1f}%',
