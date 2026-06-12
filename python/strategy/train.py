@@ -300,6 +300,7 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
     
     X: 预计算的特征矩阵 (不变)
     all_closes: 各股票的原始收盘价列表 (用于按 trial 的 horizon/threshold 重算目标)
+    返回 best_params, 同时返回 best_y (供后续训练用)
     """
     if not HAS_OPTUNA:
         print("⚠ optuna 未安装，使用默认参数")
@@ -307,7 +308,7 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
         return {**cfg['default_params'], 'horizon': cfg['horizon'], 'threshold': cfg['threshold'],
                 'n_estimators': cfg['n_estimators'],
                 'objective': 'binary', 'metric': 'binary_logloss',
-                'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}
+                'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}, None
 
     cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
     ps = cfg['optuna_params']
@@ -321,7 +322,8 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
         threshold = trial.suggest_float('threshold', *ps['threshold'])
 
         # 2. 用 trial 的 horizon/threshold 重新计算目标
-        y = _rebuild_targets(all_closes, horizon, threshold, target_fn)
+        y_trial = _rebuild_targets(all_closes, horizon, threshold, target_fn)
+        X_trial = X[:len(y_trial)]  # 对齐 X 和 y
 
         # 3. 模型参数
         params = {
@@ -343,9 +345,9 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
 
         # 4. 交叉验证
         scores = []
-        for train_idx, test_idx in tscv.split(X):
-            X_train, X_test = X[train_idx], X[test_idx]
-            y_train, y_test = y[train_idx], y[test_idx]
+        for train_idx, test_idx in tscv.split(X_trial):
+            X_train, X_test = X_trial[train_idx], X_trial[test_idx]
+            y_train, y_test = y_trial[train_idx], y_trial[test_idx]
             model = lgb.LGBMClassifier(**params)
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
                       callbacks=[lgb.early_stopping(cfg['early_stopping_rounds'], verbose=False),
@@ -365,11 +367,15 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
     best['verbosity'] = -1
     best['n_jobs'] = -1
 
+    # 用最优 horizon/threshold 重建最终 y
+    best_y = _rebuild_targets(all_closes, best['horizon'], best['threshold'], target_fn)
+
     print(f"\n最优参数 ({model_type}):")
     for k in sorted(ps.keys()):
         print(f"  {k}: {best[k]}")
     print(f"最优CV准确率: {study.best_value:.4f}")
-    return best
+    print(f"最终训练样本: {len(best_y)} 条, 正样本率: {best_y.mean():.1%}")
+    return best, best_y
 
 
 def _rebuild_targets(all_closes: List[np.ndarray], horizon: int, threshold: float,
@@ -555,13 +561,14 @@ def main():
                   'n_estimators': cfg['n_estimators'],
                   'objective': 'binary', 'metric': 'binary_logloss',
                   'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}
+        # y 保持 prepare_data 的默认值
     else:
         n_trials = 20 if args.quick else args.trials
         print(f"Optuna 搜索: {n_trials}次 {'(快速)' if args.quick else ''}")
-        params = optimize_hyperparams(X, all_closes, args.model, feature_names, n_trials=n_trials)
-        # 用找到的最优 horizon/threshold 重建目标
-        y = _rebuild_targets(all_closes, params['horizon'], params['threshold'],
-                             calculate_target_30m if args.model == '30m' else calculate_target_daily)
+        params, best_y = optimize_hyperparams(X, all_closes, args.model, feature_names, n_trials=n_trials)
+        if best_y is not None:
+            y = best_y
+            X = X[:len(y)]  # 对齐 X 和 y (horizon 变化导致有效样本数变化)
 
     # 4. 训练
     model_data = train_ensemble(X, y, params, feature_names, args.model)
