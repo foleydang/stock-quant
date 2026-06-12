@@ -373,15 +373,27 @@ def morning_alert():
         except Exception as e:
             logger.warning(f"获取自选行情失败 {w['symbol']}: {e}")
 
-    # 搜索重要财经新闻
+    # 搜索重要财经新闻（华尔街见闻API）
     news_headlines = []
     try:
-        from search import search
-        results = search("A股 股市 重要新闻 今日", count=5)
-        for r in results[:5]:
-            title = r.get('title', '').strip()
-            if title and len(title) > 10:
-                news_headlines.append(title)
+        import requests as req
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+        }
+        r = req.get('https://api-one.wallstcn.com/apiv1/content/lives?channel=global-channel&limit=10',
+                    headers=headers, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get('code') == 20000 and 'data' in data:
+                items = data['data'].get('items', [])
+                for item in items[:6]:
+                    title = item.get('title', '') or item.get('content', '')
+                    if title:
+                        import re as _re
+                        title = _re.sub(r'<[^>]+>', '', title).strip()
+                        if title and len(title) > 8:
+                            news_headlines.append(title)
     except Exception as e:
         logger.warning(f"盘前新闻搜索失败: {e}")
 
@@ -392,7 +404,10 @@ def morning_alert():
     for wp in watchlist_prices:
         sign = "+" if wp['change_pct'] >= 0 else ""
         color = "green" if wp['change_pct'] >= 0 else "red"
-        lines.append(f"- <font color='{color}'>{wp['name']} ¥{wp['price']:.2f} ({sign}{wp['change_pct']:.2f}%)</font>\n")
+        # ETF/低价股显示3位小数，普通股票2位
+        is_etf_or_low = 'ETF' in wp.get('name', '') or wp['price'] < 1.0
+        price_fmt = f"{wp['price']:.3f}" if is_etf_or_low else f"{wp['price']:.2f}"
+        lines.append(f"- <font color='{color}'>{wp['name']} ¥{price_fmt} ({sign}{wp['change_pct']:.2f}%)</font>\n")
 
     if news_headlines:
         lines.append("\n---\n**📰 今日要闻**\n")

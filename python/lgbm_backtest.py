@@ -122,15 +122,16 @@ class LGBMBacktesterOptimized:
         self.time_index_map: Dict[str, Dict[datetime, int]] = {}
 
     def _preload_daily_features(self, all_data: Dict[str, pd.DataFrame]):
-        """预计算日线特征 (双层架构第一层)"""
-        logger.info("\n预计算日线特征...")
+        """预计算日线特征 (双层架构第一层)
+        特征集: Enhanced + Advanced + Market (与训练时一致)
+        """
+        logger.info("\n预计算日线特征 (Enhanced + Advanced + Market)...")
         import sqlite3
         from config_loader import get_db_path
-        from strategy.train import DailyFeatureEngineer
+        from strategy.features import EnhancedFeatureEngineer, AdvancedFeatureEngineer, MarketFeatureEngineer
 
         self.daily_features_cache = {}
         db_path = get_db_path()
-
         daily_feature_names = self.daily_model_data.get('feature_names', [])
 
         symbols = list(all_data.keys())
@@ -150,7 +151,11 @@ class LGBMBacktesterOptimized:
                 for col in ['open', 'high', 'low', 'close', 'volume']:
                     df[col] = df[col].astype(float)
 
-                features = DailyFeatureEngineer.calculate_features(df)
+                # 与训练时一致的增强特征 + 高级特征 + 市场特征
+                base = EnhancedFeatureEngineer.calculate_features(df)
+                adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
+                market = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
+                features = pd.concat([base, adv, market], axis=1)
                 features = features.fillna(0)
 
                 if daily_feature_names:

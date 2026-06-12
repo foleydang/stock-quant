@@ -74,6 +74,8 @@ CONFIG_30M = {
 }
 
 # ============ 日线模型配置 ============
+# 特征集: Enhanced + Advanced + Market (北向资金+大盘+板块)
+# 日线数据量较少(~970K条 vs 30m的4.1M)，参数偏保守
 CONFIG_DAILY = {
     'db_table': 'kline_daily',
     'model_dir': 'models/lgb_daily',
@@ -84,11 +86,12 @@ CONFIG_DAILY = {
     'min_samples': 200,
     'time_features': ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start'],
     'zero_imp_features': [],
+    # 日线含北向资金特征，但数据量少，Optuna范围比30m窄
     'optuna_params': {
-        'num_leaves': (15, 63),
-        'max_depth': (3, 8),
-        'learning_rate': (0.01, 0.1),
-        'min_child_samples': (20, 100),
+        'num_leaves': (15, 63),         # 日线数据少，不用太深
+        'max_depth': (3, 8),            # 偏保守防过拟合
+        'learning_rate': (0.01, 0.08),  # 数据少时学习率稍高
+        'min_child_samples': (20, 120), # 叶子最小样本多一点
         'feature_fraction': (0.5, 0.9),
         'bagging_fraction': (0.5, 0.9),
         'reg_alpha': (0.0, 2.0),
@@ -97,93 +100,11 @@ CONFIG_DAILY = {
 }
 
 
-# ============ 30分钟特征工程 (复用) ============
-from strategy.features import EnhancedFeatureEngineer, AdvancedFeatureEngineer
+# ============ 特征工程 (复用) ============
+from strategy.features import EnhancedFeatureEngineer, AdvancedFeatureEngineer, MarketFeatureEngineer
 
-
-# ============ 日线特征工程 ============
-class DailyFeatureEngineer:
-    """日线级别特征工程"""
-
-    @staticmethod
-    def calculate_features(df: pd.DataFrame) -> pd.DataFrame:
-        close = df['close'].values.astype(float)
-        high = df['high'].values.astype(float)
-        low = df['low'].values.astype(float)
-        volume = df['volume'].values.astype(float)
-        open_price = df['open'].values.astype(float)
-
-        d = {}
-        for period in [1, 3, 5, 10, 20]:
-            d[f'return_{period}d'] = pd.Series(close).pct_change(period)
-        for period in [5, 10, 20, 60, 120]:
-            ma = pd.Series(close).rolling(period).mean()
-            d[f'ma{period}'] = ma
-            d[f'ma{period}_ratio'] = close / ma
-        returns = pd.Series(close).pct_change()
-        for period in [5, 10, 20]:
-            d[f'volatility_{period}d'] = returns.rolling(period).std()
-        vol20 = returns.rolling(20).std()
-        vol60 = returns.rolling(60).std()
-        d['vol_ratio_20_60'] = vol20 / vol60
-        delta = pd.Series(close).diff()
-        gain = delta.where(delta > 0, 0).rolling(14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-        d['rsi_14'] = 100 - (100 / (1 + gain / loss))
-        ema12 = pd.Series(close).ewm(span=12).mean()
-        ema26 = pd.Series(close).ewm(span=26).mean()
-        d['macd'] = ema12 - ema26
-        d['macd_signal'] = d['macd'].ewm(span=9).mean()
-        d['macd_hist'] = d['macd'] - d['macd_signal']
-        ma20 = pd.Series(close).rolling(20).mean()
-        std20 = pd.Series(close).rolling(20).std()
-        d['boll_upper'] = ma20 + 2 * std20
-        d['boll_lower'] = ma20 - 2 * std20
-        d['boll_width'] = (d['boll_upper'] - d['boll_lower']) / ma20
-        d['boll_position'] = (close - d['boll_lower']) / (d['boll_upper'] - d['boll_lower'] + 1e-10)
-        low9 = pd.Series(low).rolling(9).min()
-        high9 = pd.Series(high).rolling(9).max()
-        rsv = (close - low9) / (high9 - low9 + 1e-10) * 100
-        d['k'] = rsv.ewm(com=2).mean()
-        d['d'] = d['k'].ewm(com=2).mean()
-        d['j'] = 3 * d['k'] - 2 * d['d']
-        vol = pd.Series(volume)
-        for period in [5, 10, 20]:
-            d[f'volume_ratio_{period}d'] = volume / vol.rolling(period).mean()
-        d['volume_trend'] = vol.rolling(5).mean() / vol.rolling(20).mean()
-        body = close - open_price
-        total_range = high - low + 1e-10
-        d['body_ratio'] = body / total_range
-        d['upper_shadow'] = (high - np.maximum(close, open_price)) / total_range
-        up_days = (pd.Series(close).diff() > 0).astype(int)
-        d['consecutive_up'] = up_days.rolling(5).sum()
-        d['consecutive_down'] = (up_days == 0).astype(int).rolling(5).sum()
-        tr = np.maximum(high - low, np.abs(high - np.roll(close, 1)), np.abs(low - np.roll(close, 1)))
-        atr14 = pd.Series(tr).rolling(14).mean()
-        plus_dm = np.where((high - np.roll(high, 1)) > (np.roll(low, 1) - low),
-                           np.maximum(high - np.roll(high, 1), 0), 0)
-        minus_dm = np.where((np.roll(low, 1) - low) > (high - np.roll(high, 1)),
-                            np.maximum(np.roll(low, 1) - low, 0), 0)
-        plus_di = 100 * pd.Series(plus_dm).rolling(14).mean() / atr14
-        minus_di = 100 * pd.Series(minus_dm).rolling(14).mean() / atr14
-        d['adx'] = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di + 1e-10)
-        d['di_diff'] = plus_di - minus_di
-        for period in [5, 10, 20]:
-            ret = pd.Series(close).pct_change(period)
-            d[f'momentum_accel_{period}d'] = ret.diff(5)
-        for period in [20, 60, 120]:
-            period_high = pd.Series(high).rolling(period).max()
-            period_low = pd.Series(low).rolling(period).min()
-            period_range = period_high - period_low + 1e-10
-            d[f'price_position_{period}d'] = (close - period_low) / period_range
-        dates = pd.to_datetime(df['date'])
-        d['day_of_week'] = dates.dt.dayofweek
-        d['day_of_month'] = dates.dt.day
-        d['is_month_end'] = (dates.dt.day >= 25).astype(int)
-        d['is_month_start'] = (dates.dt.day <= 5).astype(int)
-
-        features = pd.concat(d, axis=1).fillna(0)
-        return features
+# 日线独有: 北向资金+大盘特征 (命名与基础特征不冲突，直接合并)
+# 30分钟线: 不含 Market (北向资金是日级别的，分到每根30分钟K线无意义)
 
 
 # ============ 数据加载 ============
@@ -228,7 +149,7 @@ def load_data(db_path: str, table: str, start_date: str = None, end_date: str = 
 
 # ============ 特征计算 ============
 def compute_features_30m(df: pd.DataFrame) -> pd.DataFrame:
-    """30分钟特征"""
+    """30分钟特征: Enhanced + Advanced (无Market,北向资金是日级别不适配)"""
     base = EnhancedFeatureEngineer.calculate_features(df)
     adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
     all_f = pd.concat([base, adv], axis=1)
@@ -237,9 +158,12 @@ def compute_features_30m(df: pd.DataFrame) -> pd.DataFrame:
     return all_f[keep]
 
 
-def compute_features_daily(df: pd.DataFrame) -> pd.DataFrame:
-    """日线特征"""
-    all_f = DailyFeatureEngineer.calculate_features(df)
+def compute_features_daily(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame:
+    """日线特征: Enhanced + Advanced + Market (北向资金+大盘可对齐日线)"""
+    base = EnhancedFeatureEngineer.calculate_features(df)
+    adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
+    market = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
+    all_f = pd.concat([base, adv, market], axis=1)
     drop = CONFIG_DAILY['time_features'] + CONFIG_DAILY['zero_imp_features']
     keep = [c for c in all_f.columns if c not in drop]
     return all_f[keep]
@@ -281,18 +205,28 @@ def calculate_target_daily(df: pd.DataFrame) -> np.ndarray:
 def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """准备训练数据"""
     cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
-    compute_fn = compute_features_30m if model_type == '30m' else compute_features_daily
     target_fn = calculate_target_30m if model_type == '30m' else calculate_target_daily
 
     sample_df = list(all_data.values())[0]
-    sample_features = compute_fn(sample_df)
+    first_symbol = list(all_data.keys())[0]
+    if model_type == 'daily':
+        sample_features = compute_features_daily(sample_df, symbol=first_symbol)
+    else:
+        sample_features = compute_features_30m(sample_df)
     feature_names = list(sample_features.columns)
     print(f"特征数: {len(feature_names)}")
+    if model_type == 'daily':
+        market_feats = [c for c in feature_names if c.startswith('north_') or c.startswith('market_') or c.startswith('sector_')]
+        if market_feats:
+            print(f"  含北向/市场特征: {market_feats}")
 
     all_X, all_y = [], []
     for i, (symbol, df) in enumerate(all_data.items()):
         try:
-            features = compute_fn(df)
+            if model_type == 'daily':
+                features = compute_features_daily(df, symbol=symbol)
+            else:
+                features = compute_features_30m(df)
             target = target_fn(df)
             mask_features = features.isna().any(axis=1).values
             mask_target = (target >= 0)
