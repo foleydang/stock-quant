@@ -33,7 +33,7 @@ warnings.filterwarnings('ignore')
 
 import lightgbm as lgb
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score, classification_report, roc_auc_score
 
 try:
     import optuna
@@ -56,6 +56,9 @@ CONFIG_30M = {
     'min_samples': 200,
     'n_estimators': 2000,             # 大树数，靠 early_stopping 截断
     'early_stopping_rounds': 100,     # 连续100轮不提升则停止
+    'num_class': 3,                   # 3分类: 0=持有 1=买入 2=卖出
+    'objective': 'multiclass',
+    'metric': 'multi_logloss',
     'time_features': ['day_of_week', 'day_of_month', 'hour', 'minute',
                       'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour'],
     'zero_imp_features': [
@@ -92,6 +95,7 @@ CONFIG_30M = {
         'subsample': 0.85, 'subsample_freq': 5,
         'colsample_bytree': 0.67, 'max_bin': 255,
         'learning_rate': 0.02, 'reg_alpha': 0.6, 'reg_lambda': 0.8,
+        'num_class': 3, 'objective': 'multiclass', 'metric': 'multi_logloss',
     },
 }
 
@@ -108,6 +112,9 @@ CONFIG_DAILY = {
     'min_samples': 200,
     'n_estimators': 1000,              # 日线数据少，不需要太多树
     'early_stopping_rounds': 100,
+    'num_class': 3,                   # 3分类: 0=震荡 1=上涨 2=下跌
+    'objective': 'multiclass',
+    'metric': 'multi_logloss',
     'time_features': ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start'],
     'zero_imp_features': [],
     # Optuna 搜索参数 — 13个参数 (11模型超参 + horizon + threshold), 默认130次搜索
@@ -137,6 +144,7 @@ CONFIG_DAILY = {
         'subsample': 0.8, 'subsample_freq': 3,
         'colsample_bytree': 0.7, 'max_bin': 127,
         'learning_rate': 0.03, 'reg_alpha': 0.5, 'reg_lambda': 1.0,
+        'num_class': 3, 'objective': 'multiclass', 'metric': 'multi_logloss',
     },
 }
 
@@ -210,9 +218,11 @@ def compute_features_daily(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame
     return all_f[keep]
 
 
-# ============ 目标计算 ============
+# ============ 目标计算 (3分类: 0=平/1=涨/2=跌) ============
 def calculate_target_30m(df: pd.DataFrame, horizon: int = None, threshold: float = None) -> np.ndarray:
-    """30分钟自适应阈值目标 (horizon/threshold 可被Optuna搜索)"""
+    """30分钟3分类目标: 0=持有 1=买入 2=卖出
+    ret > +threshold → 1 (买入), ret < -threshold → 2 (卖出), 其余 → 0 (持有)
+    """
     if horizon is None: horizon = CONFIG_30M['horizon']
     if threshold is None: threshold = CONFIG_30M['threshold']
     close = df['close'].values.astype(float)
@@ -225,19 +235,31 @@ def calculate_target_30m(df: pd.DataFrame, horizon: int = None, threshold: float
             continue
         adj_threshold = threshold * (vol[i] / median_vol) if median_vol > 0 else threshold
         future_ret = (close[i + horizon] - close[i]) / close[i]
-        target[i] = 1 if future_ret > adj_threshold else 0
+        if future_ret > adj_threshold:
+            target[i] = 1   # 买入
+        elif future_ret < -adj_threshold:
+            target[i] = 2   # 卖出
+        else:
+            target[i] = 0   # 持有
     return target
 
 
 def calculate_target_daily(df: pd.DataFrame, horizon: int = None, threshold: float = None) -> np.ndarray:
-    """日线固定阈值目标 (horizon/threshold 可被Optuna搜索)"""
+    """日线3分类趋势: 0=震荡 1=上涨趋势 2=下跌趋势
+    ret > +threshold → 1 (上涨), ret < -threshold → 2 (下跌), 其余 → 0 (震荡)
+    """
     if horizon is None: horizon = CONFIG_DAILY['horizon']
     if threshold is None: threshold = CONFIG_DAILY['threshold']
     close = df['close'].values.astype(float)
     target = np.full(len(close), -1)
     for i in range(len(close) - horizon):
         future_ret = (close[i + horizon] - close[i]) / close[i]
-        target[i] = 1 if future_ret > threshold else 0
+        if future_ret > threshold:
+            target[i] = 1   # 上涨趋势
+        elif future_ret < -threshold:
+            target[i] = 2   # 下跌趋势
+        else:
+            target[i] = 0   # 震荡
     return target
 
 
@@ -288,7 +310,10 @@ def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np
 
     X = np.vstack(all_X)
     y = np.concatenate(all_y)
-    print(f"\n训练数据: {len(X)} 条, 正样本率: {y.mean():.1%}")
+    unique, counts = np.unique(y, return_counts=True)
+    dist = {int(k): int(v) for k, v in zip(unique, counts)}
+    print(f"\n训练数据: {len(X)} 条")
+    print(f"  类别分布: {dist}")
     return X, y, feature_names, all_closes
 
 
@@ -339,11 +364,12 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
             'reg_alpha': trial.suggest_float('reg_alpha', *ps['reg_alpha']),
             'reg_lambda': trial.suggest_float('reg_lambda', *ps['reg_lambda']),
             'n_estimators': cfg['n_estimators'],
-            'objective': 'binary', 'metric': 'binary_logloss',
+            'num_class': cfg['num_class'],
+            'objective': cfg['objective'], 'metric': cfg['metric'],
             'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1, 'random_state': 42,
         }
 
-        # 4. 交叉验证
+        # 4. 交叉验证 (F1-macro 对多分类更公平)
         scores = []
         for train_idx, test_idx in tscv.split(X_trial):
             X_train, X_test = X_trial[train_idx], X_trial[test_idx]
@@ -352,7 +378,7 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
                       callbacks=[lgb.early_stopping(cfg['early_stopping_rounds'], verbose=False),
                                  lgb.log_evaluation(period=0)])
-            scores.append(accuracy_score(y_test, model.predict(X_test)))
+            scores.append(f1_score(y_test, model.predict(X_test), average='macro'))
         return np.mean(scores)
 
     print(f"\nOptuna 超参搜索 ({n_trials}次, {n_params}个参数: 11模型 + horizon + threshold)...")
@@ -361,8 +387,9 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
 
     best = dict(study.best_params)
     best['n_estimators'] = cfg['n_estimators']
-    best['objective'] = 'binary'
-    best['metric'] = 'binary_logloss'
+    best['num_class'] = cfg['num_class']
+    best['objective'] = cfg['objective']
+    best['metric'] = cfg['metric']
     best['boosting_type'] = 'gbdt'
     best['verbosity'] = -1
     best['n_jobs'] = -1
@@ -373,8 +400,9 @@ def optimize_hyperparams(X: np.ndarray, all_closes: List[np.ndarray],
     print(f"\n最优参数 ({model_type}):")
     for k in sorted(ps.keys()):
         print(f"  {k}: {best[k]}")
-    print(f"最优CV准确率: {study.best_value:.4f}")
-    print(f"最终训练样本: {len(best_y)} 条, 正样本率: {best_y.mean():.1%}")
+    print(f"最优CV F1-macro: {study.best_value:.4f}")
+    unique, counts = np.unique(best_y, return_counts=True)
+    print(f"最终训练样本: {len(best_y)} 条, 分布: {dict(zip(unique.astype(int), counts))}")
     return best, best_y
 
 
@@ -419,13 +447,13 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
                       callbacks=[lgb.early_stopping(cfg['early_stopping_rounds'], verbose=False),
                                  lgb.log_evaluation(period=0)])
-            cv_scores.append(accuracy_score(y_test, model.predict(X_test)))
+            cv_scores.append(f1_score(y_test, model.predict(X_test), average='macro'))
             fold_iters.append(model.best_iteration_)
-            print(f"  Fold {fold+1}: Acc={cv_scores[-1]:.4f}, BestIter={model.best_iteration_}")
+            print(f"  Fold {fold+1}: F1={cv_scores[-1]:.4f}, BestIter={model.best_iteration_}")
 
-        avg_acc = np.mean(cv_scores)
+        avg_f1 = np.mean(cv_scores)
         avg_iter = int(np.mean(fold_iters))
-        print(f"  平均: Acc={avg_acc:.4f}, BestIter={avg_iter}")
+        print(f"  平均: F1={avg_f1:.4f}, BestIter={avg_iter}")
 
         final_params = model_params.copy()
         final_params['n_estimators'] = avg_iter
@@ -439,13 +467,19 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
     all_preds = np.array([m.predict(X) for m in models]).T
     ensemble_pred = np.apply_along_axis(
         lambda x: Counter(x).most_common(1)[0][0], axis=1, arr=all_preds)
-    probs = np.mean([m.predict_proba(X)[:, 1] for m in models], axis=0)
-    ensemble_acc = accuracy_score(y, ensemble_pred)
-    ensemble_auc = roc_auc_score(y, probs)
+    # 多分类 AUC (OvR)
+    all_probs = np.mean([m.predict_proba(X) for m in models], axis=0)
+    ensemble_f1 = f1_score(y, ensemble_pred, average='macro')
+    try:
+        ensemble_auc = roc_auc_score(y, all_probs, multi_class='ovr')
+    except Exception:
+        ensemble_auc = 0.0
 
-    print(f"  单模型Acc范围: {min(accuracy_score(y, p) for p in all_preds):.2%} ~ {max(accuracy_score(y, p) for p in all_preds):.2%}")
-    print(f"  集成投票Acc: {ensemble_acc:.2%}, AUC: {ensemble_auc:.4f}")
-    print(classification_report(y, ensemble_pred, target_names=['下跌', '上涨']))
+    accs = [accuracy_score(y, p) for p in all_preds]
+    print(f"  单模型Acc范围: {min(accs):.2%} ~ {max(accs):.2%}")
+    print(f"  集成投票Acc: {accuracy_score(y, ensemble_pred):.2%}, F1-macro: {ensemble_f1:.4f}, AUC: {ensemble_auc:.4f}")
+    class_names = ['持有', '买入', '卖出'] if model_type == '30m' else ['震荡', '上涨', '下跌']
+    print(classification_report(y, ensemble_pred, target_names=class_names, zero_division=0))
 
     avg_importance = np.mean([m.feature_importances_ for m in models], axis=0)
     top_idx = np.argsort(avg_importance)[::-1][:20]
@@ -459,8 +493,8 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
     # 全部存到 model_data 里
     return {
         'models': models,
-        'cv_accuracy': round(np.mean([np.mean(accuracy_score(y, p)) for p in all_preds]), 4),
-        'ensemble_accuracy': round(ensemble_acc, 4),
+        'cv_f1': round(np.mean([np.mean(f1_score(y, p, average='macro')) for p in all_preds]), 4),
+        'ensemble_f1': round(ensemble_f1, 4),
         'ensemble_auc': round(ensemble_auc, 4),
         'best_iterations': best_iterations,
         'feature_names': feature_names,
@@ -492,11 +526,11 @@ def save_model(model_data: Dict, model_dir: str, model_type: str):
         "train_date": model_data['train_date'],
         "architecture": f"LGBM Bagging ({model_data['n_models']}个子模型投票)",
         "data": labels.get(model_type, model_type),
-        "target": f"未来{model_data['horizon']}根K线涨>{model_data['threshold']*100}%",
+        "target": f"3分类 — 未来{model_data['horizon']}根K线, 阈值±{model_data['threshold']*100}%",
         "role": roles.get(model_type, ''),
         "performance": {
-            "cv_accuracy": model_data['cv_accuracy'],
-            "ensemble_accuracy": model_data['ensemble_accuracy'],
+            "cv_f1": model_data['cv_f1'],
+            "ensemble_f1": model_data['ensemble_f1'],
             "ensemble_auc": model_data['ensemble_auc'],
         },
         "n_features": len(model_data['feature_names']),
@@ -536,9 +570,9 @@ def main():
 
     label = '30分钟' if args.model == '30m' else '日线'
     print("=" * 60)
-    print(f"  LGBM {label}模型训练")
+    print(f"  LGBM {label}模型训练 (3分类)")
     print(f"  数据: {cfg['db_table']} | 预测: 未来{cfg['horizon']}根K线")
-    print(f"  阈值: {cfg['threshold']*100}% | 集成: {cfg['n_bagging']}子模型")
+    print(f"  阈值: ±{cfg['threshold']*100}% | 集成: {cfg['n_bagging']}子模型")
     print("=" * 60)
 
     # 1. 加载数据
@@ -558,9 +592,7 @@ def main():
     if args.no_optuna:
         print("\n跳过 Optuna 搜索，使用默认参数")
         params = {**cfg['default_params'], 'horizon': cfg['horizon'], 'threshold': cfg['threshold'],
-                  'n_estimators': cfg['n_estimators'],
-                  'objective': 'binary', 'metric': 'binary_logloss',
-                  'boosting_type': 'gbdt', 'verbosity': -1, 'n_jobs': -1}
+                  'n_estimators': cfg['n_estimators']}
         # y 保持 prepare_data 的默认值
     else:
         n_trials = 20 if args.quick else args.trials

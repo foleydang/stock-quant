@@ -21,7 +21,7 @@ print("\n[1] 加载模型...")
 with open(MODEL_PATH, 'rb') as f:
     model_data = pickle.load(f)
 model = model_data.get('model')
-print(f"    模型准确率: {model_data.get('cv_accuracy', 0):.2%}")
+print(f"    模型F1: {model_data.get('cv_f1', 0):.2%}")
 
 # 2. 获取股票列表
 print("\n[2] 获取股票池...")
