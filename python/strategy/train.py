@@ -1,0 +1,629 @@
+#!/usr/bin/env python3
+"""
+LGBM 统一训练脚本 (Mac 本地训练)
+
+用法:
+  python train.py --model 30m                    # 30分钟模型 (默认)
+  python train.py --model daily                  # 日线模型
+  python train.py --model 30m --quick            # 快速模式 (20次Optuna)
+  python train.py --model daily --trials 200     # 指定Optuna搜索次数
+  python train.py --model 30m --start 2025-01-01 --end 2026-05-31  # 日期过滤
+
+输出:
+  30m  → models/lgb_hs300/model.pkl   (双层架构第二层)
+  daily → models/lgb_daily/model.pkl  (双层架构第一层)
+"""
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import argparse
+import pandas as pd
+import numpy as np
+import pickle
+import json
+import sqlite3
+import warnings
+from datetime import datetime
+from typing import Dict, List, Tuple, Optional
+from collections import Counter
+
+warnings.filterwarnings('ignore')
+
+import lightgbm as lgb
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
+
+try:
+    import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    HAS_OPTUNA = True
+except ImportError:
+    HAS_OPTUNA = False
+    print("⚠ optuna 未安装，跳过超参搜索。安装: pip install optuna")
+
+# ============ 30分钟模型配置 ============
+CONFIG_30M = {
+    'db_table': 'kline_30m',
+    'model_dir': 'models/lgb_hs300',
+    'horizon': 3,
+    'threshold': 0.010,
+    'n_bagging': 3,
+    'min_history': 150,
+    'min_samples': 200,
+    'time_features': ['day_of_week', 'day_of_month', 'hour', 'minute',
+                      'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour'],
+    'zero_imp_features': [
+        'price_above_ma5', 'price_above_ma10', 'price_above_ma20',
+        'price_above_ma30', 'price_above_ma60', 'price_above_ma80',
+        'price_above_ma100', 'price_above_ma120',
+        'ma5_cross_ma10', 'ma10_cross_ma20', 'ma20_cross_ma60', 'ma60_cross_ma120',
+        'macd_cross', 'kdj_cross_signal', 'inside_bar', 'breakout_20', 'trend_direction',
+    ],
+    'optuna_params': {
+        'num_leaves': (15, 127),
+        'max_depth': (3, 12),
+        'learning_rate': (0.005, 0.1),
+        'min_child_samples': (10, 100),
+        'feature_fraction': (0.5, 1.0),
+        'bagging_fraction': (0.5, 1.0),
+        'reg_alpha': (0.0, 2.0),
+        'reg_lambda': (0.0, 2.0),
+    },
+}
+
+# ============ 日线模型配置 ============
+CONFIG_DAILY = {
+    'db_table': 'kline_daily',
+    'model_dir': 'models/lgb_daily',
+    'horizon': 5,
+    'threshold': 0.02,
+    'n_bagging': 3,
+    'min_history': 120,
+    'min_samples': 200,
+    'time_features': ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start'],
+    'zero_imp_features': [],
+    'optuna_params': {
+        'num_leaves': (15, 63),
+        'max_depth': (3, 8),
+        'learning_rate': (0.01, 0.1),
+        'min_child_samples': (20, 100),
+        'feature_fraction': (0.5, 0.9),
+        'bagging_fraction': (0.5, 0.9),
+        'reg_alpha': (0.0, 2.0),
+        'reg_lambda': (0.0, 2.0),
+    },
+}
+
+
+# ============ 30分钟特征工程 (复用) ============
+from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+
+class AdvancedFeatureEngineer:
+    """30分钟高级特征"""
+
+    @staticmethod
+    def calculate_advanced_features(df: pd.DataFrame) -> pd.DataFrame:
+        adv = pd.DataFrame(index=df.index)
+        close = df['close'].values.astype(float)
+        high = df['high'].values.astype(float)
+        low = df['low'].values.astype(float)
+        volume = df['volume'].values.astype(float)
+        open_price = df['open'].values.astype(float)
+
+        for period in [3, 5, 10, 20]:
+            ret = pd.Series(close).pct_change(period)
+            adv[f'momentum_accel_{period}'] = ret.diff(3)
+        mom_short = pd.Series(close).pct_change(5)
+        mom_long = pd.Series(close).pct_change(20)
+        adv['momentum_decay'] = mom_short - mom_long
+
+        vol = pd.Series(volume)
+        for period in [5, 10, 20]:
+            vol_ma = vol.rolling(period).mean()
+            adv[f'vol_ratio_{period}'] = volume / vol_ma.values
+            adv[f'vol_std_{period}'] = vol.rolling(period).std() / vol_ma.values
+        adv['vol_trend'] = vol.rolling(5).mean() / vol.rolling(20).mean().values
+        price_up = (pd.Series(close).diff() > 0).astype(int)
+        vol_up = (vol.diff() > 0).astype(int)
+        adv['vol_price_divergence'] = (price_up != vol_up).rolling(5).mean()
+
+        prev_high = pd.Series(high).shift(1)
+        prev_low = pd.Series(low).shift(1)
+        adv['inside_bar'] = ((high <= prev_high) & (low >= prev_low)).astype(int)
+        adv['outside_bar'] = ((high > prev_high) & (low < prev_low)).astype(int)
+        body = close - open_price
+        total_range = high - low + 1e-10
+        adv['body_ratio'] = body / total_range
+        adv['adv_upper_shadow'] = (high - np.maximum(close, open_price)) / total_range
+
+        returns = pd.Series(close).pct_change()
+        vol20 = returns.rolling(20).std()
+        vol5 = returns.rolling(5).std()
+        adv['vol_ratio_5_20'] = vol5 / vol20.values
+        vol_ma = vol20.rolling(60).mean()
+        adv['vol_vs_mean'] = vol20 / vol_ma.values
+        vol_median = vol20.rolling(120).median()
+        adv['high_vol_state'] = (vol20 > vol_median).astype(int)
+
+        for period in [20, 60]:
+            period_high = pd.Series(high).rolling(period).max()
+            period_low = pd.Series(low).rolling(period).min()
+            period_range = period_high - period_low + 1e-10
+            adv[f'adv_price_position_{period}'] = (close - period_low) / period_range.values
+        adv['breakout_20'] = (close > pd.Series(high).rolling(20).max().shift(1)).astype(int)
+
+        up_days = pd.Series(close).diff()
+        adv['consecutive_up'] = (up_days > 0).rolling(5).sum()
+        adv['consecutive_down'] = (up_days < 0).rolling(5).sum()
+
+        return adv
+
+
+# ============ 日线特征工程 ============
+class DailyFeatureEngineer:
+    """日线级别特征工程"""
+
+    @staticmethod
+    def calculate_features(df: pd.DataFrame) -> pd.DataFrame:
+        close = df['close'].values.astype(float)
+        high = df['high'].values.astype(float)
+        low = df['low'].values.astype(float)
+        volume = df['volume'].values.astype(float)
+        open_price = df['open'].values.astype(float)
+
+        d = {}
+        for period in [1, 3, 5, 10, 20]:
+            d[f'return_{period}d'] = pd.Series(close).pct_change(period)
+        for period in [5, 10, 20, 60, 120]:
+            ma = pd.Series(close).rolling(period).mean()
+            d[f'ma{period}'] = ma
+            d[f'ma{period}_ratio'] = close / ma
+        returns = pd.Series(close).pct_change()
+        for period in [5, 10, 20]:
+            d[f'volatility_{period}d'] = returns.rolling(period).std()
+        vol20 = returns.rolling(20).std()
+        vol60 = returns.rolling(60).std()
+        d['vol_ratio_20_60'] = vol20 / vol60
+        delta = pd.Series(close).diff()
+        gain = delta.where(delta > 0, 0).rolling(14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        d['rsi_14'] = 100 - (100 / (1 + gain / loss))
+        ema12 = pd.Series(close).ewm(span=12).mean()
+        ema26 = pd.Series(close).ewm(span=26).mean()
+        d['macd'] = ema12 - ema26
+        d['macd_signal'] = d['macd'].ewm(span=9).mean()
+        d['macd_hist'] = d['macd'] - d['macd_signal']
+        ma20 = pd.Series(close).rolling(20).mean()
+        std20 = pd.Series(close).rolling(20).std()
+        d['boll_upper'] = ma20 + 2 * std20
+        d['boll_lower'] = ma20 - 2 * std20
+        d['boll_width'] = (d['boll_upper'] - d['boll_lower']) / ma20
+        d['boll_position'] = (close - d['boll_lower']) / (d['boll_upper'] - d['boll_lower'] + 1e-10)
+        low9 = pd.Series(low).rolling(9).min()
+        high9 = pd.Series(high).rolling(9).max()
+        rsv = (close - low9) / (high9 - low9 + 1e-10) * 100
+        d['k'] = rsv.ewm(com=2).mean()
+        d['d'] = d['k'].ewm(com=2).mean()
+        d['j'] = 3 * d['k'] - 2 * d['d']
+        vol = pd.Series(volume)
+        for period in [5, 10, 20]:
+            d[f'volume_ratio_{period}d'] = volume / vol.rolling(period).mean()
+        d['volume_trend'] = vol.rolling(5).mean() / vol.rolling(20).mean()
+        body = close - open_price
+        total_range = high - low + 1e-10
+        d['body_ratio'] = body / total_range
+        d['upper_shadow'] = (high - np.maximum(close, open_price)) / total_range
+        up_days = (pd.Series(close).diff() > 0).astype(int)
+        d['consecutive_up'] = up_days.rolling(5).sum()
+        d['consecutive_down'] = (up_days == 0).astype(int).rolling(5).sum()
+        tr = np.maximum(high - low, np.abs(high - np.roll(close, 1)), np.abs(low - np.roll(close, 1)))
+        atr14 = pd.Series(tr).rolling(14).mean()
+        plus_dm = np.where((high - np.roll(high, 1)) > (np.roll(low, 1) - low),
+                           np.maximum(high - np.roll(high, 1), 0), 0)
+        minus_dm = np.where((np.roll(low, 1) - low) > (high - np.roll(high, 1)),
+                            np.maximum(np.roll(low, 1) - low, 0), 0)
+        plus_di = 100 * pd.Series(plus_dm).rolling(14).mean() / atr14
+        minus_di = 100 * pd.Series(minus_dm).rolling(14).mean() / atr14
+        d['adx'] = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di + 1e-10)
+        d['di_diff'] = plus_di - minus_di
+        for period in [5, 10, 20]:
+            ret = pd.Series(close).pct_change(period)
+            d[f'momentum_accel_{period}d'] = ret.diff(5)
+        for period in [20, 60, 120]:
+            period_high = pd.Series(high).rolling(period).max()
+            period_low = pd.Series(low).rolling(period).min()
+            period_range = period_high - period_low + 1e-10
+            d[f'price_position_{period}d'] = (close - period_low) / period_range
+        dates = pd.to_datetime(df['date'])
+        d['day_of_week'] = dates.dt.dayofweek
+        d['day_of_month'] = dates.dt.day
+        d['is_month_end'] = (dates.dt.day >= 25).astype(int)
+        d['is_month_start'] = (dates.dt.day <= 5).astype(int)
+
+        features = pd.concat(d, axis=1).fillna(0)
+        return features
+
+
+# ============ 数据加载 ============
+def load_data(db_path: str, table: str, start_date: str = None, end_date: str = None) -> Dict[str, pd.DataFrame]:
+    """从数据库加载数据，支持日期过滤"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT DISTINCT symbol FROM {table}")
+    symbols = [r[0] for r in cursor.fetchall()]
+    conn.close()
+
+    # 构建 SQL
+    sql = f'SELECT date, open, high, low, close, volume FROM {table} WHERE symbol=?'
+    params = []
+    if start_date:
+        sql += ' AND date >= ?'
+        params.append(start_date)
+    if end_date:
+        sql += ' AND date <= ?'
+        params.append(end_date)
+    sql += ' ORDER BY date'
+
+    all_data = {}
+    for symbol in symbols:
+        try:
+            conn = sqlite3.connect(db_path)
+            df = pd.read_sql_query(sql, conn, params=([symbol] + params))
+            conn.close()
+            if len(df) > 200:
+                df['date'] = pd.to_datetime(df['date'])
+                for col in ['open', 'high', 'low', 'close', 'volume']:
+                    df[col] = df[col].astype(float)
+                all_data[symbol] = df
+        except Exception:
+            pass
+
+    print(f"加载了 {len(all_data)} 只股票 (表: {table})")
+    if start_date or end_date:
+        print(f"  日期范围: {start_date or '不限'} ~ {end_date or '不限'}")
+    return all_data
+
+
+# ============ 特征计算 ============
+def compute_features_30m(df: pd.DataFrame) -> pd.DataFrame:
+    """30分钟特征"""
+    base = EnhancedFeatureEngineer.calculate_features(df)
+    adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
+    all_f = pd.concat([base, adv], axis=1)
+    drop = CONFIG_30M['time_features'] + CONFIG_30M['zero_imp_features']
+    keep = [c for c in all_f.columns if c not in drop]
+    return all_f[keep]
+
+
+def compute_features_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """日线特征"""
+    all_f = DailyFeatureEngineer.calculate_features(df)
+    drop = CONFIG_DAILY['time_features'] + CONFIG_DAILY['zero_imp_features']
+    keep = [c for c in all_f.columns if c not in drop]
+    return all_f[keep]
+
+
+# ============ 目标计算 ============
+def calculate_target_30m(df: pd.DataFrame) -> np.ndarray:
+    """30分钟自适应阈值目标"""
+    close = df['close'].values.astype(float)
+    horizon = CONFIG_30M['horizon']
+    base_threshold = CONFIG_30M['threshold']
+    target = np.full(len(close), -1)
+    returns = pd.Series(close).pct_change()
+    vol = returns.rolling(20).std().values
+    median_vol = np.nanmedian(vol)
+
+    for i in range(len(close) - horizon - 1):
+        if i < 20 or np.isnan(vol[i]):
+            continue
+        adj_threshold = base_threshold * (vol[i] / median_vol) if median_vol > 0 else base_threshold
+        future_ret = (close[i + horizon] - close[i]) / close[i]
+        target[i] = 1 if future_ret > adj_threshold else 0
+    return target
+
+
+def calculate_target_daily(df: pd.DataFrame) -> np.ndarray:
+    """日线固定阈值目标"""
+    close = df['close'].values.astype(float)
+    horizon = CONFIG_DAILY['horizon']
+    threshold = CONFIG_DAILY['threshold']
+    target = np.full(len(close), -1)
+    for i in range(len(close) - horizon):
+        future_ret = (close[i + horizon] - close[i]) / close[i]
+        target[i] = 1 if future_ret > threshold else 0
+    return target
+
+
+# ============ 数据准备 ============
+def prepare_data(all_data: Dict[str, pd.DataFrame], model_type: str) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """准备训练数据"""
+    cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
+    compute_fn = compute_features_30m if model_type == '30m' else compute_features_daily
+    target_fn = calculate_target_30m if model_type == '30m' else calculate_target_daily
+
+    sample_df = list(all_data.values())[0]
+    sample_features = compute_fn(sample_df)
+    feature_names = list(sample_features.columns)
+    print(f"特征数: {len(feature_names)}")
+
+    all_X, all_y = [], []
+    for i, (symbol, df) in enumerate(all_data.items()):
+        try:
+            features = compute_fn(df)
+            target = target_fn(df)
+            mask_features = features.isna().any(axis=1).values
+            mask_target = (target >= 0)
+            valid_mask = ~mask_features & mask_target
+            features_valid = features.iloc[valid_mask].iloc[cfg['min_history']:]
+            target_valid = target[valid_mask][cfg['min_history']:]
+            features_valid = features_valid.fillna(0)
+            if len(features_valid) > 30:
+                all_X.append(features_valid.values)
+                all_y.append(target_valid)
+        except Exception:
+            pass
+        if (i + 1) % 100 == 0:
+            print(f"  处理 {i+1}/{len(all_data)} 只股票...")
+
+    X = np.vstack(all_X)
+    y = np.concatenate(all_y)
+    print(f"\n训练数据: {len(X)} 条, 正样本率: {y.mean():.1%}")
+    return X, y, feature_names
+
+
+# ============ Optuna 超参搜索 ============
+def optimize_hyperparams(X: np.ndarray, y: np.ndarray, model_type: str, n_trials: int = 200) -> Dict:
+    """Optuna 超参数搜索"""
+    if not HAS_OPTUNA:
+        print("⚠ optuna 未安装，使用默认参数")
+        return {
+            'num_leaves': 31, 'max_depth': 7, 'learning_rate': 0.05,
+            'min_child_samples': 20, 'feature_fraction': 0.8,
+            'bagging_fraction': 0.8, 'reg_alpha': 0.1, 'reg_lambda': 0.1,
+            'n_estimators': 500, 'objective': 'binary', 'metric': 'binary_logloss',
+            'boosting_type': 'gbdt', 'bagging_freq': 5, 'verbose': -1, 'random_state': 42, 'n_jobs': -1,
+        }
+
+    cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
+    param_space = cfg['optuna_params']
+    tscv = TimeSeriesSplit(n_splits=3)
+
+    def objective(trial):
+        params = {
+            'num_leaves': trial.suggest_int('num_leaves', *param_space['num_leaves']),
+            'max_depth': trial.suggest_int('max_depth', *param_space['max_depth']),
+            'learning_rate': trial.suggest_float('learning_rate', *param_space['learning_rate'], log=True),
+            'min_child_samples': trial.suggest_int('min_child_samples', *param_space['min_child_samples']),
+            'feature_fraction': trial.suggest_float('feature_fraction', *param_space['feature_fraction']),
+            'bagging_fraction': trial.suggest_float('bagging_fraction', *param_space['bagging_fraction']),
+            'reg_alpha': trial.suggest_float('reg_alpha', *param_space['reg_alpha']),
+            'reg_lambda': trial.suggest_float('reg_lambda', *param_space['reg_lambda']),
+            'n_estimators': 500, 'objective': 'binary', 'metric': 'binary_logloss',
+            'boosting_type': 'gbdt', 'bagging_freq': 5, 'verbose': -1, 'random_state': 42, 'n_jobs': -1,
+        }
+        scores = []
+        for train_idx, test_idx in tscv.split(X):
+            X_train, X_test = X[train_idx], X[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+            model = lgb.LGBMClassifier(**params)
+            model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
+                      callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(period=0)])
+            scores.append(accuracy_score(y_test, model.predict(X_test)))
+        return np.mean(scores)
+
+    print(f"\nOptuna 超参搜索 ({n_trials}次, 8个参数)...")
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
+
+    best = study.best_params
+    best['n_estimators'] = 500
+    best['objective'] = 'binary'
+    best['metric'] = 'binary_logloss'
+    best['boosting_type'] = 'gbdt'
+    best['bagging_freq'] = 5
+    best['verbose'] = -1
+    best['random_state'] = 42
+    best['n_jobs'] = -1
+
+    print(f"\n最优参数: {best}")
+    print(f"最优CV准确率: {study.best_value:.4f}")
+    return best
+
+
+# ============ Bagging 集成训练 ============
+def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: List[str],
+                   model_type: str) -> Dict:
+    """训练 Bagging 集成"""
+    cfg = CONFIG_30M if model_type == '30m' else CONFIG_DAILY
+    n_models = cfg['n_bagging']
+    print(f"\n=== 训练 Bagging 集成 ({n_models} 个子模型) ===")
+
+    tscv = TimeSeriesSplit(n_splits=5)
+    models = []
+    best_iterations = []
+
+    for m_idx in range(n_models):
+        print(f"\n子模型 {m_idx + 1}/{n_models}:")
+        model_params = params.copy()
+        model_params['random_state'] = 42 + m_idx * 7
+        model_params['feature_fraction'] = min(0.9, params['feature_fraction'] + (m_idx % 3) * 0.05)
+
+        cv_scores, fold_iters = [], []
+        for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
+            X_train, X_test = X[train_idx], X[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+            model = lgb.LGBMClassifier(**model_params)
+            model.fit(X_train, y_train, eval_set=[(X_test, y_test)],
+                      callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(period=0)])
+            cv_scores.append(accuracy_score(y_test, model.predict(X_test)))
+            fold_iters.append(model.best_iteration_)
+            print(f"  Fold {fold+1}: Acc={cv_scores[-1]:.4f}, BestIter={model.best_iteration_}")
+
+        avg_acc = np.mean(cv_scores)
+        avg_iter = int(np.mean(fold_iters))
+        print(f"  平均: Acc={avg_acc:.4f}, BestIter={avg_iter}")
+
+        final_params = model_params.copy()
+        final_params['n_estimators'] = avg_iter
+        final_model = lgb.LGBMClassifier(**final_params)
+        final_model.fit(X, y)
+        models.append(final_model)
+        best_iterations.append(avg_iter)
+
+    # 集成评估
+    print(f"\n=== 集成评估 ===")
+    all_preds = np.array([m.predict(X) for m in models]).T
+    ensemble_pred = np.apply_along_axis(
+        lambda x: Counter(x).most_common(1)[0][0], axis=1, arr=all_preds)
+    probs = np.mean([m.predict_proba(X)[:, 1] for m in models], axis=0)
+    ensemble_acc = accuracy_score(y, ensemble_pred)
+    ensemble_auc = roc_auc_score(y, probs)
+
+    print(f"  单模型Acc范围: {min(accuracy_score(y, p) for p in all_preds):.2%} ~ {max(accuracy_score(y, p) for p in all_preds):.2%}")
+    print(f"  集成投票Acc: {ensemble_acc:.2%}, AUC: {ensemble_auc:.4f}")
+    print(classification_report(y, ensemble_pred, target_names=['下跌', '上涨']))
+
+    avg_importance = np.mean([m.feature_importances_ for m in models], axis=0)
+    top_idx = np.argsort(avg_importance)[::-1][:20]
+    print(f"\nTop 20 特征:")
+    for i in top_idx:
+        print(f"  {feature_names[i]}: {avg_importance[i]:.0f}")
+
+    keep_features = [feature_names[i] for i in range(len(feature_names)) if avg_importance[i] >= 1]
+    print(f"建议保留特征: {len(keep_features)}/{len(feature_names)}")
+
+    return {
+        'models': models,
+        'cv_accuracy': round(np.mean([np.mean(accuracy_score(y, p)) for p in all_preds]), 4),
+        'ensemble_accuracy': round(ensemble_acc, 4),
+        'ensemble_auc': round(ensemble_auc, 4),
+        'best_iterations': best_iterations,
+        'feature_names': feature_names,
+        'keep_features': keep_features,
+        'n_models': n_models,
+        'horizon': cfg['horizon'],
+        'threshold': cfg['threshold'],
+        'train_samples': len(X),
+        'train_date': datetime.now().strftime('%Y-%m-%d'),
+        'params': params,
+        'model_type': model_type,
+    }
+
+
+# ============ 模型保存 ============
+def save_model(model_data: Dict, model_dir: str, model_type: str):
+    """保存模型"""
+    os.makedirs(model_dir, exist_ok=True)
+
+    with open(os.path.join(model_dir, 'model.pkl'), 'wb') as f:
+        pickle.dump(model_data, f)
+
+    labels = {'30m': '30分钟K线', 'daily': '日线K线'}
+    roles = {'30m': '双层架构第二层 — 精确进出场信号', 'daily': '双层架构第一层 — 趋势方向判断'}
+
+    metadata = {
+        "model_name": f"lgb_{model_type}_v1",
+        "version": "1.0",
+        "train_date": model_data['train_date'],
+        "architecture": f"LGBM Bagging ({model_data['n_models']}个子模型投票)",
+        "data": labels.get(model_type, model_type),
+        "target": f"未来{model_data['horizon']}根K线涨>{model_data['threshold']*100}%",
+        "role": roles.get(model_type, ''),
+        "performance": {
+            "cv_accuracy": model_data['cv_accuracy'],
+            "ensemble_accuracy": model_data['ensemble_accuracy'],
+            "ensemble_auc": model_data['ensemble_auc'],
+        },
+        "n_features": len(model_data['feature_names']),
+        "n_samples": model_data['train_samples'],
+    }
+
+    with open(os.path.join(model_dir, 'metadata.json'), 'w') as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    model_size_mb = os.path.getsize(os.path.join(model_dir, 'model.pkl')) / 1024 / 1024
+    print(f"\n✅ 模型已保存到 {model_dir}")
+    print(f"   model.pkl: {model_size_mb:.1f} MB")
+
+
+# ============ 主流程 ============
+def main():
+    parser = argparse.ArgumentParser(description='LGBM 统一训练脚本')
+    parser.add_argument('--model', type=str, default='30m', choices=['30m', 'daily'],
+                        help='模型类型: 30m=30分钟, daily=日线 (默认: 30m)')
+    parser.add_argument('--start', type=str, default=None,
+                        help='数据起始日期 (YYYY-MM-DD)')
+    parser.add_argument('--end', type=str, default=None,
+                        help='数据截止日期 (YYYY-MM-DD)')
+    parser.add_argument('--trials', type=int, default=100,
+                        help='Optuna 搜索次数 (8个参数, 默认: 100)')
+    parser.add_argument('--quick', action='store_true',
+                        help='快速模式 (20次 Optuna, 快速验证用)')
+    parser.add_argument('--no-optuna', action='store_true',
+                        help='跳过 Optuna 超参搜索')
+    args = parser.parse_args()
+
+    cfg = CONFIG_30M if args.model == '30m' else CONFIG_DAILY
+    model_dir = os.path.join(os.path.dirname(__file__), '..', cfg['model_dir'])
+    model_dir = os.path.abspath(model_dir)
+    db_path = os.path.join(os.path.dirname(__file__), '..', 'data/stock_data.db')
+    db_path = os.path.abspath(db_path)
+
+    label = '30分钟' if args.model == '30m' else '日线'
+    print("=" * 60)
+    print(f"  LGBM {label}模型训练")
+    print(f"  数据: {cfg['db_table']} | 预测: 未来{cfg['horizon']}根K线")
+    print(f"  阈值: {cfg['threshold']*100}% | 集成: {cfg['n_bagging']}子模型")
+    print("=" * 60)
+
+    # 1. 加载数据
+    print(f"\n数据库: {db_path}")
+    all_data = load_data(db_path, cfg['db_table'], args.start, args.end)
+    if not all_data:
+        print("❌ 未加载到数据")
+        return
+
+    # 2. 准备特征
+    X, y, feature_names = prepare_data(all_data, args.model)
+    if len(X) < cfg['min_samples']:
+        print(f"❌ 数据不足: {len(X)} 条 (需要≥{cfg['min_samples']})")
+        return
+
+    # 3. Optuna 超参搜索
+    if args.no_optuna:
+        print("\n跳过 Optuna 搜索，使用默认参数")
+        params = {
+            'num_leaves': 31, 'max_depth': 7, 'learning_rate': 0.05,
+            'min_child_samples': 20, 'feature_fraction': 0.8,
+            'bagging_fraction': 0.8, 'reg_alpha': 0.1, 'reg_lambda': 0.1,
+            'n_estimators': 500, 'objective': 'binary', 'metric': 'binary_logloss',
+            'boosting_type': 'gbdt', 'bagging_freq': 5, 'verbose': -1,
+            'random_state': 42, 'n_jobs': -1,
+        }
+    else:
+        n_trials = 20 if args.quick else args.trials
+        print(f"Optuna 搜索: {n_trials}次 {'(快速)' if args.quick else ''}")
+        params = optimize_hyperparams(X, y, args.model, n_trials=n_trials)
+
+    # 4. 训练
+    model_data = train_ensemble(X, y, params, feature_names, args.model)
+
+    # 5. 保存
+    save_model(model_data, model_dir, args.model)
+
+    print("\n" + "=" * 60)
+    print("  🎉 训练完成!")
+    print("=" * 60)
+    if args.model == '30m':
+        print(f"\nscp {model_dir}/model.pkl root@47.242.158.242:/root/github/stock-quant/python/models/lgb_hs300/")
+    else:
+        print(f"\nscp {model_dir}/model.pkl root@47.242.158.242:/root/github/stock-quant/python/models/lgb_daily/")
+        print(f"scp strategy/train.py root@47.242.158.242:/root/github/stock-quant/python/strategy/")
+    print(f"\n回测: python lgbm_backtest.py")
+
+
+if __name__ == '__main__':
+    main()
