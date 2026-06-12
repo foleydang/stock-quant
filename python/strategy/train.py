@@ -492,7 +492,8 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
     except Exception:
         ensemble_auc = 0.0
 
-    accs = [accuracy_score(y, p) for p in all_preds]
+    # 每个模型的准确率 (all_preds.shape = (n_samples, n_models))
+    accs = [accuracy_score(y, all_preds[:, i]) for i in range(all_preds.shape[1])]
     print(f"  单模型Acc范围: {min(accs):.2%} ~ {max(accs):.2%}")
     print(f"  集成投票Acc: {accuracy_score(y, ensemble_pred):.2%}, F1-macro: {ensemble_f1:.4f}, AUC: {ensemble_auc:.4f}")
     class_names = ['持有', '买入', '卖出'] if model_type == '30m' else ['震荡', '上涨', '下跌']
@@ -510,7 +511,7 @@ def train_ensemble(X: np.ndarray, y: np.ndarray, params: Dict, feature_names: Li
     # 全部存到 model_data 里
     return {
         'models': models,
-        'cv_f1': round(np.mean([np.mean(f1_score(y, p, average='macro')) for p in all_preds]), 4),
+        'cv_f1': round(np.mean([f1_score(y, all_preds[:, i], average='macro') for i in range(all_preds.shape[1])]), 4),
         'ensemble_f1': round(ensemble_f1, 4),
         'ensemble_auc': round(ensemble_auc, 4),
         'best_iterations': best_iterations,
