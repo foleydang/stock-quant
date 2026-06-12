@@ -26,6 +26,25 @@ from config import DB_PATH
 
 logger = logging.getLogger("feishu_bot")
 
+# ========== 模型分类器（懒加载） ==========
+
+_intent_classifier = None
+
+
+def _get_model_classifier():
+    """懒加载意图分类模型"""
+    global _intent_classifier
+    if _intent_classifier is None:
+        try:
+            from intent_classifier.model import IntentClassifier
+            _intent_classifier = IntentClassifier()
+            logger.info("意图分类模型已加载")
+        except Exception as e:
+            logger.warning(f"意图分类模型加载失败，使用关键词: {e}")
+            _intent_classifier = False  # 标记为失败，不再重试
+    return _intent_classifier if _intent_classifier is not False else None
+
+
 # ========== 股票代码映射 ==========
 
 STOCK_NAME_MAP = {
@@ -287,12 +306,24 @@ def classify_intent(text: str) -> Tuple[str, Dict]:
             return 'stock_deep', {'symbol': symbol}
         return 'stock_brief', {'symbol': symbol}
 
-    # ===== 8. 兜底 =====
-    if _has_any(text_lower, CHAT_KEYWORDS):
-        return 'chat', {'raw_text': text}
-
-    # 有内容但不是已知意图 → LLM 兜底
+    # ===== 8. 模型兜底 =====
     if len(text_lower) >= 2:
+        clf = _get_model_classifier()
+        if clf:
+            try:
+                intent, confidence, probs = clf.predict(text)
+                if confidence >= 0.5:
+                    logger.info(f"模型分类: {intent} ({confidence:.2f})")
+                    params = {'raw_text': text}
+                    if intent in ('stock_brief', 'stock_deep', 'stock_news'):
+                        s = extract_symbol(text)
+                        if s:
+                            params['symbol'] = s
+                        if intent == 'stock_news':
+                            params['keyword'] = text
+                    return intent, params
+            except Exception as e:
+                logger.warning(f"模型分类失败: {e}")
         return 'chat', {'raw_text': text}
 
     return 'help', {}
