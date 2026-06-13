@@ -25,7 +25,7 @@ warnings.filterwarnings('ignore')
 
 # ============ 配置 ============
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data/stock_data.db')
-MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/lgb_daily/model.pkl')
+MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models/lgb_daily/model.pkl')
 HORIZON = 5         # 预测天数
 TEST_DAYS = 60      # 样本外测试天数
 TOP_K = 10          # 每天选多少只
