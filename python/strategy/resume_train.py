@@ -25,14 +25,16 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 CONFIGS = {
     'daily': {
         'db_table': 'kline_daily', 'model_dir': 'models/lgb_daily',
-        'label': '日线', 'horizon': 5, 'early_stopping': 80,
-        'role': 'α选股层', 'cv_spearman': 0.3862, 'cv_rmse': 0.0442, 'cv_mae': 0.0327,
+        'label': '日线', 'horizon': 5, 'min_history': 120, 'min_samples': 200,
+        'features': 'enhanced+advanced+market', 'purged_gap': 1,
+        'early_stopping': 80, 'role': 'α选股层',
+        'cv_spearman': 0.3862, 'cv_rmse': 0.0442, 'cv_mae': 0.0327,
     },
     '30m': {
         'db_table': 'kline_30m', 'model_dir': 'models/lgb_30m',
-        'label': '30分钟', 'horizon': 3, 'early_stopping': 80,
-        'role': 'γ择时层',
-        # 以下需要替换为30m模型的实际CV结果
+        'label': '30分钟', 'horizon': 3, 'min_history': 150, 'min_samples': 200,
+        'features': 'enhanced+advanced', 'purged_gap': 3,
+        'early_stopping': 80, 'role': 'γ择时层',
         'cv_spearman': None, 'cv_rmse': None, 'cv_mae': None,
     },
 }
