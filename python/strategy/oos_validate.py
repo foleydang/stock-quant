@@ -220,7 +220,7 @@ def oos_validate():
         return np.min(dd)
 
     def win_rate(returns):
-        return sum(1 for r in returns if r > 0) / len(returns) if returns else 0
+        return float((np.array(returns) > 0).mean()) if len(returns) else 0
 
     print(f"\n  Rank IC:")
     print(f"    均值: {ic_mean:.4f}")
