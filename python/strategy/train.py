@@ -372,23 +372,21 @@ def optuna_search(X, y, cfg, quick=False):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', choices=['daily', '30m'], default='daily')
-    parser.add_argument('--quick', action='store_true', help='快速验证模式')
-    parser.add_argument('--tune', action='store_true', help='Optuna 超参搜索')
+    parser.add_argument('--quick', action='store_true', help='快速验证 (跳过Optuna, 500树)')
+    parser.add_argument('--tune-only', action='store_true', help='仅Optuna搜索 (不训练)')
     parser.add_argument('--no-cross-section', action='store_true', help='跳过截面特征')
+    parser.add_argument('--no-tune', action='store_true', help='跳过Optuna搜索')
     args = parser.parse_args()
 
     cfg = CONFIGS[args.model]
     cfg['model_key'] = args.model
 
-    max_trees = QUICK_TREES if args.quick else MAX_TREES
-    patience = QUICK_PATIENCE if args.quick else EARLY_STOPPING
-
     print("=" * 60)
     print(f" LGBM {cfg['label']}模型训练 v3")
     print(f" 时序分离: train({TRAIN_RATIO:.0%}) → val({VAL_RATIO:.0%}) → test({TEST_RATIO:.0%})")
-    print(f" purged_gap={cfg['purged_gap']}  |  north_shift={cfg['north_shift_days']}天")
-    print(f" 截面特征: {'✅' if not args.no_cross_section else '❌'}")
-    print(f" max_trees={max_trees}  |  patience={patience}")
+    print(f" Optuna: {'❌' if (args.quick or args.no_tune) else '✅'}  |  "
+          f"截面特征: {'✅' if not args.no_cross_section else '❌'}  |  "
+          f"purged_gap={cfg['purged_gap']}  |  north_shift={cfg['north_shift_days']}天")
     print("=" * 60)
 
     # ---- 1. 加载数据 + 时序切分 ----
@@ -403,7 +401,6 @@ def main():
     print(f"  {n_dates} 个交易日, {len(data)} 只股票")
     print(f"  train: ~{str(train_cutoff)[:10]}  val: ~{str(val_cutoff)[:10]}  test: ~{str(all_dates[-1])[:10]}")
 
-    # 初始化特征流水线
     pipeline = FeaturePipeline(cfg)
 
     conn = sqlite3.connect(DB_PATH)
@@ -418,27 +415,29 @@ def main():
     print(f"\n  训练: {len(X_train):,}条  |  验证: {len(X_val):,}条  |  测试: {len(X_test):,}条")
     print(f"  特征: {len(feature_names)}  |  目标: mean={y_train.mean():.4f} std={y_train.std():.4f}")
 
-    # ---- 2. Optuna 搜索 (可选) ----
-    if args.tune:
-        best_params = optuna_search(
-            np.vstack([X_train, X_val]),
-            np.concatenate([y_train, y_val]), cfg, quick=args.quick)
-        print("\n超参搜索完成，请重新运行训练（不加 --tune）")
+    # ---- 2. Optuna 超参搜索 (默认执行) ----
+    params_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'best_params.json')
+
+    if args.tune_only:
+        optuna_search(np.vstack([X_train, X_val]), np.concatenate([y_train, y_val]),
+                      cfg, quick=args.quick)
         return
 
-    # ---- 3. 加载超参 ----
-    params = {}
-    params_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'best_params.json')
-    if os.path.exists(params_file):
-        with open(params_file) as f:
-            params = json.load(f).get(args.model, {})
-    if not params:
-        print("⚠️ 未找到 best_params.json，使用默认参数")
+    if not args.quick and not args.no_tune:
+        params = optuna_search(np.vstack([X_train, X_val]), np.concatenate([y_train, y_val]),
+                               cfg, quick=False)
+    else:
+        params = {}
+        if os.path.exists(params_file):
+            with open(params_file) as f:
+                params = json.load(f).get(args.model, {})
+        if not params:
+            print("⚠️ 未找到 best_params.json，使用默认参数")
 
     for k, v in LGBM_FIXED.items():
         params.setdefault(k, v)
 
-    # ---- 4. 特征选择 (仅基于训练集) ----
+    # ---- 3. 特征选择 (仅基于训练集) ----
     print("\n🔧 特征选择...")
     X_train, feature_names, corr_mask = remove_redundant(X_train, feature_names)
     X_val = X_val[:, corr_mask]
@@ -452,25 +451,28 @@ def main():
 
     print(f"  最终特征: {len(feature_names)}")
 
-    # ---- 5. 训练 ----
+    # ---- 4. 训练 ----
+    max_trees = QUICK_TREES if args.quick else MAX_TREES
+    patience = QUICK_PATIENCE if args.quick else EARLY_STOPPING
+
     print(f"\n🏋️ 训练 (max {max_trees} 棵树, patience {patience})...")
     model, n_trees = train_model(X_train, y_train, X_val, y_val, params, max_trees, patience)
     print(f"\n  ✅ 训练完成: {n_trees} 棵树")
 
-    # ---- 6. 测试集评估 ----
+    # ---- 5. 测试集评估 ----
     print("\n" + "=" * 60)
     print(" 🧪 测试集评估 (真正样本外)")
     print("=" * 60)
     test_ic, test_rmse, test_mae = evaluate(model, X_test, y_test, feature_names)
 
-    # ---- 7. 最终模型 (train+val) ----
+    # ---- 6. 最终模型 (train+val) ----
     print(f"\n🏋️ 最终模型 (train+val, {n_trees} 棵树)...")
     X_full = np.vstack([X_train, X_val])
     y_full = np.concatenate([y_train, y_val])
     final_model = lgb.LGBMRegressor(**params, n_estimators=n_trees)
     final_model.fit(X_full, y_full)
 
-    # ---- 8. 保存 ----
+    # ---- 7. 保存 ----
     print("\n💾 保存模型...")
     model_dir = cfg['model_dir']
     os.makedirs(model_dir, exist_ok=True)
