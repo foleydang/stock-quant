@@ -271,7 +271,8 @@ class MarketFeatureEngineer:
     MARKET_FEATURE_NAMES = None
 
     @staticmethod
-    def calculate_market_features(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame:
+    def calculate_market_features(df: pd.DataFrame, symbol: str = None,
+                                   north_shift_days: int = 0) -> pd.DataFrame:
         """
         计算市场/板块特征（v2优化版）
         
@@ -285,6 +286,7 @@ class MarketFeatureEngineer:
         Args:
             df: 30分钟K线DataFrame，必须有 'date' 列
             symbol: 股票代码（如 '600036.SH'），用于查询板块映射
+            north_shift_days: 北向资金滞后天数（日线模型=1，避免当天数据未来信息）
         """
         features = pd.DataFrame(index=df.index)
 
@@ -335,6 +337,10 @@ class MarketFeatureEngineer:
             if len(north_df) > 0:
                 north_df['total_net_billion'] = north_df['total_net'] / 10000
                 north_df = north_df[north_df['total_net_billion'].abs() < 500]
+                if north_shift_days > 0:
+                    from datetime import timedelta
+                    north_df['trade_date'] = (pd.to_datetime(north_df['trade_date'])
+                                               + timedelta(days=north_shift_days)).dt.strftime('%Y-%m-%d')
                 north_map = dict(zip(north_df['trade_date'], north_df['total_net_billion']))
                 north_mapped = trade_dates_ymd.map(north_map)
                 coverage = north_mapped.notna().sum() / len(north_mapped)
