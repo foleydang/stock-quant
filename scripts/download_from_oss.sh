@@ -17,12 +17,8 @@ mkdir -p "$DATA_DIR"
 
 echo "📥 从 OSS 下载: $(date)"
 
-# stock_data.db (K线/行情数据)
+# stock_data.db (K线/行情数据) — --update 只下载更新的版本
 DB_FILE="$DATA_DIR/stock_data.db"
-if [ -f "$DB_FILE" ]; then
-    cp "$DB_FILE" "$DB_FILE.bak"
-    echo "📦 已备份旧 stock_data.db"
-fi
 ossutil cp "oss://${OSS_BUCKET}/stock-quant/stock_data.db" "$DB_FILE" \
     --update \
     --access-key-id="$OSS_ACCESS_KEY_ID" \
@@ -32,10 +28,6 @@ echo "   stock_data.db: $(ls -lh $DB_FILE | awk '{print $5}')"
 
 # trading.db (持仓/交易记录)
 TRADING_DB="$DATA_DIR/trading.db"
-if [ -f "$TRADING_DB" ]; then
-    cp "$TRADING_DB" "$TRADING_DB.bak"
-    echo "📦 已备份旧 trading.db"
-fi
 ossutil cp "oss://${OSS_BUCKET}/stock-quant/trading.db" "$TRADING_DB" \
     --update \
     --access-key-id="$OSS_ACCESS_KEY_ID" \
