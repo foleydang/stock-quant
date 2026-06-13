@@ -49,7 +49,8 @@ CONFIG_DAILY = {
     'search_sample': 0.5, 'search_estimators': 500,
     'optuna_trials': 100,
     'features': 'enhanced+advanced+market',  # 日线含北向资金+情绪
-    'purged_gap': 1,
+    'purged_gap': 5,  # gap >= horizon 防止信息泄露
+    'north_shift_days': 1,  # 北向资金滞后1天，收盘后数据不能当同日特征
 }
 
 
@@ -59,7 +60,8 @@ def compute_features(df: pd.DataFrame, symbol: str, cfg: dict) -> pd.DataFrame:
     adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
     feats = pd.concat([base, adv], axis=1)
     if 'market' in cfg['features']:
-        market = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
+        market = MarketFeatureEngineer.calculate_market_features(
+            df, symbol=symbol, north_shift_days=cfg.get('north_shift_days', 0))
         feats = pd.concat([feats, market], axis=1)
     time_cols = ['day_of_week', 'day_of_month', 'is_month_end', 'is_month_start',
                  'hour', 'minute', 'is_morning', 'is_afternoon']
