@@ -399,7 +399,9 @@ class CrossSectionFeatures:
             for sym, feats in all_features.items():
                 if date in feats.index:
                     row = feats.loc[date]
-                    if not row.isna().all():
+                    if isinstance(row, pd.DataFrame):
+                        row = row.iloc[0]  # 取第一个匹配
+                    if not bool(row.isna().all()):
                         date_data[sym] = row
 
             if len(date_data) < 10:  # 至少需要10只股票才有意义
