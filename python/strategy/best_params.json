@@ -1,0 +1,15 @@
+{
+  "daily": {
+    "num_leaves": 213,
+    "max_depth": 11,
+    "min_child_samples": 82,
+    "learning_rate": 0.0625702939878549,
+    "subsample": 0.9411782218118704,
+    "colsample_bytree": 0.8322996508689037,
+    "subsample_freq": 2,
+    "reg_alpha": 0.2442368049071945,
+    "reg_lambda": 0.38977010977957094,
+    "min_split_gain": 0.4910911829732968
+  },
+  "30m": {}
+}

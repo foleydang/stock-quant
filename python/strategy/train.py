@@ -242,10 +242,10 @@ def train(X: np.ndarray, y: np.ndarray, feature_names: List[str],
 
     # ====== 特征选择 ======
     if len(feature_names) > 20:
+        # 去冗余 (先做，再切 Xp)
         v = int(len(X) * 0.8)
-        Xp = X[:v]
-        # 去冗余
-        cm = np.corrcoef(Xp.T)
+        Xv = X[:v]
+        cm = np.corrcoef(Xv.T)
         rm = set()
         for i in range(len(feature_names)):
             for j in range(i + 1, len(feature_names)):
@@ -257,9 +257,11 @@ def train(X: np.ndarray, y: np.ndarray, feature_names: List[str],
             X, feature_names = X[:, keep], [fn for fn, m in zip(feature_names, keep) if m]
             print(f"特征去冗余: {sum(keep)}/{sum(keep)+len(rm)}")
 
-        # SelectFromModel
+        # SelectFromModel (基于去冗余后的 X)
+        v2 = int(len(X) * 0.8)
+        Xp = X[:v2]
         sel = lgb.LGBMRegressor(**final_p)
-        sel.fit(Xp[:-50], y[:v][:-50], eval_set=[(Xp[-50:], y[:v][-50:])],
+        sel.fit(Xp[:-50], y[:v2][:-50], eval_set=[(Xp[-50:], y[:v2][-50:])],
                 callbacks=[lgb.early_stopping(30, verbose=False)])
         sf = SelectFromModel(sel, threshold='median', prefit=True)
         X = sf.transform(X)
