@@ -81,6 +81,22 @@ LGBM_FIXED = {
     'n_jobs': -1,
 }
 
+# 默认超参 (Optuna 历史最优，fallback 用)
+DEFAULT_PARAMS = {
+    'daily': {
+        'num_leaves': 213, 'max_depth': 11, 'learning_rate': 0.0626,
+        'subsample': 0.941, 'colsample_bytree': 0.832,
+        'subsample_freq': 3, 'reg_alpha': 0.0089, 'reg_lambda': 0.0024,
+        'min_child_samples': 32, 'min_split_gain': 0.064,
+    },
+    '30m': {
+        'num_leaves': 128, 'max_depth': 8, 'learning_rate': 0.05,
+        'subsample': 0.9, 'colsample_bytree': 0.8,
+        'subsample_freq': 5, 'reg_alpha': 0.05, 'reg_lambda': 0.05,
+        'min_child_samples': 100, 'min_split_gain': 0.2,
+    },
+}
+
 
 # ============ 数据加载 ============
 def load_data(db_path: str, table: str) -> Dict[str, pd.DataFrame]:
@@ -427,12 +443,16 @@ def main():
         params = optuna_search(np.vstack([X_train, X_val]), np.concatenate([y_train, y_val]),
                                cfg, quick=False)
     else:
+        # 加载已有参数，没有则用历史最优默认值
         params = {}
         if os.path.exists(params_file):
-            with open(params_file) as f:
-                params = json.load(f).get(args.model, {})
+            saved = json.load(open(params_file)).get(args.model, {})
+            if saved:
+                params = saved
+                print(f"  ✅ 从 best_params.json 加载参数")
         if not params:
-            print("⚠️ 未找到 best_params.json，使用默认参数")
+            params = DEFAULT_PARAMS.get(args.model, {}).copy()
+            print(f"  ⚠️ 使用历史最优默认参数 (Optuna 搜索过)")
 
     for k, v in LGBM_FIXED.items():
         params.setdefault(k, v)
