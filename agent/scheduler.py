@@ -42,46 +42,66 @@ FEISHU_TARGET_CHAT_ID = os.environ.get("FEISHU_TARGET_CHAT_ID", "")
 
 
 def _search_stock_news_brief(symbol: str, name: str) -> Optional[dict]:
-    """搜索个股相关新闻（优先百度，备用DuckDuckGo），带当前日期过滤"""
-    today_str = datetime.now().strftime('%Y年%m月')  # 例：2026年06月
-    # 方案1: 百度新闻搜索（中文效果最好）
+    """搜索个股近3日相关新闻（百度），带日期过滤"""
+    from datetime import timedelta
+    recent_days = [(datetime.now() - timedelta(days=i)).strftime('%m月%d日') for i in range(3)]
+    date_filter = '|'.join(recent_days)  # 例: "06月13日|06月14日"
+
     try:
         import requests, re
         short_name = name.replace('股份', '').replace('集团', '').replace('有限', '').replace('-W', '')
         url = 'https://news.baidu.com/ns'
-        params = {'word': f'{short_name} {today_str}', 'tn': 'news', 'ie': 'utf-8', 'rn': 8}
+        params = {'word': short_name, 'tn': 'news', 'ie': 'utf-8', 'rn': 10, 'pn': 0}
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         r = requests.get(url, params=params, headers=headers, timeout=10)
-        titles = re.findall(r'<h3[^>]*>.*?<a[^>]*>(.*?)</a>', r.text, re.DOTALL)
-        titles = [re.sub(r'<[^>]+>', '', t).strip() for t in titles if t.strip()]
-        # 过滤行情页面和过期旧闻
-        skip_patterns = ['最新价格', '行情_走势图', '净申购', '净赎回', '份额增长', '份额减少', '资金流向']
-        # 过滤明显过期的话题（双十一、年报、季报等与当前月份不匹配的）
-        stale_patterns = ['双十一', '双11', '618', '年报', '季报', '中期报告', '分红方案', '股东大会']
+        # 提取标题和来源时间
+        matches = re.findall(
+            r'<h3[^>]*>.*?<a[^>]*>(.*?)</a>.*?(?:<span[^>]*class="c-color-gray2[^"]*"[^>]*>(.*?)</span>)',
+            r.text, re.DOTALL
+        )
+        if not matches:
+            # 宽松匹配：只要标题，不强制匹配时间
+            titles = re.findall(r'<h3[^>]*>.*?<a[^>]*>(.*?)</a>', r.text, re.DOTALL)
+            titles = [re.sub(r'<[^>]+>', '', t).strip() for t in titles if t.strip()]
+            matches = [(t, '') for t in titles]
+
+        skip_patterns = ['最新价格', '行情_走势图', '净申购', '净赎回', '份额增长', '资金流向',
+                        '股价行情_财报', '个股资金流向', '股票股价', '实时行情']
+
         headlines = []
-        for t in titles[:8]:
-            if t and len(t) > 15 and not any(p in t for p in skip_patterns) and not any(p in t for p in stale_patterns):
-                headlines.append({'title': t, 'snippet': '', 'url': ''})
+        for raw_title, raw_time in matches:
+            title = re.sub(r'<[^>]+>', '', raw_title).strip()
+            if not title or len(title) < 12:
+                continue
+            if any(p in title for p in skip_patterns):
+                continue
+            # 检查是否在近3天内或者时间信息匹配近3日
+            time_str = re.sub(r'<[^>]+>', '', raw_time).strip() if raw_time else ''
+            is_recent = any(d in title or d in time_str for d in recent_days)
+            if not is_recent:
+                # Baidu news sometimes shows "X小时前", "昨天", "X分钟前"
+                is_recent = any(kw in time_str for kw in ['小时前', '分钟前', '昨天', '今天'])
+            if not is_recent and headlines:
+                continue  # 已有近期新闻后跳过旧闻
+            headlines.append({'title': title, 'snippet': '', 'url': '', 'time': time_str})
+
         if headlines:
             return {'headlines': headlines[:5], 'keyword': name}
     except Exception as e:
         logger.warning(f"百度新闻搜索失败 {name}: {e}")
 
-    # 方案2: DuckDuckGo（备用）
+    # 备用: DuckDuckGo
     try:
         from search import search
         short_name = name.replace('股份', '').replace('集团', '').replace('有限', '').replace('-W', '')
-        today_yyyy = datetime.now().strftime('%Y')
-        results = search(f"{short_name} 利好 利空 最新消息 {today_yyyy}", count=5)
-        if not results:
-            results = search(f"{short_name} 新闻 股价 {today_yyyy}", count=5)
+        results = search(f"{short_name} 最新消息", count=5)
         if not results:
             return None
         headlines = []
         skip_patterns = ['最新价格', '行情_走势图', '股价行情_财报', '个股资金流向', '股票股价_股价行情']
-        for r in results[:5]:
+        for r in results[:3]:
             title = r.get('title', '').strip()
-            if title and len(title) > 15 and not any(p in title for p in skip_patterns):
+            if title and len(title) > 12 and not any(p in title for p in skip_patterns):
                 headlines.append({'title': title, 'snippet': r.get('snippet', '')[:80], 'url': r.get('url', '')})
         if not headlines:
             return None

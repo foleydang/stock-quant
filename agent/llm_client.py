@@ -110,25 +110,47 @@ def chat_response(text: str, context: dict = None) -> str:
 
 
 def analyze_news_sentiment(news_list: list) -> Dict:
-    """分析新闻情绪"""
+    """分析新闻情绪，返回确定性评分（非中庸）"""
     if not news_list:
-        return {"sentiment": "无数据", "score": 0, "summary": "暂无新闻"}
+        return {"sentiment_label": "无数据", "sentiment": "无数据", "score": 0, "summary": "暂无新闻"}
 
-    news_text = "\n".join([f"- [{n['time']}] {n['title']}: {n['content'][:100]}" for n in news_list[:10]])
+    news_text = "\n".join([
+        f"[{n.get('time', '?')}] {n.get('title', '')} | {n.get('snippet', n.get('content', ''))[:80]}"
+        for n in news_list[:6]
+    ])
+
+    today = datetime.now().strftime('%Y年%m月%d日')
     messages = [
-        {"role": "system", "content": "分析财经新闻的市场情绪倾向。只返回JSON。"},
+        {"role": "system", "content": (
+            f"你是资深A股/港股研究员，今天是{today}。\n"
+            "分析以下新闻对股价的综合影响，给出确定性的判断。\n\n"
+            "评分规则（非常重要）：\n"
+            "- 0.7-1.0 偏利好：明显利好（业绩超预期/大单签约/政策扶持/新产品发布/机构增持）\n"
+            "- 0.3-0.7 中性：无明确利好利空，或利多利空互抵\n"
+            "- 0.0-0.3 偏利空：明显利空（业绩下滑/大股东减持/监管处罚/行业调控/诉讼风险）\n\n"
+            "注意：不要默认给0.5！根据新闻内容认真判断。\n"
+            "只返回JSON无需解释: "
+            "{\"sentiment_label\": \"偏利好/偏利空/中性\", \"score\": 0.0-1.0, "
+            "\"summary\": \"一句话综合判断\", \"factors\": [\"关键要点1\", \"关键要点2\"]}"
+        )},
         {"role": "user", "content": news_text}
     ]
-    result = _call_dashscope_chat(messages, temperature=0.3)
+    result = _call_dashscope_chat(messages, temperature=0.2, max_tokens=200)
     if result:
         try:
             if '{' in result:
                 start = result.index('{')
                 end = result.rindex('}') + 1
-                return json.loads(result[start:end])
-        except (json.JSONDecodeError, ValueError):
-            pass
-    return {"sentiment": "中性", "score": 0.5, "summary": "无法分析情绪"}
+                parsed = json.loads(result[start:end])
+                # 强制 score 为 float
+                parsed['score'] = float(parsed.get('score', 0.5))
+                parsed.setdefault('sentiment_label', '中性')
+                parsed.setdefault('summary', '')
+                parsed.setdefault('factors', [])
+                return parsed
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(f"新闻情绪解析失败: {e}")
+    return {"sentiment_label": "中性", "sentiment": "中性", "score": 0.5, "summary": "无法分析"}
 
 
 def is_available() -> bool:
