@@ -234,9 +234,10 @@ def prepare_data(data: Dict, conn, cfg: dict,
 
     print(f"  截面排名完成: {n_dates_ranked} 个交易日, {len(stock_returns)} 只股票")
 
-    # 第四遍: 合并特征 + 排名目标 + 切分
+    # 第四遍: 合并特征 + 排名目标 + 实际收益率 + 切分
     feature_names = None
     X_tr, y_tr, X_va, y_va, X_te, y_te = [], [], [], [], [], []
+    y_te_raw = []  # 测试集实际收益率 (用于分组回测展示)
 
     for sym, df in list(stock_data.items()):
         try:
@@ -247,10 +248,12 @@ def prepare_data(data: Dict, conn, cfg: dict,
             if feature_names is None:
                 feature_names = list(feats.columns)
 
-            # 截面排名目标
+            # 截面排名目标 + 实际收益率
             rank_target = stock_rank_target.get(sym, {})
+            ret_map = stock_returns.get(sym, {})
             date_strs = [str(d)[:10] for d in df['date'].values]
             target = np.array([rank_target.get(d, np.nan) for d in date_strs], dtype=np.float32)
+            raw_ret = np.array([ret_map.get(d, np.nan) for d in date_strs], dtype=np.float32)
             valid = ~np.isnan(target)
 
             if valid.sum() < cfg['min_history']:
@@ -258,6 +261,7 @@ def prepare_data(data: Dict, conn, cfg: dict,
 
             feats_v = feats[valid].values
             target_v = target[valid]
+            raw_ret_v = raw_ret[valid]
             dates_v = feats.index[valid]
 
             # 时序切分
@@ -274,6 +278,7 @@ def prepare_data(data: Dict, conn, cfg: dict,
             if test_mask.sum() >= 10:
                 X_te.append(feats_v[test_mask])
                 y_te.append(target_v[test_mask])
+                y_te_raw.append(raw_ret_v[test_mask])
         except Exception:
             continue
 
@@ -286,8 +291,9 @@ def prepare_data(data: Dict, conn, cfg: dict,
     y_val = np.concatenate(y_va).astype(np.float32)
     X_test = np.vstack(X_te).astype(np.float32)
     y_test = np.concatenate(y_te).astype(np.float32)
+    y_test_raw = np.concatenate(y_te_raw).astype(np.float32) if y_te_raw else None
 
-    return (X_train, y_train), (X_val, y_val), (X_test, y_test), feature_names
+    return (X_train, y_train), (X_val, y_val), (X_test, y_test), feature_names, y_test_raw
 
 
 # ============ 特征去冗余 ============
@@ -352,16 +358,24 @@ def train_one(seed: int, X_train, y_train, X_val, y_val,
 
 # ============ 测试集评估 ============
 def evaluate_ensemble(models_info: List[Dict], X_test, y_test,
-                      feature_names: List[str]):
-    """测试集评估: 单模型 + Ensemble (IC + MSE)"""
+                      feature_names: List[str], y_test_raw=None):
+    """测试集评估: 单模型 + Ensemble (IC + MSE)
+
+    Args:
+        y_test: 排名分位目标 (用于计算 IC)
+        y_test_raw: 实际收益率 (用于分组回测展示)
+    """
     n = len(models_info)
     print(f"\n{'='*70}")
     print(f" 🧪 测试集评估 ({len(X_test):,}条, {n}模型)")
     print(f"{'='*70}")
 
     # 目标统计
-    print(f"  目标统计: mean={y_test.mean():.4f} std={y_test.std():.4f} "
+    print(f"  排名目标: mean={y_test.mean():.4f} std={y_test.std():.4f} "
           f"min={y_test.min():.4f} max={y_test.max():.4f}")
+    if y_test_raw is not None:
+        print(f"  实际收益: mean={y_test_raw.mean():.4f} std={y_test_raw.std():.4f} "
+              f"min={y_test_raw.min():.4f} max={y_test_raw.max():.4f}")
 
     # 单模型评估
     all_preds = []
@@ -382,21 +396,30 @@ def evaluate_ensemble(models_info: List[Dict], X_test, y_test,
         print(f"  {'─'*50}")
         print(f"  🏆 Ensemble({n}) → IC={ic:.4f} | MSE={mse:.6f}")
 
-    # 分组回测 (按预测值分5组, 看分组收益)
+    # 分组回测 (按预测值分5组, 用实际收益率评估)
     if n > 1:
-        print(f"\n  📊 分组回测 (按预测值分5组):")
+        print(f"\n  📊 分组回测 (按预测排名分5组, 展示实际收益率):")
         sort_idx = np.argsort(ensemble_pred)
         n_per_group = len(sort_idx) // 5
         for g in range(5):
             start = g * n_per_group
             end = start + n_per_group if g < 4 else len(sort_idx)
-            group_ret = y_test[sort_idx[start:end]].mean()
+            group_rank = y_test[sort_idx[start:end]].mean()
             group_pred = ensemble_pred[sort_idx[start:end]].mean()
-            print(f"    G{g+1}: 实际收益={group_ret:.4f} | 预测均值={group_pred:.4f}")
+            if y_test_raw is not None:
+                group_ret = y_test_raw[sort_idx[start:end]].mean()
+                print(f"    G{g+1}: 排名={group_rank:+.4f} | 预测={group_pred:+.4f} | 实际5日收益={group_ret:+.4%}")
+            else:
+                print(f"    G{g+1}: 排名={group_rank:+.4f} | 预测={group_pred:+.4f}")
         # 多空收益
-        long_ret = y_test[sort_idx[-n_per_group:]].mean()
-        short_ret = y_test[sort_idx[:n_per_group]].mean()
-        print(f"    多空收益差: {long_ret - short_ret:.4f}")
+        if y_test_raw is not None:
+            long_ret = y_test_raw[sort_idx[-n_per_group:]].mean()
+            short_ret = y_test_raw[sort_idx[:n_per_group]].mean()
+            print(f"    多空收益差(5日): {long_ret - short_ret:+.4%}  (买入G5 卖出G1)")
+        else:
+            long_rank = y_test[sort_idx[-n_per_group:]].mean()
+            short_rank = y_test[sort_idx[:n_per_group]].mean()
+            print(f"    多空排名差: {long_rank - short_rank:.4f}")
 
     # 特征重要性
     if models_info:
@@ -461,7 +484,7 @@ def main():
     if result is None:
         print("❌ 数据准备失败"); return
 
-    (X_train, y_train), (X_val, y_val), (X_test, y_test), feature_names = result
+    (X_train, y_train), (X_val, y_val), (X_test, y_test), feature_names, y_test_raw = result
     print(f"  特征计算耗时: {time.time()-t0:.0f}s")
     print(f"  训练: {len(X_train):,}条 | 验证: {len(X_val):,}条 | 测试: {len(X_test):,}条")
     print(f"  特征: {len(feature_names)}")
@@ -489,7 +512,7 @@ def main():
           f"平均 {avg_trees}棵/模型, 平均 val IC={avg_ic:.4f}")
 
     # ---- 5. 测试集评估 ----
-    test_ic, test_mse = evaluate_ensemble(models_info, X_test, y_test, feature_names)
+    test_ic, test_mse = evaluate_ensemble(models_info, X_test, y_test, feature_names, y_test_raw)
 
     # ---- 6. 最终模型 (train+val 全量) ----
     print(f"\n🏋️ 训练最终模型 (train+val 全量, 复用最佳树数)...")
