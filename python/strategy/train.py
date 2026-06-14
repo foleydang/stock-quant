@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-LGBM 生产级训练脚本 v5 — 回归 Bagging Ensemble
+LGBM 生产级训练脚本 v5 — 截面排名回归 Bagging Ensemble
 
 架构:
-  日线模型 → 预测5日收益率 (α选股层)
-  30m模型  → 预测3根K线收益率 (γ择时层)
+  日线模型 → 预测截面排名分位 (α选股层)
+  30m模型  → 预测截面排名分位 (γ择时层)
 
 关键设计:
-  1. 回归目标: 直接预测连续收益率（不做分类/分桶）
+  1. 截面排名回归: 每日对所有股票按收益率排名, 预测排名分位值
+     消除市场beta干扰, 直接对齐IC评估指标
   2. Bagging Ensemble: 5个独立LGBM并行训练
   3. 时序分离: train(80%) → val(10%) → test(10%)
   4. 生产级参数: num_leaves=255, lr=0.01, 20000棵树
-  5. 评估指标: IC (Spearman) + MSE, 非分类指标
+  5. 评估指标: IC (Spearman) + 分组回测
 
 用法:
   python strategy/train.py --model daily           # 日线训练
@@ -156,15 +157,20 @@ def get_all_dates(data: Dict) -> np.ndarray:
 def prepare_data(data: Dict, conn, cfg: dict,
                  train_cutoff, val_cutoff,
                  pipeline: FeaturePipeline) -> Optional[Tuple]:
-    """准备训练数据: 特征 + 回归目标 + 时序切分"""
+    """准备训练数据: 特征 + 截面排名回归目标 + 时序切分
+
+    目标: 每日对股票按未来收益率排名, 预测排名分位值 (0~1)
+    这直接对齐 IC 评估指标, 消除市场 beta 干扰
+    """
     sent_df = load_sentiment(conn)
     has_sent = len(sent_df) > 0
     horizon = cfg['horizon']
 
-    # 第一遍: 计算所有股票特征
+    # 第一遍: 计算所有股票特征和收益率
     print("  计算个股特征...")
     all_features = {}
     stock_data = {}
+    stock_returns = {}  # {symbol: {date_str: return_val}}
     success = 0
 
     for sym, df in data.items():
@@ -176,6 +182,20 @@ def prepare_data(data: Dict, conn, cfg: dict,
             feats.index = df['date'].values
             all_features[sym] = feats
             stock_data[sym] = df
+
+            # 预计算收益率 (后续用于截面排名)
+            close = df['close'].values.astype(float)
+            ret = np.full(len(close), np.nan)
+            for j in range(len(close) - horizon):
+                ret[j] = (close[j + horizon] - close[j]) / close[j]
+
+            date_strs = [str(d)[:10] for d in df['date'].values]
+            ret_map = {}
+            for j, d in enumerate(date_strs):
+                if not np.isnan(ret[j]) and abs(ret[j]) < RETURN_CLIP:
+                    ret_map[d] = ret[j]
+            stock_returns[sym] = ret_map
+
             success += 1
         except Exception:
             continue
@@ -186,7 +206,35 @@ def prepare_data(data: Dict, conn, cfg: dict,
     print("  计算截面排名特征...")
     cs_features = pipeline.compute_cross_section(all_features, get_all_dates(data))
 
-    # 第三遍: 合并 + 回归目标 + 切分
+    # 第三遍: 按日期截面排名, 构建目标
+    print("  计算截面排名目标...")
+    # 收集每个日期的所有股票收益率
+    date_returns: Dict[str, Dict[str, float]] = {}  # {date: {symbol: return}}
+    for sym, ret_map in stock_returns.items():
+        for d, r in ret_map.items():
+            if d not in date_returns:
+                date_returns[d] = {}
+            date_returns[d][sym] = r
+
+    # 对每个日期, 截面排名 → 分位值 0~1
+    stock_rank_target: Dict[str, Dict[str, float]] = {}  # {symbol: {date: rank_pct}}
+    for sym in stock_returns:
+        stock_rank_target[sym] = {}
+
+    n_dates_ranked = 0
+    for d, sym_rets in date_returns.items():
+        if len(sym_rets) < 10:  # 至少10只股票才有排名意义
+            continue
+        rets = np.array(list(sym_rets.values()))
+        # 百分位排名: 0=最差, 1=最好
+        ranks = (pd.Series(rets).rank(pct=True) - 0.5).values  # 中心化到 -0.5 ~ 0.5
+        for i, sym in enumerate(sym_rets.keys()):
+            stock_rank_target[sym][d] = float(ranks[i])
+        n_dates_ranked += 1
+
+    print(f"  截面排名完成: {n_dates_ranked} 个交易日, {len(stock_returns)} 只股票")
+
+    # 第四遍: 合并特征 + 排名目标 + 切分
     feature_names = None
     X_tr, y_tr, X_va, y_va, X_te, y_te = [], [], [], [], [], []
 
@@ -199,20 +247,17 @@ def prepare_data(data: Dict, conn, cfg: dict,
             if feature_names is None:
                 feature_names = list(feats.columns)
 
-            # 回归目标: 连续收益率 (不做分类)
-            close = df['close'].values.astype(float)
-            ret = np.full(len(close), np.nan)
-            for j in range(len(close) - horizon):
-                ret[j] = (close[j + horizon] - close[j]) / close[j]
-
-            # 过滤异常值 (极端涨跌停样本)
-            valid = ~np.isnan(ret) & (np.abs(ret) < RETURN_CLIP)
+            # 截面排名目标
+            rank_target = stock_rank_target.get(sym, {})
+            date_strs = [str(d)[:10] for d in df['date'].values]
+            target = np.array([rank_target.get(d, np.nan) for d in date_strs], dtype=np.float32)
+            valid = ~np.isnan(target)
 
             if valid.sum() < cfg['min_history']:
                 continue
 
             feats_v = feats[valid].values
-            target_v = ret[valid].astype(np.float32)
+            target_v = target[valid]
             dates_v = feats.index[valid]
 
             # 时序切分
@@ -381,7 +426,7 @@ def main():
 
     print("=" * 70)
     print(f"  LGBM {cfg['label']}模型训练 v5 — {n_models}模型 Bagging Ensemble")
-    print(f"  目标: 回归 (连续收益率) | 预测周期: {cfg['horizon']}根K线")
+    print(f"  目标: 截面排名回归 (0~1分位) | 预测周期: {cfg['horizon']}根K线")
     print(f"  时序: train({TRAIN_RATIO:.0%}) → val({VAL_RATIO:.0%}) → test({TEST_RATIO:.0%})")
     print(f"  并行: {n_models}模型并行 (joblib n_jobs={N_JOBS_PARALLEL})")
     print(f"  {'⚠️ 快速模式' if args.quick else '🚀 生产模式'}: "
@@ -475,7 +520,7 @@ def main():
         'keep_features': feature_names,
         'n_models': n_models,
         'horizon': cfg['horizon'],
-        'model_type': 'regression',
+        'model_type': 'rank_regression',
         'train_date': datetime.now().strftime('%Y-%m-%d'),
         'train_samples': len(X_full),
         'seeds': seeds,
