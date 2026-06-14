@@ -98,7 +98,7 @@ class TradingMonitor:
         # 策略参数（熊市策略）
         params = get_strategy_params()
         self.add_position_threshold = params.get('add_position_threshold', -0.20)
-        self.add_position_up_prob = params.get("add_position_prob", 0.55)
+        self.add_position_up_prob = params.get("add_position_prob", 0.01)
         self.max_add_ratio = params.get("max_add_ratio", 0.30)
 
         # 模型
@@ -183,7 +183,7 @@ class TradingMonitor:
         return positions
 
     def _predict_up_prob(self, symbol: str) -> Optional[float]:
-        """预测上涨概率（支持v3集成和v2单模型）"""
+        """预测预期收益率（支持v5集成和v2单模型）"""
         if self.model_data is None or not FEATURE_ENGINEER_AVAILABLE:
             return None
 
@@ -222,17 +222,17 @@ class TradingMonitor:
 
             # 预测
             if 'models' in self.model_data:
-                # v3 集成：平均概率
-                probs = []
+                # v5 集成：预测均值
+                preds = []
                 for m in self.model_data['models']:
                     try:
-                        probs.append(m.predict_proba([last_features.values])[0][1])
+                        preds.append(m.predict([last_features.values])[0])
                     except Exception:
-                        probs.append(0.5)
-                return float(np.mean(probs))
+                        preds.append(0.0)
+                return float(np.mean(preds))
             else:
                 # v2/v1 单模型
-                return self.model.predict_proba([last_features.values])[0][1]
+                return self.model.predict([last_features.values])[0]
         except Exception as e:
             sys.stderr.write(f"预测失败 {symbol}: {e}\n")
             return None
@@ -243,7 +243,7 @@ class TradingMonitor:
         suggestions = []
 
         for symbol, pos in positions.items():
-            up_prob = self._predict_up_prob(symbol)
+            pred_ret = self._predict_up_prob(symbol)
             profit_pct = pos.profit_pct
 
             suggestion = {
@@ -254,29 +254,29 @@ class TradingMonitor:
                 'current_price': pos.current_price,
                 'profit': pos.profit,
                 'profit_pct': profit_pct,
-                'up_prob': up_prob or 0,
+                'up_prob': pred_ret or 0,
                 'action': '持有',
                 'reason': ''
             }
 
             # 熊市策略：浮亏超过20%且模型看涨，建议补仓
-            if profit_pct <= -20 and up_prob and up_prob >= self.add_position_up_prob:
+            if profit_pct <= -20 and pred_ret and pred_ret >= self.add_position_up_prob:
                 add_shares = int(pos.shares * self.max_add_ratio / 100) * 100
                 add_amount = add_shares * pos.current_price
 
                 if add_amount <= self.available_cash:
                     suggestion['action'] = '补仓'
-                    suggestion['reason'] = f"浮亏{profit_pct:.0f}%，模型看涨{up_prob:.0%}，建议补仓{add_shares}股"
+                    suggestion['reason'] = f"浮亏{profit_pct:.0f}%，模型看涨(预期收益{pred_ret:.4f})，建议补仓{add_shares}股"
                     suggestion['add_shares'] = add_shares
                     suggestion['add_amount'] = add_amount
 
             # 浮亏严重但模型看跌，提示风险
-            elif profit_pct <= -25 and up_prob and up_prob < 0.45:
+            elif profit_pct <= -25 and pred_ret and pred_ret < -0.005:
                 suggestion['action'] = '观望'
                 suggestion['reason'] = f"浮亏{profit_pct:.0f}%，但模型看跌，暂不补仓"
 
             # 浮盈超过15%且模型看跌，提示减仓机会
-            elif profit_pct >= 15 and up_prob and up_prob < 0.45:
+            elif profit_pct >= 15 and pred_ret and pred_ret < -0.005:
                 suggestion['action'] = '减仓'
                 suggestion['reason'] = f"浮盈{profit_pct:.0f}%，模型看跌，可考虑减仓"
 
@@ -384,7 +384,7 @@ class TradingMonitor:
             action_emoji = {'补仓': '🟢', '减仓': '🔴', '持有': '⚪', '观望': '⚠️'}.get(s['action'], '⚪')
             profit_emoji = '✅' if s['profit'] > 0 else '❌'
             print(f"  {profit_emoji} {s['stock_name']}: {s['shares']}股 @ ¥{s['cost_price']:.2f} → ¥{s['current_price']:.2f}")
-            print(f"     盈亏: ¥{s['profit']:,.0f} ({s['profit_pct']:.1f}%) | 模型预测: {s['up_prob']:.0%}")
+            print(f"     盈亏: ¥{s['profit']:,.0f} ({s['profit_pct']:.1f}%) | 预期收益: {s['up_prob']:.4f}")
             print(f"     {action_emoji} {s['action']}: {s['reason']}")
 
         # 做T建议
@@ -442,10 +442,10 @@ class TradingMonitor:
         for s in sorted(suggestions, key=lambda x: x['profit_pct'], reverse=True):
             color = "green" if s['profit'] > 0 else "red"
             action_color = {'补仓': '#28a745', '减仓': '#dc3545', '持有': '#6c757d', '观望': '#ffc107'}[s['action']]
-            # 预测上涨概率颜色
-            up_prob = s['up_prob']
-            prob_color = "green" if up_prob >= 0.55 else "red" if up_prob < 0.45 else "gray"
-            prob_text = f"看涨{up_prob:.0%}" if up_prob >= 0.55 else f"看跌{up_prob:.0%}" if up_prob < 0.45 else f"中性{up_prob:.0%}"
+            # 预期收益率颜色
+            pred_ret = s['up_prob']
+            prob_color = "green" if pred_ret >= 0.01 else "red" if pred_ret < -0.005 else "gray"
+            prob_text = f"看涨{pred_ret:.4f}" if pred_ret >= 0.01 else f"看跌{pred_ret:.4f}" if pred_ret < -0.005 else f"中性{pred_ret:.4f}"
             rows += f"""
             <tr>
                 <td>{s['stock_name']}</td>
@@ -614,7 +614,7 @@ class TradingMonitor:
                 {''.join([f"<li><b>{s['stock_name']}</b>: {s['action']} - {s['reason']}</li>" for s in suggestions if s['action'] != '持有'])}
                 </ul>
                 <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">
-                <b>预测上涨</b>列说明: 模型预测该股票未来上涨概率，>55%看涨(绿色)，<45%看跌(红色)，其余中性
+                <b>预期收益</b>列说明: 模型预测该股票预期收益率，>1%看涨(绿色)，<-0.5%看跌(红色)，其余中性
                 </p>
             </div>
         </div>

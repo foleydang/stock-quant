@@ -112,8 +112,8 @@ class LGBMBacktesterOptimized:
         self.max_hold_periods = 24  # 最大持仓24根K线=12小时
         self.stop_loss_pct = 0.015   # 止损1.5%
         self.take_profit_pct = 0.035  # 止盈3.5%
-        self.buy_threshold = 0.55   # 买入阈值(最优值,回测验证)
-        self.sell_threshold = 0.35  # 卖出阈值
+        self.buy_threshold = 0.01    # 买入阈值: 预期收益 > 1%
+        self.sell_threshold = -0.005 # 卖出阈值: 预期收益 < -0.5%
         self.dynamic_stop_loss = False  # 动态止损(验证无效,关闭)
 
         # 特征缓存
@@ -196,17 +196,17 @@ class LGBMBacktesterOptimized:
             if last_row.isna().any():
                 last_row = last_row.fillna(0)
 
-            probs = []
+            preds = []
             for model in self.models:
                 try:
-                    p = model.predict_proba([last_row.values])[0]
-                    # 3分类: p[0]=持有 p[1]=买入 p[2]=卖出
-                    probs.append(p[1] if len(p) > 2 else (p[1] if len(p) > 1 else p[0]))
+                    p = model.predict([last_row.values])[0]
+                    # 回归: 预测值为预期收益率
+                    preds.append(p)
                 except Exception:
-                    probs.append(0.33)
+                    preds.append(0.0)
 
-            avg_prob = float(np.mean(probs))
-            return avg_prob, f"买入概率:{avg_prob:.1%}({len(self.models)}LGBM)"
+            avg_pred = float(np.mean(preds))
+            return avg_pred, f"预期收益:{avg_pred:.4f}({len(self.models)}LGBM)"
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
@@ -240,17 +240,17 @@ class LGBMBacktesterOptimized:
             if last_row.isna().any():
                 last_row = last_row.fillna(0)
 
-            probs = []
+            preds = []
             for model in self.daily_models:
                 try:
-                    p = model.predict_proba([last_row.values])[0]
-                    # 3分类: p[0]=震荡 p[1]=上涨 p[2]=下跌
-                    probs.append(p[1] if len(p) > 1 else p[0])
+                    p = model.predict([last_row.values])[0]
+                    # 回归: 预测值为预期收益率
+                    preds.append(p)
                 except Exception:
-                    probs.append(0.33)
+                    preds.append(0.0)
 
-            daily_prob = float(np.mean(probs))
-            return daily_prob, f"日线趋势:{daily_prob:.1%}"
+            daily_pred = float(np.mean(preds))
+            return daily_pred, f"日线预期收益:{daily_pred:.4f}"
         except Exception as e:
             return 0.5, f"日线错误:{e}"
 
@@ -352,7 +352,7 @@ class LGBMBacktesterOptimized:
             logger.info(f"双层架构: 日线趋势过滤 + 30分钟信号")
         else:
             logger.warning("日线模型未加载，使用单层30分钟模型")
-        logger.info(f"买入阈值: 上涨概率 > {self.buy_threshold:.0%}")
+        logger.info(f"买入阈值: 预期收益 > {self.buy_threshold:.4f}")
         logger.info("=" * 70)
 
         # 加载数据
@@ -467,9 +467,9 @@ class LGBMBacktesterOptimized:
             elif hold_periods >= self.max_hold_periods:
                 sell_reason = "到期"
             elif hold_periods >= self.min_hold_periods:
-                up_prob, _ = self._get_model_prediction(symbol, current_idx)
-                if up_prob < self.sell_threshold:
-                    sell_reason = f"模型看跌({up_prob:.0%})"
+                pred_ret, _ = self._get_model_prediction(symbol, current_idx)
+                if pred_ret < self.sell_threshold:
+                    sell_reason = f"模型看跌(预期收益{pred_ret:.4f})"
 
             if sell_reason:
                 self._sell_position(symbol, current_time, current_price, sell_reason, hold_periods)
@@ -517,30 +517,29 @@ class LGBMBacktesterOptimized:
             if current_idx is None or current_idx < 120:
                 continue
 
-            up_prob, reason = self._get_model_prediction(symbol, current_idx)
+            pred_ret, reason = self._get_model_prediction(symbol, current_idx)
 
-            # 双层架构: 日线模型过滤 (3分类)
+            # 双层架构: 日线模型过滤 (回归)
             if self.daily_models:
-                daily_prob, daily_reason = self._get_daily_trend(symbol, current_time)
-                # P(上涨) < 0.35 → 震荡/下跌趋势，禁止买入
-                if daily_prob < 0.35:
-                    logger.debug(f"{symbol} 日线看跌/震荡(P(up)={daily_prob:.1%})，跳过买入")
+                daily_pred, daily_reason = self._get_daily_trend(symbol, current_time)
+                # 日线预期收益 < -1% → 看跌趋势，禁止买入
+                if daily_pred < -0.01:
+                    logger.debug(f"{symbol} 日线看跌(预期收益={daily_pred:.4f})，跳过买入")
                     continue
-                elif daily_prob < 0.45:  # 日线偏弱 → 提高买入门槛
-                    if up_prob < self.buy_threshold + 0.05:  # 门槛提高5%
+                elif daily_pred < 0.0:  # 日线偏弱 → 提高买入门槛
+                    if pred_ret < self.buy_threshold + 0.005:
                         continue
                     reason += f" + {daily_reason}"
                 else:
                     reason += f" + {daily_reason}"
 
-            if up_prob > self.buy_threshold:
-                # 置信度决定仓位比例
-                confidence = up_prob - 0.5
-                if confidence > 0.20:   # >70%: 重仓40%
+            if pred_ret > self.buy_threshold:
+                # 预期收益决定仓位比例
+                if pred_ret > 0.03:     # >3%: 重仓40%
                     pos_pct = 0.40
-                elif confidence > 0.10: # >60%: 中仓30%
+                elif pred_ret > 0.02:   # >2%: 中仓30%
                     pos_pct = 0.30
-                else:                  # 55-60%: 轻仓20%
+                else:                   # 1-2%: 轻仓20%
                     pos_pct = 0.20
 
                 current_price = float(df['close'].iloc[current_idx])
