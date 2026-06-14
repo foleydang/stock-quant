@@ -496,6 +496,83 @@ class InteractionFeatures:
         return f
 
 
+# ============ 情绪特征 ============
+class SentimentFeatures:
+    """情绪特征: 涨跌停、融资融券、龙虎榜、量比、异常收益"""
+
+    @staticmethod
+    def calculate(df: pd.DataFrame, symbol: str = None) -> pd.DataFrame:
+        f = pd.DataFrame(index=df.index)
+
+        if 'date' not in df.columns or symbol is None:
+            for col in ['sent_limit_up', 'sent_limit_down', 'sent_consecutive_limit',
+                        'sent_vol_ratio', 'sent_abnormal_ret', 'sent_margin_chg',
+                        'sent_short_balance', 'sent_lhb_ret_5d', 'sent_lhb_flag',
+                        'sent_limit_any', 'sent_vol_ratio_ma5', 'sent_margin_cum3']:
+                f[col] = 0
+            return f
+
+        df_dates = pd.to_datetime(df['date'])
+        trade_dates_ymd = df_dates.dt.strftime('%Y-%m-%d')
+
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            min_d, max_d = trade_dates_ymd.min(), trade_dates_ymd.max()
+            sent = pd.read_sql(
+                "SELECT symbol, trade_date, is_limit_up, is_limit_down, "
+                "consecutive_limit_up, vol_ratio_20, abnormal_ret, "
+                "margin_balance_chg, short_balance, lhb_ret_5d, lhb_flag "
+                "FROM sentiment_daily "
+                f"WHERE symbol='{symbol}' AND trade_date >= '{min_d}' "
+                f"AND trade_date <= '{max_d}' ORDER BY trade_date", conn)
+            conn.close()
+
+            if len(sent) > 0:
+                sent_map = sent.set_index('trade_date')
+
+                f['sent_limit_up'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'is_limit_up']) if d in sent_map.index else 0).fillna(0)
+                f['sent_limit_down'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'is_limit_down']) if d in sent_map.index else 0).fillna(0)
+                f['sent_consecutive_limit'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'consecutive_limit_up']) if d in sent_map.index else 0).fillna(0)
+
+                f['sent_vol_ratio'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'vol_ratio_20']) if d in sent_map.index else 1).fillna(1)
+                f['sent_vol_ratio'] = f['sent_vol_ratio'].clip(0, 50)
+
+                f['sent_abnormal_ret'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'abnormal_ret']) if d in sent_map.index else 0).fillna(0)
+
+                f['sent_margin_chg'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'margin_balance_chg']) if d in sent_map.index else 0).fillna(0)
+                f['sent_short_balance'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'short_balance']) if d in sent_map.index else 0).fillna(0)
+
+                f['sent_lhb_ret_5d'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'lhb_ret_5d']) if d in sent_map.index else 0).fillna(0)
+                f['sent_lhb_flag'] = trade_dates_ymd.map(
+                    lambda d: float(sent_map.loc[d, 'lhb_flag']) if d in sent_map.index else 0).fillna(0)
+
+                f['sent_limit_any'] = ((f['sent_limit_up'] > 0) | (f['sent_limit_down'] > 0)).astype(int)
+                f['sent_vol_ratio_ma5'] = f['sent_vol_ratio'].rolling(5, min_periods=1).mean()
+                f['sent_margin_cum3'] = f['sent_margin_chg'].rolling(3, min_periods=1).sum()
+            else:
+                for col in ['sent_limit_up', 'sent_limit_down', 'sent_consecutive_limit',
+                            'sent_vol_ratio', 'sent_abnormal_ret', 'sent_margin_chg',
+                            'sent_short_balance', 'sent_lhb_ret_5d', 'sent_lhb_flag',
+                            'sent_limit_any', 'sent_vol_ratio_ma5', 'sent_margin_cum3']:
+                    f[col] = 0
+        except Exception:
+            for col in ['sent_limit_up', 'sent_limit_down', 'sent_consecutive_limit',
+                        'sent_vol_ratio', 'sent_abnormal_ret', 'sent_margin_chg',
+                        'sent_short_balance', 'sent_lhb_ret_5d', 'sent_lhb_flag',
+                        'sent_limit_any', 'sent_vol_ratio_ma5', 'sent_margin_cum3']:
+                f[col] = 0
+
+        return f
+
+
 # ============ 市场特征 ============
 class MarketFeatures:
     """市场特征: 北向资金、大盘、板块"""
@@ -512,29 +589,50 @@ class MarketFeatures:
         trade_dates_ymd = df_dates.dt.strftime('%Y-%m-%d')
         trade_dates_raw8 = df_dates.dt.strftime('%Y%m%d')
 
-        # ---- 大盘数据 ----
+        # ---- 大盘数据 (沪深300) ----
         market_pct = None
         try:
             conn = sqlite3.connect(DB_PATH)
             min_d, max_d = trade_dates_raw8.min(), trade_dates_raw8.max()
             hs300 = pd.read_sql(
-                f"SELECT trade_date, pct_chg, avg_pct_chg FROM hs300_daily "
+                f"SELECT trade_date, pct_chg, avg_pct_chg, volume, up_count "
+                f"FROM hs300_daily "
                 f"WHERE trade_date >= '{min_d}' AND trade_date <= '{max_d}'", conn)
             conn.close()
             if len(hs300) > 0:
                 pct_col = 'pct_chg' if 'pct_chg' in hs300.columns else 'avg_pct_chg'
                 mkt_map = dict(zip(hs300['trade_date'], hs300[pct_col]))
                 market_pct = trade_dates_raw8.map(mkt_map).fillna(0) / 100
+
+                if 'volume' in hs300.columns:
+                    vol_map = dict(zip(hs300['trade_date'], hs300['volume'].astype(float)))
+                    market_volume = pd.Series(trade_dates_raw8.map(vol_map).fillna(0).values, index=f.index)
+                    vol_ma20 = market_volume.rolling(20, min_periods=1).mean()
+                    f['mkt_hs300_volume_chg'] = (market_volume - vol_ma20) / (vol_ma20 + 1e-10)
+
+                if 'up_count' in hs300.columns:
+                    up_map = dict(zip(hs300['trade_date'], hs300['up_count'].astype(float)))
+                    up_series = pd.Series(trade_dates_raw8.map(up_map).fillna(0).values, index=f.index)
+                    f['mkt_breadth'] = up_series / 300
+                    f['mkt_breadth_ma5'] = f['mkt_breadth'].rolling(5, min_periods=1).mean()
         except Exception:
             pass
 
+        if market_pct is not None:
+            mkt_vol = pd.Series(market_pct).rolling(20, min_periods=1).std()
+            f['mkt_hs300_volatility'] = mkt_vol.values
+
         # ---- 北向资金 (可选滞后) ----
         north_flow_abs = None
+        north_sh_net = None
+        north_sz_net = None
+        north_buy_ratio = None
         try:
             conn = sqlite3.connect(DB_PATH)
             min_ymd, max_ymd = trade_dates_ymd.min(), trade_dates_ymd.max()
             north_df = pd.read_sql(
-                "SELECT trade_date, total_net FROM north_flow "
+                "SELECT trade_date, total_net, north_net, sz_net, total_buy, total_sell "
+                "FROM north_flow "
                 "WHERE total_net IS NOT NULL AND total_net != 0 "
                 f"AND trade_date >= '{min_ymd}' AND trade_date <= '{max_ymd}'", conn)
             conn.close()
@@ -544,24 +642,67 @@ class MarketFeatures:
                     from datetime import timedelta
                     north_df['trade_date'] = (pd.to_datetime(north_df['trade_date'])
                                               + timedelta(days=north_shift_days)).dt.strftime('%Y-%m-%d')
+
                 north_df['total_net_billion'] = north_df['total_net'] / 10000
                 north_df = north_df[north_df['total_net_billion'].abs() < 500]
                 north_map = dict(zip(north_df['trade_date'], north_df['total_net_billion']))
                 north_mapped = trade_dates_ymd.map(north_map)
                 if north_mapped.notna().sum() / len(north_mapped) >= 0.5:
                     north_flow_abs = north_mapped.fillna(0)
+
+                sh_map = dict(zip(north_df['trade_date'], north_df['north_net'] / 10000))
+                sh_mapped = trade_dates_ymd.map(sh_map).fillna(0)
+                if sh_mapped.notna().sum() / len(sh_mapped) >= 0.5:
+                    north_sh_net = sh_mapped
+
+                sz_map = dict(zip(north_df['trade_date'], north_df['sz_net'] / 10000))
+                sz_mapped = trade_dates_ymd.map(sz_map).fillna(0)
+                if sz_mapped.notna().sum() / len(sz_mapped) >= 0.5:
+                    north_sz_net = sz_mapped
+
+                north_df['buy_sell_ratio'] = (
+                    north_df['total_buy'].astype(float) /
+                    (north_df['total_sell'].astype(float) + 1)
+                ).clip(0, 5)
+                ratio_map = dict(zip(north_df['trade_date'], north_df['buy_sell_ratio']))
+                ratio_mapped = trade_dates_ymd.map(ratio_map).fillna(1)
+                if ratio_mapped.notna().sum() / len(ratio_mapped) >= 0.5:
+                    north_buy_ratio = ratio_mapped
         except Exception:
             pass
 
         if north_flow_abs is not None:
             north_ma = north_flow_abs.rolling(10, min_periods=1).mean()
             f['mkt_north_surprise'] = (north_flow_abs - north_ma) / (north_ma.abs() + 1e-6)
-            f['mkt_north_cum'] = f['mkt_north_surprise'].rolling(6, min_periods=1).sum()
+            f['mkt_north_cum5'] = north_flow_abs.rolling(5, min_periods=1).sum()
+            f['mkt_north_cum10'] = north_flow_abs.rolling(10, min_periods=1).sum()
             f['mkt_north_dir'] = (north_flow_abs > 0).astype(int)
+            f['mkt_north_dir_streak'] = f['mkt_north_dir'].rolling(5, min_periods=1).sum()
         else:
-            f['mkt_north_surprise'] = 0
-            f['mkt_north_cum'] = 0
-            f['mkt_north_dir'] = 0
+            for col in ['mkt_north_surprise', 'mkt_north_cum5', 'mkt_north_cum10',
+                        'mkt_north_dir', 'mkt_north_dir_streak']:
+                f[col] = 0
+
+        if north_sh_net is not None:
+            f['mkt_north_sh_net'] = north_sh_net
+            f['mkt_north_sh_ma5'] = north_sh_net.rolling(5, min_periods=1).mean()
+        else:
+            f['mkt_north_sh_net'] = 0
+            f['mkt_north_sh_ma5'] = 0
+
+        if north_sz_net is not None:
+            f['mkt_north_sz_net'] = north_sz_net
+            f['mkt_north_sz_ma5'] = north_sz_net.rolling(5, min_periods=1).mean()
+        else:
+            f['mkt_north_sz_net'] = 0
+            f['mkt_north_sz_ma5'] = 0
+
+        if north_buy_ratio is not None:
+            f['mkt_north_buy_ratio'] = north_buy_ratio
+            f['mkt_north_buy_ratio_ma5'] = north_buy_ratio.rolling(5, min_periods=1).mean()
+        else:
+            f['mkt_north_buy_ratio'] = 1
+            f['mkt_north_buy_ratio_ma5'] = 1
 
         # ---- 个股 vs 大盘 ----
         if 'close' in df.columns and market_pct is not None:
@@ -572,8 +713,8 @@ class MarketFeatures:
             f['mkt_contra_up'] = ((stock_pct > 0) & (market_pct < 0)).astype(int)
             f['mkt_contra_down'] = ((stock_pct < 0) & (market_pct > 0)).astype(int)
             stock_vol = stock_pct.rolling(20, min_periods=1).std()
-            market_vol = market_pct.rolling(20, min_periods=1).std()
-            f['mkt_vol_ratio'] = stock_vol / (market_vol + 1e-10)
+            market_vol = pd.Series(market_pct).rolling(20, min_periods=1).std()
+            f['mkt_vol_ratio'] = stock_vol / (market_vol.values + 1e-10)
             if 'open' in df.columns:
                 intraday = (df['close'] - df['open']) / (df['open'] + 1e-10)
                 f['mkt_intraday_alpha'] = intraday - market_pct
@@ -616,8 +757,9 @@ class FeaturePipeline:
         pattern = PatternFeatures.calculate(df)
         momentum = MomentumFeatures.calculate(df)
         market = MarketFeatures.calculate(df, symbol=symbol, north_shift_days=self.north_shift)
+        sentiment = SentimentFeatures.calculate(df, symbol=symbol)
 
-        base = pd.concat([price, volume, pattern, momentum, market], axis=1)
+        base = pd.concat([price, volume, pattern, momentum, market, sentiment], axis=1)
         interact = InteractionFeatures.calculate(base)
 
         return pd.concat([base, interact], axis=1)
