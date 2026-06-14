@@ -76,12 +76,12 @@ for idx, (symbol, cnt) in enumerate(stocks):
             features = EnhancedFeatureEngineer.calculate_features(df.iloc[:i+1])
             if features.iloc[-1].isna().any():
                 continue
-            up_prob = model.predict_proba([features.iloc[-1].values])[0][1]
+            pred_ret = model.predict([features.iloc[-1].values])[0]
         except:
             continue
 
         # 买入
-        if holding == 0 and up_prob > 0.60:
+        if holding == 0 and pred_ret > 0.01:
             shares = int(cash * 0.9 / price / 100) * 100
             if shares >= 100:
                 holding = shares
@@ -90,7 +90,7 @@ for idx, (symbol, cnt) in enumerate(stocks):
                 trades_list.append({'type': 'BUY', 'price': price, 'shares': shares})
 
         # 卖出
-        elif holding > 0 and (up_prob < 0.40 or (price - cost) / cost > 0.10 or (price - cost) / cost < -0.08):
+        elif holding > 0 and (pred_ret < -0.01 or (price - cost) / cost > 0.10 or (price - cost) / cost < -0.08):
             cash += holding * price
             profit = (price - cost) * holding
             if profit > 0:

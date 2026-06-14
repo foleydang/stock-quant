@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-LGBM 生产级训练脚本 v4 — 3分类 Bagging Ensemble
+LGBM 生产级训练脚本 v5 — 回归 Bagging Ensemble
 
 架构:
-  日线模型 → 预测5日涨跌方向 (α选股层)
-  30m模型  → 预测3根K线涨跌方向 (γ择时层)
+  日线模型 → 预测5日收益率 (α选股层)
+  30m模型  → 预测3根K线收益率 (γ择时层)
 
 关键设计:
-  1. 3分类目标: 涨(0) / 震荡(1) / 跌(2)，分位数自适应切分
+  1. 回归目标: 直接预测连续收益率（不做分类/分桶）
   2. Bagging Ensemble: 5个独立LGBM并行训练
   3. 时序分离: train(80%) → val(10%) → test(10%)
-  4. 生产级参数: num_leaves=255, lr=0.02, 15000棵树
-  5. 特征保留全部 (不砍半)，截面排名特征 + 冗余去相关
+  4. 生产级参数: num_leaves=255, lr=0.01, 20000棵树
+  5. 评估指标: IC (Spearman) + MSE, 非分类指标
 
 用法:
   python strategy/train.py --model daily           # 日线训练
@@ -28,8 +28,7 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from joblib import Parallel, delayed
 from scipy.stats import spearmanr
-from sklearn.metrics import f1_score, accuracy_score, log_loss
-from collections import Counter
+from sklearn.metrics import mean_squared_error
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from strategy.features import FeaturePipeline
@@ -61,15 +60,10 @@ TRAIN_RATIO = 0.8
 VAL_RATIO = 0.1
 TEST_RATIO = 0.1
 
-# 分类阈值: 分位数自适应 (涨30% / 震荡40% / 跌30%)
-UP_Q = 0.70
-DOWN_Q = 0.30
-
-# LGBM 生产级固定参数
+# LGBM 生产级固定参数 (回归)
 LGBM_PARAMS = {
-    'objective': 'multiclass',
-    'num_class': 3,
-    'metric': 'multi_logloss',
+    'objective': 'regression',
+    'metric': 'l2',
     'boosting_type': 'gbdt',
     'num_leaves': 255,
     'max_depth': 16,
@@ -89,10 +83,11 @@ LGBM_PARAMS = {
     'force_row_wise': True,
 }
 
-# 快速验证参数
+# 快速验证参数 (回归)
 QUICK_PARAMS = {
-    'objective': 'multiclass', 'num_class': 3,
-    'metric': 'multi_logloss', 'boosting_type': 'gbdt',
+    'objective': 'regression',
+    'metric': 'l2',
+    'boosting_type': 'gbdt',
     'num_leaves': 127, 'max_depth': 8, 'learning_rate': 0.05,
     'n_estimators': 1000, 'early_stopping_rounds': 50,
     'subsample': 0.8, 'colsample_bytree': 0.7,
@@ -110,6 +105,10 @@ QUICK_SEEDS = [42, 123]
 
 # 去相关阈值
 CORR_THRESHOLD = 0.95
+
+# 收益率异常值过滤 (绝对值超过此阈值的样本丢弃)
+RETURN_CLIP = 0.20
+
 
 # ============ 数据加载 ============
 def load_data(db_path: str, table: str) -> Dict[str, pd.DataFrame]:
@@ -153,26 +152,11 @@ def get_all_dates(data: Dict) -> np.ndarray:
     return np.array(sorted(dates))
 
 
-# ============ 3分类目标 ============
-def make_classification_target(returns: np.ndarray) -> np.ndarray:
-    """涨(0) / 震荡(1) / 跌(2)，分位数自适应切分"""
-    valid = returns[~np.isnan(returns) & (np.abs(returns) < 0.15)]
-    up_thresh = np.percentile(valid, UP_Q * 100)
-    down_thresh = np.percentile(valid, DOWN_Q * 100)
-
-    labels = np.full_like(returns, np.nan, dtype=float)
-    labels[returns > up_thresh] = 0      # 涨
-    labels[(returns >= down_thresh) & (returns <= up_thresh)] = 1  # 震荡
-    labels[returns < down_thresh] = 2     # 跌
-
-    return labels
-
-
 # ============ 数据准备 ============
 def prepare_data(data: Dict, conn, cfg: dict,
                  train_cutoff, val_cutoff,
                  pipeline: FeaturePipeline) -> Optional[Tuple]:
-    """准备训练数据: 特征 + 3分类目标 + 时序切分"""
+    """准备训练数据: 特征 + 回归目标 + 时序切分"""
     sent_df = load_sentiment(conn)
     has_sent = len(sent_df) > 0
     horizon = cfg['horizon']
@@ -202,7 +186,7 @@ def prepare_data(data: Dict, conn, cfg: dict,
     print("  计算截面排名特征...")
     cs_features = pipeline.compute_cross_section(all_features, get_all_dates(data))
 
-    # 第三遍: 合并 + 目标 + 切分
+    # 第三遍: 合并 + 回归目标 + 切分
     feature_names = None
     X_tr, y_tr, X_va, y_va, X_te, y_te = [], [], [], [], [], []
 
@@ -215,20 +199,20 @@ def prepare_data(data: Dict, conn, cfg: dict,
             if feature_names is None:
                 feature_names = list(feats.columns)
 
-            # 3分类目标
+            # 回归目标: 连续收益率 (不做分类)
             close = df['close'].values.astype(float)
             ret = np.full(len(close), np.nan)
             for j in range(len(close) - horizon):
                 ret[j] = (close[j + horizon] - close[j]) / close[j]
 
-            target = make_classification_target(ret)
-            valid = ~np.isnan(target)
+            # 过滤异常值 (极端涨跌停样本)
+            valid = ~np.isnan(ret) & (np.abs(ret) < RETURN_CLIP)
 
             if valid.sum() < cfg['min_history']:
                 continue
 
             feats_v = feats[valid].values
-            target_v = target[valid]
+            target_v = ret[valid].astype(np.float32)
             dates_v = feats.index[valid]
 
             # 时序切分
@@ -252,11 +236,11 @@ def prepare_data(data: Dict, conn, cfg: dict,
         return None
 
     X_train = np.vstack(X_tr).astype(np.float32)
-    y_train = np.concatenate(y_tr).astype(np.int8)
+    y_train = np.concatenate(y_tr).astype(np.float32)
     X_val = np.vstack(X_va).astype(np.float32)
-    y_val = np.concatenate(y_va).astype(np.int8)
+    y_val = np.concatenate(y_va).astype(np.float32)
     X_test = np.vstack(X_te).astype(np.float32)
-    y_test = np.concatenate(y_te).astype(np.int8)
+    y_test = np.concatenate(y_te).astype(np.float32)
 
     return (X_train, y_train), (X_val, y_val), (X_test, y_test), feature_names
 
@@ -282,11 +266,11 @@ def remove_redundant(X: np.ndarray, feature_names: List[str]) -> Tuple:
 # ============ 单模型训练 ============
 def train_one(seed: int, X_train, y_train, X_val, y_val,
               feature_names: List[str], params: dict) -> Dict:
-    """训练单个 LGBM 分类器"""
+    """训练单个 LGBM 回归器"""
     t0 = time.time()
 
     p = {**params, 'random_state': seed}
-    model = lgb.LGBMClassifier(**p)
+    model = lgb.LGBMRegressor(**p)
 
     n_est = p.pop('n_estimators')
     es_rounds = p.pop('early_stopping_rounds')
@@ -300,22 +284,22 @@ def train_one(seed: int, X_train, y_train, X_val, y_val,
     n_trees = model.best_iteration_ or n_est
     elapsed = time.time() - t0
 
-    # 验证集评估
+    # 验证集评估 (回归指标)
     pred = model.predict(X_val)
-    f1 = f1_score(y_val, pred, average='macro')
-    acc = accuracy_score(y_val, pred)
+    ic = spearmanr(y_val, pred)[0]  # Rank IC
+    mse = mean_squared_error(y_val, pred)
 
     # 特征重要性
     imp = model.feature_importances_
     top_idx = np.argsort(imp)[-10:][::-1]
     top_feats = [(feature_names[i], int(imp[i])) for i in top_idx]
 
-    print(f"  [seed={seed}] {n_trees}棵 | val F1={f1:.4f} acc={acc:.4f} | {elapsed:.0f}s "
+    print(f"  [seed={seed}] {n_trees}棵 | val IC={ic:.4f} MSE={mse:.6f} | {elapsed:.0f}s "
           f"| top3: {', '.join(f[0].split('_')[-2] if '_' in f[0] else f[0] for f in top_feats[:3])}")
 
     return {
         'model': model, 'seed': seed, 'n_trees': n_trees,
-        'val_f1': round(f1, 4), 'val_acc': round(acc, 4),
+        'val_ic': round(ic, 4), 'val_mse': round(mse, 6),
         'train_time_s': round(elapsed, 1),
         'top_features': top_feats,
     }
@@ -324,38 +308,50 @@ def train_one(seed: int, X_train, y_train, X_val, y_val,
 # ============ 测试集评估 ============
 def evaluate_ensemble(models_info: List[Dict], X_test, y_test,
                       feature_names: List[str]):
-    """测试集评估: 单模型 + 投票集成"""
+    """测试集评估: 单模型 + Ensemble (IC + MSE)"""
     n = len(models_info)
     print(f"\n{'='*70}")
     print(f" 🧪 测试集评估 ({len(X_test):,}条, {n}模型)")
     print(f"{'='*70}")
 
-    # 类别分布
-    dist = Counter(y_test)
-    print(f"  类别分布: 涨={dist.get(0,0)} 震荡={dist.get(1,0)} 跌={dist.get(2,0)}")
+    # 目标统计
+    print(f"  目标统计: mean={y_test.mean():.4f} std={y_test.std():.4f} "
+          f"min={y_test.min():.4f} max={y_test.max():.4f}")
 
     # 单模型评估
     all_preds = []
     for info in models_info:
         model = info['model']
         pred = model.predict(X_test)
-        proba = model.predict_proba(X_test)
-        all_preds.append(proba)
+        all_preds.append(pred)
 
-        f1 = f1_score(y_test, pred, average='macro')
-        acc = accuracy_score(y_test, pred)
-        ll = log_loss(y_test, proba)
-        print(f"  [seed={info['seed']}] F1={f1:.4f} | Acc={acc:.4f} | LogLoss={ll:.4f} | {info['n_trees']}棵")
+        ic = spearmanr(y_test, pred)[0]
+        mse = mean_squared_error(y_test, pred)
+        print(f"  [seed={info['seed']}] IC={ic:.4f} | MSE={mse:.6f} | {info['n_trees']}棵")
 
-    # 投票集成 (soft voting)
+    # Ensemble (预测均值)
     if n > 1:
-        avg_proba = np.mean(all_preds, axis=0)
-        ensemble_pred = np.argmax(avg_proba, axis=1)
-        f1 = f1_score(y_test, ensemble_pred, average='macro')
-        acc = accuracy_score(y_test, ensemble_pred)
-        ll = log_loss(y_test, avg_proba)
+        ensemble_pred = np.mean(all_preds, axis=0)
+        ic = spearmanr(y_test, ensemble_pred)[0]
+        mse = mean_squared_error(y_test, ensemble_pred)
         print(f"  {'─'*50}")
-        print(f"  🏆 Ensemble({n}投票) → F1={f1:.4f} | Acc={acc:.4f} | LogLoss={ll:.4f}")
+        print(f"  🏆 Ensemble({n}) → IC={ic:.4f} | MSE={mse:.6f}")
+
+    # 分组回测 (按预测值分5组, 看分组收益)
+    if n > 1:
+        print(f"\n  📊 分组回测 (按预测值分5组):")
+        sort_idx = np.argsort(ensemble_pred)
+        n_per_group = len(sort_idx) // 5
+        for g in range(5):
+            start = g * n_per_group
+            end = start + n_per_group if g < 4 else len(sort_idx)
+            group_ret = y_test[sort_idx[start:end]].mean()
+            group_pred = ensemble_pred[sort_idx[start:end]].mean()
+            print(f"    G{g+1}: 实际收益={group_ret:.4f} | 预测均值={group_pred:.4f}")
+        # 多空收益
+        long_ret = y_test[sort_idx[-n_per_group:]].mean()
+        short_ret = y_test[sort_idx[:n_per_group]].mean()
+        print(f"    多空收益差: {long_ret - short_ret:.4f}")
 
     # 特征重要性
     if models_info:
@@ -365,7 +361,7 @@ def evaluate_ensemble(models_info: List[Dict], X_test, y_test,
         for idx in top:
             print(f"    {feature_names[idx]}: {int(imp[idx])}")
 
-    return f1, acc
+    return ic, mse
 
 
 # ============ 主入口 ============
@@ -384,8 +380,8 @@ def main():
     params = QUICK_PARAMS if args.quick else LGBM_PARAMS
 
     print("=" * 70)
-    print(f"  LGBM {cfg['label']}模型训练 v4 — {n_models}模型 Bagging Ensemble")
-    print(f"  目标: 3分类(涨/震荡/跌) | 预测周期: {cfg['horizon']}根K线")
+    print(f"  LGBM {cfg['label']}模型训练 v5 — {n_models}模型 Bagging Ensemble")
+    print(f"  目标: 回归 (连续收益率) | 预测周期: {cfg['horizon']}根K线")
     print(f"  时序: train({TRAIN_RATIO:.0%}) → val({VAL_RATIO:.0%}) → test({TEST_RATIO:.0%})")
     print(f"  并行: {n_models}模型并行 (joblib n_jobs={N_JOBS_PARALLEL})")
     print(f"  {'⚠️ 快速模式' if args.quick else '🚀 生产模式'}: "
@@ -443,10 +439,12 @@ def main():
 
     train_time = time.time() - t0
     avg_trees = int(np.mean([m['n_trees'] for m in models_info]))
-    print(f"\n  ✅ {n_models}模型训练完成: 总耗时 {train_time/60:.1f}min, 平均 {avg_trees}棵/模型")
+    avg_ic = np.mean([m['val_ic'] for m in models_info])
+    print(f"\n  ✅ {n_models}模型训练完成: 总耗时 {train_time/60:.1f}min, "
+          f"平均 {avg_trees}棵/模型, 平均 val IC={avg_ic:.4f}")
 
     # ---- 5. 测试集评估 ----
-    test_f1, test_acc = evaluate_ensemble(models_info, X_test, y_test, feature_names)
+    test_ic, test_mse = evaluate_ensemble(models_info, X_test, y_test, feature_names)
 
     # ---- 6. 最终模型 (train+val 全量) ----
     print(f"\n🏋️ 训练最终模型 (train+val 全量, 复用最佳树数)...")
@@ -461,7 +459,7 @@ def main():
         es_rounds = p.pop('early_stopping_rounds')
         p.pop('n_jobs', None)
 
-        m = lgb.LGBMClassifier(**p, n_estimators=info['n_trees'])
+        m = lgb.LGBMRegressor(**p, n_estimators=info['n_trees'])
         m.fit(X_full, y_full)
         final_models.append(m)
         final_n_trees.append(info['n_trees'])
@@ -474,19 +472,19 @@ def main():
     ensemble = {
         'models': final_models,
         'feature_names': feature_names,
-        'keep_features': feature_names,  # 全部保留
+        'keep_features': feature_names,
         'n_models': n_models,
         'horizon': cfg['horizon'],
-        'model_type': 'multiclass_3',
+        'model_type': 'regression',
         'train_date': datetime.now().strftime('%Y-%m-%d'),
         'train_samples': len(X_full),
         'seeds': seeds,
         'n_trees_per_model': final_n_trees,
         'avg_n_trees': int(np.mean(final_n_trees)),
-        'val_f1_list': [m['val_f1'] for m in models_info],
-        'val_acc_list': [m['val_acc'] for m in models_info],
-        'test_f1': round(test_f1, 4),
-        'test_acc': round(test_acc, 4),
+        'val_ic_list': [m['val_ic'] for m in models_info],
+        'val_mse_list': [m['val_mse'] for m in models_info],
+        'test_ic': round(test_ic, 4),
+        'test_mse': round(test_mse, 6),
         'params': {k: v for k, v in params.items()
                    if k not in ('verbosity', 'random_state',
                                 'force_row_wise', 'n_jobs',
@@ -507,8 +505,8 @@ def main():
         'n_models': n_models, 'n_trees_per_model': final_n_trees,
         'avg_n_trees': int(np.mean(final_n_trees)),
         'n_train': len(X_full), 'n_test': len(X_test),
-        'test_f1': round(test_f1, 4), 'test_acc': round(test_acc, 4),
-        'val_f1': round(np.mean([m['val_f1'] for m in models_info]), 4),
+        'test_ic': round(test_ic, 4), 'test_mse': round(test_mse, 6),
+        'val_ic': round(np.mean([m['val_ic'] for m in models_info]), 4),
         'params': ensemble['params'],
         'role': cfg['role'], 'trained_at': datetime.now().isoformat(),
         'size_mb': round(size_mb, 1),
@@ -520,15 +518,15 @@ def main():
     print(f" ✅ 模型已保存: {model_path} ({size_mb:.1f} MB)")
     print(f"    特征: {len(feature_names)} | 模型数: {n_models}")
     print(f"    树数: {final_n_trees} (avg={int(np.mean(final_n_trees))})")
-    print(f"    测试 F1: {test_f1:.4f} | Acc: {test_acc:.4f}")
+    print(f"    测试 IC: {test_ic:.4f} | MSE: {test_mse:.6f}")
     print(f"    总训练耗时: {train_time/60:.1f}min")
 
-    if test_f1 > 0.4:
-        print(f" ✅ 样本外有效 (F1 > 0.4)")
-    elif test_f1 > 0.35:
-        print(f" ⚠️ 弱有效 (F1 > 0.35)，可优化")
+    if test_ic > 0.05:
+        print(f" ✅ 样本外有效 (IC > 0.05)")
+    elif test_ic > 0.03:
+        print(f" ⚠️ 弱有效 (IC > 0.03)，可优化")
     else:
-        print(f" ❌ 样本外不足 (F1 <= 0.35)")
+        print(f" ❌ 样本外不足 (IC <= 0.03)")
     print(f"{'='*70}")
 
 
