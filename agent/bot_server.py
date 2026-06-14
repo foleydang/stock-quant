@@ -73,22 +73,30 @@ def _build_stock_deep(symbol: str) -> dict:
         from scheduler import _search_stock_news_brief
         news_data = _search_stock_news_brief(symbol, name)
         if news_data and news_data.get('headlines'):
-            headlines = news_data['headlines'][:3]
-            news_line = "**📰 消息面**\n"
+            headlines = news_data['headlines'][:5]
+            news_line = "**📰 消息面（近3日）**\n"
             for h in headlines:
                 title = h.get('title', '')
+                time_str = h.get('time', '')
                 if title:
-                    news_line += f"- {title}\n"
+                    time_suffix = f" _{time_str}_" if time_str else ""
+                    news_line += f"- {title}{time_suffix}\n"
             try:
                 from llm_client import analyze_news_sentiment
-                items = [{'title': h.get('title', ''), 'content': h.get('snippet', ''),
-                          'time': ''} for h in headlines]
+                items = [{'title': h.get('title', ''), 'snippet': h.get('snippet', ''),
+                          'time': h.get('time', '')} for h in headlines]
                 sentiment = analyze_news_sentiment(items)
                 s_label = sentiment.get('sentiment_label', '中性')
                 s_score = sentiment.get('score', 0.5)
                 s_summary = sentiment.get('summary', '')
-                s_color = 'red' if s_score > 0.5 else 'green' if s_score < 0.5 else 'default'
-                news_line += f"\n**情绪**: <font color='{s_color}'>{s_label}（{s_score:.1f}）</font> — {s_summary}"
+                s_factors = sentiment.get('factors', [])
+
+                s_color = 'red' if s_score > 0.6 else 'green' if s_score < 0.4 else 'default'
+                news_line += f"\n**综合判断**: <font color='{s_color}'>{s_label}（{s_score:.2f}）</font>"
+                if s_summary:
+                    news_line += f" — {s_summary}"
+                if s_factors:
+                    news_line += "\n" + "\n".join([f"- {f}" for f in s_factors[:3]])
             except Exception:
                 pass
             data['news_hint'] = news_line
@@ -111,7 +119,7 @@ def _build_stock_deep(symbol: str) -> dict:
                     start = result.index('{')
                     end = result.rindex('}') + 1
                     llm_s = json.loads(result[start:end])
-                    s_color = 'red' if llm_s.get('score', 0.5) > 0.5 else 'green' if llm_s.get('score', 0.5) < 0.5 else 'default'
+                    s_color = 'red' if llm_s.get('score', 0.5) > 0.6 else 'green' if llm_s.get('score', 0.5) < 0.4 else 'default'
                     factors_text = '\n'.join([f"- [推断] {f}" for f in llm_s.get('factors', [])[:3]])
                     data['news_hint'] = f"**📰 消息面**\n{factors_text}\n**情绪**: <font color='{s_color}'>{llm_s.get('sentiment_label', '中性')}（{llm_s.get('score', 0.5):.1f}）</font> — {llm_s.get('summary', '')}"
         except Exception as e:

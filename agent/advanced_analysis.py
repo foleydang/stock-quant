@@ -597,7 +597,7 @@ def get_action_recommendations(symbol: str = None) -> Dict:
                     news_items = [{'title': h['title'], 'content': h.get('snippet', ''), 'time': ''} for h in news_data['headlines'][:5]]
                     news_sentiment = analyze_news_sentiment(news_items)
                 except Exception:
-                    news_sentiment = {'summary': '无法分析', 'score': 0.5}
+                    news_sentiment = {'summary': '无法分析', 'score': 0.5, 'sentiment_label': '中性'}
         except Exception as e:
             logger.warning(f"新闻搜索失败 {name}: {e}")
         
