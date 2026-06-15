@@ -278,7 +278,7 @@ def extract_embeddings(model, output_path: str, norm_stats=None):
     if norm_stats is None:
         stats_path = os.path.join(MODEL_DIR, 'norm_stats.pt')
         if os.path.exists(stats_path):
-            norm_stats = torch.load(stats_path, map_location='cpu')
+            norm_stats = torch.load(stats_path, map_location='cpu', weights_only=False)
 
     embeddings = {}  # {symbol: {date_str: np.array(64,)}}
 
@@ -338,7 +338,7 @@ def main():
     if args.extract_only:
         # 仅推理模式
         model = LSTMPredictor(hidden_dim=args.hidden)
-        model.load_state_dict(torch.load(args.extract_only, map_location=DEVICE))
+        model.load_state_dict(torch.load(args.extract_only, map_location=DEVICE, weights_only=True))
         out_path = os.path.join(ROOT, 'data/lstm_embeddings.pkl')
         extract_embeddings(model, out_path)
         return
@@ -356,15 +356,17 @@ def main():
 
     # 1.5 数据标准化 (防止 NaN loss)
     print("  标准化数据...")
-    # 按特征维度计算 mean/std
-    train_mean = train_X.mean(axis=(0, 1), keepdims=True)
-    train_std = train_X.std(axis=(0, 1), keepdims=True) + 1e-8
-    train_X = (train_X - train_mean) / train_std
-    val_X = (val_X - train_mean) / train_std
+    # 按特征维度计算 mean/std, 处理全零特征
+    train_mean = np.nanmean(train_X, axis=(0, 1), keepdims=True)
+    train_std = np.nanstd(train_X, axis=(0, 1), keepdims=True)
+    train_std = np.where(train_std < 1e-8, 1.0, train_std)  # 零方差特征用1
+    train_X = np.nan_to_num((train_X - train_mean) / train_std, nan=0.0, posinf=0.0, neginf=0.0)
+    val_X = np.nan_to_num((val_X - train_mean) / train_std, nan=0.0, posinf=0.0, neginf=0.0)
     # 目标也标准化
-    y_mean, y_std = train_y.mean(), train_y.std() + 1e-8
-    train_y = (train_y - y_mean) / y_std
-    val_y = (val_y - y_mean) / y_std
+    y_mean = np.nanmean(train_y)
+    y_std = np.nanstd(train_y) + 1e-8
+    train_y = np.nan_to_num((train_y - y_mean) / y_std, nan=0.0)
+    val_y = np.nan_to_num((val_y - y_mean) / y_std, nan=0.0)
     print(f"   训练集均值: {train_X.mean():.4f} std: {train_X.std():.4f}")
     print(f"   目标均值: {y_mean:.4f} std: {y_std:.4f}")
 
