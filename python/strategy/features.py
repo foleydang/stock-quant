@@ -30,7 +30,6 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # 延迟导入, 避免循环依赖
 def _get_macro_features():
     from strategy.macro_features import MacroFeatures
-    from strategy.fundamental_features import _get_fundamental_features
     return MacroFeatures
 
 # ============ 默认周期配置 ============
@@ -808,6 +807,7 @@ class FeaturePipeline:
     def _get_fundamental(self):
         """延迟加载基本面特征类"""
         if self._fundamental_features is None:
+            from strategy.fundamental_features import _get_fundamental_features
             self._fundamental_features = _get_fundamental_features()
         return self._fundamental_features
 
