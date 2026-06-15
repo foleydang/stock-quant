@@ -54,7 +54,7 @@ class FundamentalFeatures:
         if len(fund) == 0:
             return f
 
-        fund = fund.set_index('trade_date').sort_index()
+        fund = fund.drop_duplicates(subset=['trade_date'], keep='last').set_index('trade_date').sort_index()
         dates = df['date'].values
 
         # 对齐: 财务数据按季度, 前向填充到每日

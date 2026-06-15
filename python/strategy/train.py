@@ -152,6 +152,14 @@ def load_data(db_path: str, table: str) -> Dict[str, pd.DataFrame]:
         except Exception:
             continue
     conn.close()
+    # 去重: 修复部分股票日期重复
+    for sym in list(data.keys()):
+        df = data[sym]
+        df = df.drop_duplicates(subset=['date']).reset_index(drop=True)
+        if len(df) >= 100:
+            data[sym] = df
+        else:
+            del data[sym]
     print(f"  加载 {len(data)} 只股票, 共 {sum(len(d) for d in data.values()):,} 行 ({table})")
     return data
 
