@@ -39,6 +39,7 @@ frontend/dist/
 # 数据库（通过 OSS 同步，不提交 git）
 python/data/*.db
 python/data/backup/
+python/data/*.pkl
 
 # 日志
 logs/

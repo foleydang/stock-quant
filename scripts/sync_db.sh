@@ -102,6 +102,31 @@ bucket.get_object_to_file(key, '$DB', progress_callback=progress)
 print(f'\n✅ 下载完成')
 "
     echo "✅ 同步完成"
+    echo ""
+
+    # 同步 LSTM embeddings (如果远程有)
+    EMB="$PROJECT_DIR/python/data/lstm_embeddings.pkl"
+    OSS_EMB_KEY="stock-quant/lstm_embeddings.pkl"
+    if ! python3 -c "
+import oss2, os
+endpoint = os.environ.get('OSS_ENDPOINT', 'https://oss-cn-hangzhou.aliyuncs.com')
+bucket = oss2.Bucket(oss2.Auth(os.environ.get('OSS_ACCESS_KEY_ID',''), os.environ.get('OSS_ACCESS_KEY_SECRET','')), endpoint, os.environ.get('OSS_BUCKET',''))
+print('exists' if bucket.object_exists('$OSS_EMB_KEY') else 'no')
+" 2>/dev/null | grep -q exists; then
+        echo "⏭️ LSTM embeddings 未上传到 OSS, 跳过"
+    elif [ ! -f "$EMB" ] || [ "$(stat -f%z "$EMB" 2>/dev/null || stat -c%s "$EMB" 2>/dev/null || echo 0)" -lt 1000000 ]; then
+        echo "⬇️ 正在下载 LSTM embeddings..."
+        python3 -c "
+import oss2, os
+endpoint = os.environ.get('OSS_ENDPOINT', 'https://oss-cn-hangzhou.aliyuncs.com')
+bucket = oss2.Bucket(oss2.Auth(os.environ.get('OSS_ACCESS_KEY_ID',''), os.environ.get('OSS_ACCESS_KEY_SECRET','')), endpoint, os.environ.get('OSS_BUCKET',''))
+bucket.get_object_to_file('$OSS_EMB_KEY', '$EMB')
+print(f'✅ LSTM embeddings 下载完成 ({os.path.getsize(\"$EMB\")/1024/1024:.0f}MB)')
+"
+    else
+        EMB_SIZE=$(ls -lh "$EMB" 2>/dev/null | awk '{print $5}')
+        echo "✅ LSTM embeddings 已存在 ($EMB_SIZE)"
+    fi
 else
     echo ""
     echo "✅ 数据完整，可以训练"

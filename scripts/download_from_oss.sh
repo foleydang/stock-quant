@@ -36,3 +36,11 @@ ossutil cp "oss://${OSS_BUCKET}/stock-quant/trading.db" "$TRADING_DB" \
 echo "   trading.db: $(ls -lh $TRADING_DB | awk '{print $5}')"
 
 echo "✅ 下载完成: $(date)"
+
+# LSTM embeddings (如果远程有, 下载)
+EMB_FILE="$DATA_DIR/lstm_embeddings.pkl"
+ossutil cp "oss://${OSS_BUCKET}/stock-quant/lstm_embeddings.pkl" "$EMB_FILE" \
+    --update \
+    --access-key-id="$OSS_ACCESS_KEY_ID" \
+    --access-key-secret="$OSS_ACCESS_KEY_SECRET" \
+    --endpoint="$OSS_ENDPOINT" 2>/dev/null && echo "   lstm_embeddings.pkl: $(ls -lh $EMB_FILE | awk '{print $5}')" || echo "   ⏭️ LSTM embeddings 未上传到 OSS, 跳过"
