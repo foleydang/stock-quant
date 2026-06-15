@@ -61,25 +61,32 @@ TRAIN_RATIO = 0.8
 VAL_RATIO = 0.1
 TEST_RATIO = 0.1
 
-# LGBM 生产级固定参数 (回归) — v6 防过拟合优化
-# 目标: 缩小 train/test IC 差距 (之前 0.095→0.044, 衰减54%)
+# LGBM 生产级固定参数 (回归) — v7 全面防过拟合
+# 策略: 小树 + 强正则 + 三重随机采样 + 路径平滑
+# 预期: 训练IC 0.05-0.07, 测试IC 0.05-0.06, gap < 30%
 LGBM_PARAMS = {
     'objective': 'regression',
     'metric': 'l2',
     'boosting_type': 'gbdt',
-    'num_leaves': 127,          # 255→127, 降低模型复杂度
-    'max_depth': 10,            # 16→10, 限制树深度
-    'learning_rate': 0.008,     # 0.01→0.008, 更小步长, 更多树但每棵影响小
+    # --- 树结构: 金融数据信噪比低, 小树够用 ---
+    'num_leaves': 63,              # 127→63, 减半叶子数
+    'max_depth': 7,                # 10→7, 树深不超过7层
+    'learning_rate': 0.005,        # 0.008→0.005, 更小步长, 更多树但每棵影响小
     'n_estimators': 20000,
-    'early_stopping_rounds': 80,  # 200→80, 更早停止, 防止过拟合
-    'subsample': 0.6,           # 0.75→0.6, 更强行采样
-    'colsample_bytree': 0.5,    # 0.65→0.5, 更强列采样, 打破特征垄断
-    'subsample_freq': 3,        # 5→3, 更频繁采样
-    'reg_alpha': 0.5,           # 0.05→0.5, L1正则化 ×10
-    'reg_lambda': 1.0,          # 0.05→1.0, L2正则化 ×20
-    'min_child_samples': 100,   # 30→100, 更大叶子节点
-    'min_child_weight': 0.001,  # 新增, Hessian约束, 回归专用
-    'min_split_gain': 0.01,     # 0.005→0.01, 更高分裂门槛
+    'early_stopping_rounds': 50,   # 80→50, 50轮不提升就停
+    # --- 三重随机采样: 打破特征垄断, 增加模型多样性 ---
+    'subsample': 0.5,              # 0.6→0.5, 每轮只用50%样本
+    'subsample_freq': 1,           # 3→1, 每轮重新采样 (Dropout效果)
+    'colsample_bytree': 0.35,      # 0.5→0.35, 每棵树只用35%特征
+    'feature_fraction_bynode': 0.6, # 新增: 节点级再随机选60%特征
+    # --- 强正则化: 压权重, 防噪声 ---
+    'reg_alpha': 1.0,              # 0.5→1.0, L1 ×2
+    'reg_lambda': 5.0,             # 1.0→5.0, L2 ×5, 强力压权重
+    'min_child_samples': 300,      # 100→300, 叶子至少300样本
+    'min_child_weight': 0.01,      # 0.001→0.01, Hessian约束 ×10
+    'min_split_gain': 0.05,        # 0.01→0.05, 分裂收益不够5%不分
+    # --- 路径平滑: 预测值做移动平均, 消除单棵树噪声 ---
+    'path_smooth': 15,             # 新增: 平滑最近15棵树的梯度
     'verbosity': -1,
     'random_state': None,
     'n_jobs': 3,
@@ -106,8 +113,8 @@ SEEDS = [42, 123, 456, 789, 1024]
 QUICK_MODELS = 2
 QUICK_SEEDS = [42, 123]
 
-# 去相关阈值
-CORR_THRESHOLD = 0.95
+# 去相关阈值 (v7: 0.95→0.88, 更激进去重, 预计移除 35-50 个特征)
+CORR_THRESHOLD = 0.88
 
 # 收益率异常值过滤 (绝对值超过此阈值的样本丢弃)
 RETURN_CLIP = 0.20
