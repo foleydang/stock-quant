@@ -3,7 +3,7 @@
 import sys, os, sqlite3, pickle, warnings
 warnings.filterwarnings('ignore')
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
