@@ -8,7 +8,7 @@ LSTM 时序特征提取器 v1
   两者正交，LSTM 输出作为额外特征拼入 LGBM
 
 架构:
-  输入: 过去60天 × 15个基础特征 (OHLCV衍生)
+  输入: 过去60天 × 14个基础特征 (OHLCV衍生)
   编码: 2层 LSTM (hidden=64) → 64维时序embedding
   训练目标: 预测未来5日收益率 (回归)
   输出: 64维特征向量，拼入 LGBM 特征矩阵
@@ -25,6 +25,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from typing import Dict, List, Optional, Tuple
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+except ImportError:
+    HAS_TQDM = False
+    def tqdm(iterable, **kw): return iterable
 
 # 设备选择
 if torch.backends.mps.is_available():
@@ -148,7 +154,7 @@ def load_and_prepare() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, 
     val_seqs, val_targets = [], []
 
     n_ok, n_skip, n_err = 0, 0, 0
-    for sym in symbols:
+    for sym in tqdm(symbols, desc='   加载股票', unit='stock'):
         try:
             df = pd.read_sql(
                 "SELECT date, open, high, low, close, volume FROM kline_daily "
@@ -192,7 +198,7 @@ def load_and_prepare() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, 
         except Exception as e:
             n_err += 1
             if n_err <= 3:
-                print(f"   ⚠️ {sym}: {e}")
+                tqdm.write(f"   ⚠️ {sym}: {e}")
 
     print(f"   成功: {n_ok} | 数据不足: {n_skip} | 错误: {n_err}")
 
@@ -283,7 +289,7 @@ def extract_embeddings(model, output_path: str, norm_stats=None):
 
     embeddings = {}  # {symbol: {date_str: np.array(64,)}}
 
-    for sym in symbols:
+    for sym in tqdm(symbols, desc='   提取 embeddings', unit='stock'):
         try:
             df = pd.read_sql(
                 "SELECT date, open, high, low, close, volume FROM kline_daily "
@@ -301,21 +307,24 @@ def extract_embeddings(model, output_path: str, norm_stats=None):
                 feats = np.nan_to_num((feats - mean) / std, nan=0.0, posinf=0.0, neginf=0.0)
 
             emb_dict = {}
+            # 批量推理：一次处理股票的所有序列
+            seqs = []
+            dates = []
             for i in range(SEQ_LEN, len(feats)):
                 seq = feats[i - SEQ_LEN:i]
                 if np.isnan(seq).any():
                     continue
-                x = torch.FloatTensor(seq).unsqueeze(0).to(DEVICE)
-                emb = model.encode(x).flatten()
-                date_str = str(df['date'].iloc[i])[:10]
-                emb_dict[date_str] = emb.astype(np.float32)
+                seqs.append(seq)
+                dates.append(str(df['date'].iloc[i])[:10])
+            if seqs:
+                batch = torch.FloatTensor(np.array(seqs)).to(DEVICE)  # (n, 60, 14)
+                embs = model.encode(batch)  # (n, 64)
+                for d, e in zip(dates, embs):
+                    emb_dict[d] = e.astype(np.float32)
 
             embeddings[sym] = emb_dict
         except Exception:
             continue
-
-        if len(embeddings) % 100 == 0:
-            print(f"   {len(embeddings)}/{len(symbols)}")
 
     conn.close()
 
