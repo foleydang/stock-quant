@@ -1,288 +1,161 @@
 #!/usr/bin/env python3
 """
-获取宏观数据并存入 SQLite
-数据源: akshare (免费, 无需 API token)
+获取宏观数据并存入 SQLite (v2)
+数据源: akshare
 表: macro_daily
 
-用法:
-  python scripts/fetch_macro_data.py              # 获取全部历史
-  python scripts/fetch_macro_data.py --update     # 增量更新最近30天
-  python scripts/fetch_macro_data.py --start 2020-01-01  # 指定起始日期
+数据:
+  - SHIBOR (隔夜/1周/1月/3月)
+  - 中国国债收益率 (2Y/5Y/10Y/30Y) + 美国国债收益率
+  - USD/CNY (在岸) + USD/CNH (离岸)
+  - 沪深300指数 (收盘/成交量)
+  - 中美利差 (10Y)
 """
 
 import sys, os, sqlite3, argparse
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data/stock_data.db')
 
 
 def fetch_shibor() -> pd.DataFrame:
-    """获取 SHIBOR 利率 (隔夜/1周/1月/3月)"""
-    try:
-        import akshare as ak
-        df = ak.macro_china_shibor_all()
-        if df is None or len(df) == 0:
-            print("  ⚠️ SHIBOR: 无数据")
-            return pd.DataFrame()
+    """SHIBOR 利率"""
+    import akshare as ak
+    df = ak.macro_china_shibor_all()
+    col_map = {}
+    for c in df.columns:
+        c_str = str(c)
+        if '日期' in c_str or 'date' in c_str.lower(): col_map['date'] = c
+        elif '隔夜' in c_str or 'o/n' in c_str.lower(): col_map['on'] = c
+        elif '1周' in c_str or '1w' in c_str.lower(): col_map['1w'] = c
+        elif '1月' in c_str or '1m' in c_str.lower(): col_map['1m'] = c
+        elif '3月' in c_str or '3m' in c_str.lower(): col_map['3m'] = c
 
-        # 列名可能是中文或英文
-        col_map = {}
-        for c in df.columns:
-            c_lower = str(c).lower()
-            if '日期' in c or 'date' in c_lower:
-                col_map['date'] = c
-            elif '隔夜' in c or 'o/n' in c_lower or 'on' in c_lower:
-                col_map['overnight'] = c
-            elif '1周' in c or '1w' in c_lower:
-                col_map['1w'] = c
-            elif '1月' in c or '1m' in c_lower:
-                col_map['1m'] = c
-            elif '3月' in c or '3m' in c_lower:
-                col_map['3m'] = c
-
-        if 'date' not in col_map:
-            print(f"  ⚠️ SHIBOR: 无法识别日期列, 列名: {list(df.columns)}")
-            return pd.DataFrame()
-
-        result = pd.DataFrame()
-        result['trade_date'] = pd.to_datetime(df[col_map['date']])
-        result['shibor_on'] = pd.to_numeric(df[col_map.get('overnight', col_map.get('date'))], errors='coerce')
-        if '1w' in col_map:
-            result['shibor_1w'] = pd.to_numeric(df[col_map['1w']], errors='coerce')
-        if '1m' in col_map:
-            result['shibor_1m'] = pd.to_numeric(df[col_map['1m']], errors='coerce')
-        if '3m' in col_map:
-            result['shibor_3m'] = pd.to_numeric(df[col_map['3m']], errors='coerce')
-
-        result = result.dropna(subset=['shibor_on'])
-        print(f"  ✅ SHIBOR: {len(result)} 条 ({result['trade_date'].min().date()} ~ {result['trade_date'].max().date()})")
-        return result
-    except ImportError:
-        print("  ❌ akshare 未安装: pip install akshare")
-        return pd.DataFrame()
-    except Exception as e:
-        print(f"  ❌ SHIBOR: {e}")
-        return pd.DataFrame()
+    result = pd.DataFrame()
+    result['trade_date'] = pd.to_datetime(df[col_map['date']]).dt.strftime('%Y-%m-%d')
+    for key, col_name in [('shibor_on', 'on'), ('shibor_1w', '1w'), ('shibor_1m', '1m'), ('shibor_3m', '3m')]:
+        if col_name in col_map:
+            result[key] = pd.to_numeric(df[col_map[col_name]], errors='coerce')
+    result = result.dropna(subset=['shibor_on'])
+    print(f"  ✅ SHIBOR: {len(result)} 条 ({result['trade_date'].iloc[0]} ~ {result['trade_date'].iloc[-1]})")
+    return result
 
 
-def fetch_bond_yield() -> pd.DataFrame:
-    """获取中国国债收益率 (10年期)"""
-    try:
-        import akshare as ak
-        df = ak.bond_china_yield()
-        if df is None or len(df) == 0:
-            print("  ⚠️ 国债收益率: 无数据")
-            return pd.DataFrame()
-
-        # 列名通常是 日期, 10年期, 等
-        date_col = None
-        y10_col = None
-        for c in df.columns:
-            c_str = str(c)
-            if '日期' in c_str or 'date' in c_str.lower():
-                date_col = c
-            elif '10年' in c_str or '10Y' in c_str.upper() or '10y' in c_str.lower():
-                y10_col = c
-
-        if date_col is None or y10_col is None:
-            print(f"  ⚠️ 国债收益率: 列名不匹配, 列名: {list(df.columns)[:10]}")
-            return pd.DataFrame()
-
-        result = pd.DataFrame()
-        result['trade_date'] = pd.to_datetime(df[date_col])
-        result['cn_10y_yield'] = pd.to_numeric(df[y10_col], errors='coerce')
-        result = result.dropna(subset=['cn_10y_yield'])
-        print(f"  ✅ 国债收益率: {len(result)} 条 ({result['trade_date'].min().date()} ~ {result['trade_date'].max().date()})")
-        return result
-    except ImportError:
-        return pd.DataFrame()
-    except Exception as e:
-        print(f"  ❌ 国债收益率: {e}")
-        return pd.DataFrame()
+def fetch_bond_yields() -> pd.DataFrame:
+    """中国+美国国债收益率"""
+    import akshare as ak
+    df = ak.bond_zh_us_rate()
+    result = pd.DataFrame()
+    result['trade_date'] = pd.to_datetime(df['日期']).dt.strftime('%Y-%m-%d')
+    # 中国国债
+    for cn, en in [('中国国债收益率2年', 'cn_2y'), ('中国国债收益率5年', 'cn_5y'),
+                    ('中国国债收益率10年', 'cn_10y'), ('中国国债收益率30年', 'cn_30y')]:
+        if cn in df.columns:
+            result[en] = pd.to_numeric(df[cn], errors='coerce')
+    # 美国国债
+    for cn, en in [('美国国债收益率2年', 'us_2y'), ('美国国债收益率5年', 'us_5y'),
+                    ('美国国债收益率10年', 'us_10y'), ('美国国债收益率30年', 'us_30y')]:
+        if cn in df.columns:
+            result[en] = pd.to_numeric(df[cn], errors='coerce')
+    # 中美利差
+    if 'cn_10y' in result.columns and 'us_10y' in result.columns:
+        result['cn_us_spread'] = result['cn_10y'] - result['us_10y']
+    result = result.dropna(subset=['cn_10y'])
+    print(f"  ✅ 国债收益率: {len(result)} 条 ({result['trade_date'].iloc[0]} ~ {result['trade_date'].iloc[-1]})")
+    return result
 
 
 def fetch_usdcny() -> pd.DataFrame:
-    """获取 USD/CNY 汇率"""
+    """USD/CNY 汇率 (在岸 + 离岸)"""
+    import akshare as ak
+    result = None
+
+    # 在岸 CNY (BOC中间价)
     try:
-        import akshare as ak
-        # 使用外汇即期报价
-        df = ak.currency_boc_sina(symbol='美元')
-        if df is None or len(df) == 0:
-            print("  ⚠️ USD/CNY: 无数据")
-            return pd.DataFrame()
-
-        # currency_boc_sina 返回的列名: 日期, 中行钞买价, 中行钞卖价, 中行汇买价, 中行汇卖价
-        date_col = None
-        price_col = None
-        for c in df.columns:
-            c_str = str(c)
-            if '日期' in c_str or 'date' in c_str.lower():
-                date_col = c
-            elif '中行汇卖价' in c_str or '汇卖价' in c_str:
-                price_col = c
-
-        if date_col is None:
-            # 尝试第一列作为日期
-            date_col = df.columns[0]
-        if price_col is None:
-            # 尝试最后一列作为价格
-            price_col = df.columns[-1]
-
-        result = pd.DataFrame()
-        result['trade_date'] = pd.to_datetime(df[date_col])
-        result['usdcny'] = pd.to_numeric(df[price_col], errors='coerce') / 100  # 分 → 元
-        result = result.dropna(subset=['usdcny'])
-        result = result[result['usdcny'] > 5]  # 过滤异常值
-
-        print(f"  ✅ USD/CNY: {len(result)} 条 ({result['trade_date'].min().date()} ~ {result['trade_date'].max().date()})")
-        return result
-    except ImportError:
-        return pd.DataFrame()
+        df = ak.currency_boc_sina(symbol='美元', start_date='20150101', end_date='20260615')
+        tmp = pd.DataFrame()
+        tmp['trade_date'] = pd.to_datetime(df['日期']).dt.strftime('%Y-%m-%d')
+        # 使用央行中间价, 缺失用汇卖价/100
+        mid = pd.to_numeric(df['央行中间价'], errors='coerce')
+        sell = pd.to_numeric(df['中行钞卖价/汇卖价'], errors='coerce') / 100
+        tmp['usdcny'] = mid.fillna(sell)
+        result = tmp.dropna(subset=['usdcny'])
+        print(f"  ✅ USD/CNY(在岸): {len(result)} 条 ({result['trade_date'].iloc[0]} ~ {result['trade_date'].iloc[-1]})")
     except Exception as e:
-        print(f"  ❌ USD/CNY: {e}")
-        return pd.DataFrame()
+        print(f"  ⚠️ USD/CNY(在岸) 失败: {e}")
 
-
-def fetch_hs300_index() -> pd.DataFrame:
-    """获取沪深300指数数据"""
+    # 离岸 CNH
     try:
-        import akshare as ak
-        df = ak.stock_zh_index_daily_em(symbol="sh000300")
-        if df is None or len(df) == 0:
-            # 尝试 sz399300
-            df = ak.stock_zh_index_daily_em(symbol="sz399300")
-        if df is None or len(df) == 0:
-            print("  ⚠️ 沪深300: 无数据")
-            return pd.DataFrame()
-
-        result = pd.DataFrame()
-        result['trade_date'] = pd.to_datetime(df['date'])
-        result['hs300_close'] = pd.to_numeric(df['close'], errors='coerce')
-        result['hs300_volume'] = pd.to_numeric(df['volume'], errors='coerce')
-        # 计算涨跌比 (如果有涨跌家数)
-        if 'up_count' in df.columns or '上涨家数' in [str(c) for c in df.columns]:
-            # 这个API可能没有涨跌家数, 我们先跳过, 用现有的 hs300_daily 表
-            pass
-        result = result.dropna(subset=['hs300_close'])
-        print(f"  ✅ 沪深300: {len(result)} 条 ({result['trade_date'].min().date()} ~ {result['trade_date'].max().date()})")
-        return result
-    except ImportError:
-        return pd.DataFrame()
-    except Exception as e:
-        print(f"  ❌ 沪深300: {e}")
-        return pd.DataFrame()
-
-
-def build_macro_table(dfs: dict) -> pd.DataFrame:
-    """合并所有宏观数据到一张表, 按日期对齐"""
-    if not dfs:
-        return pd.DataFrame()
-
-    # 从 existing hs300_daily 表获取市场广度 (如果存在)
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        hs300 = pd.read_sql("SELECT trade_date, up_count, volume FROM hs300_daily ORDER BY trade_date", conn)
-        conn.close()
-        if len(hs300) > 0:
-            hs300['trade_date'] = pd.to_datetime(hs300['trade_date'].astype(str))
-            hs300['market_breadth'] = hs300['up_count'].astype(float) / 300
-            hs300 = hs300[['trade_date', 'market_breadth']]
-            dfs['breadth'] = hs300
-            print(f"  ✅ 市场广度 (from hs300_daily): {len(hs300)} 条")
-    except Exception:
-        pass
-
-    # 合并所有数据源
-    merged = None
-    for name, df in dfs.items():
-        if df is None or len(df) == 0:
-            continue
-        if merged is None:
-            merged = df.copy()
+        df = ak.forex_hist_em(symbol='USDCNH')
+        tmp = pd.DataFrame()
+        tmp['trade_date'] = pd.to_datetime(df['日期']).dt.strftime('%Y-%m-%d')
+        tmp['usdcnh'] = pd.to_numeric(df['最新价'], errors='coerce')
+        tmp = tmp.dropna(subset=['usdcnh'])
+        if result is not None:
+            result = pd.merge(result, tmp, on='trade_date', how='outer')
         else:
-            merged = pd.merge(merged, df, on='trade_date', how='outer')
+            result = tmp
+        print(f"  ✅ USD/CNH(离岸): {len(tmp)} 条 ({tmp['trade_date'].iloc[0]} ~ {tmp['trade_date'].iloc[-1]})")
+    except Exception as e:
+        print(f"  ⚠️ USD/CNH(离岸) 失败: {e}")
 
-    if merged is None:
-        return pd.DataFrame()
-
-    merged = merged.sort_values('trade_date').reset_index(drop=True)
-    # 前向填充缺失值 (宏观数据低频发布, 用最近值填充)
-    merged = merged.ffill()
-    print(f"\n  合并后: {len(merged)} 条, 列: {list(merged.columns)}")
-    return merged
+    return result if result is not None else pd.DataFrame()
 
 
-def save_to_db(df: pd.DataFrame):
-    """保存到 SQLite 的 macro_daily 表"""
-    if df is None or len(df) == 0:
-        print("  ⚠️ 无数据可保存")
+def fetch_hs300() -> pd.DataFrame:
+    """沪深300指数数据"""
+    import akshare as ak
+    df = ak.stock_zh_index_daily(symbol='sh000300')
+    result = pd.DataFrame()
+    result['trade_date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+    result['hs300_close'] = pd.to_numeric(df['close'], errors='coerce')
+    result['hs300_volume'] = pd.to_numeric(df['volume'], errors='coerce')
+    result = result.dropna(subset=['hs300_close'])
+    print(f"  ✅ 沪深300: {len(result)} 条 ({result['trade_date'].iloc[0]} ~ {result['trade_date'].iloc[-1]})")
+    return result
+
+
+def merge_and_save(dfs: list):
+    """合并所有数据源并保存"""
+    if not dfs:
+        print("❌ 无数据")
         return
 
+    merged = dfs[0]
+    for df in dfs[1:]:
+        if df is not None and len(df) > 0:
+            merged = pd.merge(merged, df, on='trade_date', how='outer')
+
+    merged = merged.sort_values('trade_date').reset_index(drop=True)
+    # 前向填充 (低频宏观数据用最近值)
+    merged = merged.ffill()
+
+    print(f"\n  合并后: {len(merged)} 条, {len(merged.columns)} 列")
+
     conn = sqlite3.connect(DB_PATH)
-
-    # 确保 trade_date 是字符串格式
-    df['trade_date'] = df['trade_date'].dt.strftime('%Y-%m-%d')
-
-    # 创建表 (如果不存在)
-    cols = [f"{c} REAL" if c != 'trade_date' else 'trade_date TEXT PRIMARY KEY' for c in df.columns]
-    conn.execute(f"CREATE TABLE IF NOT EXISTS macro_daily ({', '.join(cols)})")
-
-    # UPSERT
-    placeholders = ', '.join(['?'] * len(df.columns))
-    cols_str = ', '.join(df.columns)
-    update_str = ', '.join([f"{c}=excluded.{c}" for c in df.columns if c != 'trade_date'])
-
-    conn.executemany(
-        f"INSERT OR REPLACE INTO macro_daily ({cols_str}) VALUES ({placeholders})",
-        df.values.tolist()
-    )
-    conn.commit()
-
+    merged.to_sql('macro_daily', conn, if_exists='replace', index=False)
     # 验证
     count = conn.execute("SELECT COUNT(*), MIN(trade_date), MAX(trade_date) FROM macro_daily").fetchone()
     conn.close()
-    print(f"\n  💾 已保存: {count[0]} 条 ({count[1]} ~ {count[2]})")
+    print(f"  💾 已保存 macro_daily: {count[0]} 条 ({count[1]} ~ {count[2]})")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='获取宏观数据')
-    parser.add_argument('--update', action='store_true', help='仅更新最近30天')
-    parser.add_argument('--start', type=str, default=None, help='起始日期 YYYY-MM-DD')
-    args = parser.parse_args()
-
     print("=" * 60)
-    print("  宏观数据获取")
+    print("  宏观数据获取 v2")
     print("=" * 60)
 
-    # 1. 获取各数据源
-    dfs = {}
-    dfs['shibor'] = fetch_shibor()
-    dfs['bond'] = fetch_bond_yield()
-    dfs['usdcny'] = fetch_usdcny()
-    dfs['hs300'] = fetch_hs300_index()
+    dfs = [
+        fetch_hs300(),
+        fetch_shibor(),
+        fetch_bond_yields(),
+        fetch_usdcny(),
+    ]
 
-    # 2. 合并
-    merged = build_macro_table(dfs)
-
-    if len(merged) == 0:
-        print("\n  ❌ 未获取到任何宏观数据, 请检查网络或 akshare 版本")
-        return
-
-    # 3. 过滤日期范围
-    if args.update:
-        cutoff = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
-        merged = merged[merged['trade_date'] >= cutoff]
-        print(f"\n  增量模式: 保留 {cutoff} 之后的数据 ({len(merged)} 条)")
-
-    if args.start:
-        merged = merged[merged['trade_date'] >= args.start]
-        print(f"\n  起始日期: {args.start} ({len(merged)} 条)")
-
-    # 4. 保存
-    save_to_db(merged)
+    merge_and_save([d for d in dfs if d is not None and len(d) > 0])
     print("\n✅ 完成")
 
 
