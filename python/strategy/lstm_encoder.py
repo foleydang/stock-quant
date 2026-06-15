@@ -339,9 +339,12 @@ def main():
     args = parser.parse_args()
 
     if args.extract_only:
-        # 仅推理模式
-        model = LSTMPredictor(hidden_dim=args.hidden)
-        model.load_state_dict(torch.load(args.extract_only, map_location=DEVICE, weights_only=True))
+        # 仅推理模式 — 从 checkpoint 推断 input_dim
+        state_dict = torch.load(args.extract_only, map_location='cpu', weights_only=True)
+        input_dim = state_dict['lstm.weight_ih_l0'].shape[1]
+        model = LSTMPredictor(input_dim=input_dim, hidden_dim=args.hidden)
+        model.load_state_dict(state_dict)
+        model.to(DEVICE)
         out_path = os.path.join(ROOT, 'data/lstm_embeddings.pkl')
         extract_embeddings(model, out_path)
         return
