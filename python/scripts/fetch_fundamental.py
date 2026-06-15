@@ -95,7 +95,7 @@ def fetch_all(symbols: list):
         df = fetch_financial(sym)
         if len(df) > 0:
             all_data.append(df)
-        time.sleep(0.1)  # 限速
+        time.sleep(0.01)  # 限速
 
     if not all_data:
         print("   ⚠️ 未获取到任何数据")
