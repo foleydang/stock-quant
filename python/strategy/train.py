@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LGBM 生产级训练脚本 v8 — 截面排名回归 Bagging Ensemble + 宏观特征
+LGBM 生产级训练脚本 v9 — 截面排名回归 Bagging Ensemble + 宏观 + LSTM时序
 
 架构:
   日线模型 → 预测截面排名分位 (α选股层)
@@ -457,7 +457,7 @@ def main():
     params = QUICK_PARAMS if args.quick else LGBM_PARAMS
 
     print("=" * 70)
-    print(f"  LGBM {cfg['label']}模型训练 v8 — {n_models}模型 Bagging Ensemble + 宏观特征")
+    print(f"  LGBM {cfg['label']}模型训练 v9 — {n_models}模型 Bagging Ensemble + 宏观 + LSTM")
     print(f"  目标: 截面排名回归 (0~1分位) | 预测周期: {cfg['horizon']}根K线")
     print(f"  时序: train({TRAIN_RATIO:.0%}) → val({VAL_RATIO:.0%}) → test({TEST_RATIO:.0%})")
     print(f"  并行: {n_models}模型并行 (joblib n_jobs={N_JOBS_PARALLEL})")
