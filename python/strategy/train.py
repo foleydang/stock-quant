@@ -22,6 +22,9 @@ LGBM 生产级训练脚本 v10 — 绝对收益预测 + 截面排名 (双模式)
 """
 
 import sys, os, argparse, pickle, json, sqlite3, warnings, time
+
+# 抑制 sklearn 特征名警告 (numpy array predict 无列名)
+warnings.filterwarnings('ignore', message='X does not have valid feature names')
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -126,7 +129,7 @@ CORR_THRESHOLD = 0.88
 RETURN_CLIP = 0.20
 
 # 目标类型: 'rank'=截面排名分位, 'return'=绝对5日收益率
-TARGET_TYPE = 'return'  # 默认改为绝对收益 (v10)
+TARGET_TYPE = 'rank'  # 回退到排名模式 (绝对收益预测无效, IC=-0.016)
 
 
 # ============ 数据加载 ============
