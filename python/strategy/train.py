@@ -61,23 +61,25 @@ TRAIN_RATIO = 0.8
 VAL_RATIO = 0.1
 TEST_RATIO = 0.1
 
-# LGBM 生产级固定参数 (回归)
+# LGBM 生产级固定参数 (回归) — v6 防过拟合优化
+# 目标: 缩小 train/test IC 差距 (之前 0.095→0.044, 衰减54%)
 LGBM_PARAMS = {
     'objective': 'regression',
     'metric': 'l2',
     'boosting_type': 'gbdt',
-    'num_leaves': 255,
-    'max_depth': 16,
-    'learning_rate': 0.01,
+    'num_leaves': 127,          # 255→127, 降低模型复杂度
+    'max_depth': 10,            # 16→10, 限制树深度
+    'learning_rate': 0.008,     # 0.01→0.008, 更小步长, 更多树但每棵影响小
     'n_estimators': 20000,
-    'early_stopping_rounds': 200,
-    'subsample': 0.75,
-    'colsample_bytree': 0.65,
-    'subsample_freq': 5,
-    'reg_alpha': 0.05,
-    'reg_lambda': 0.05,
-    'min_child_samples': 30,
-    'min_split_gain': 0.005,
+    'early_stopping_rounds': 80,  # 200→80, 更早停止, 防止过拟合
+    'subsample': 0.6,           # 0.75→0.6, 更强行采样
+    'colsample_bytree': 0.5,    # 0.65→0.5, 更强列采样, 打破特征垄断
+    'subsample_freq': 3,        # 5→3, 更频繁采样
+    'reg_alpha': 0.5,           # 0.05→0.5, L1正则化 ×10
+    'reg_lambda': 1.0,          # 0.05→1.0, L2正则化 ×20
+    'min_child_samples': 100,   # 30→100, 更大叶子节点
+    'min_child_weight': 0.001,  # 新增, Hessian约束, 回归专用
+    'min_split_gain': 0.01,     # 0.005→0.01, 更高分裂门槛
     'verbosity': -1,
     'random_state': None,
     'n_jobs': 3,
