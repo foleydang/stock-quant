@@ -296,7 +296,8 @@ def extract_embeddings(model, output_path: str, norm_stats=None):
 
             # 应用标准化
             if norm_stats is not None:
-                feats = (feats - norm_stats['x_mean']) / norm_stats['x_std']
+                feats = np.nan_to_num((feats - norm_stats['x_mean']) / norm_stats['x_std'],
+                                      nan=0.0, posinf=0.0, neginf=0.0)
 
             emb_dict = {}
             for i in range(SEQ_LEN, len(feats)):
