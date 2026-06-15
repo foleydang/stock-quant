@@ -89,7 +89,7 @@ class FundamentalFeatures:
         # --- 估值 ---
         if 'bv_per_share' in aligned:
             close = df['close'].astype(float).values
-            bv = aligned['bv_per_share'].values
+            bv = pd.to_numeric(aligned['bv_per_share'], errors='coerce').values
             mask = bv > 0
             pb = np.full(len(close), np.nan)
             pb[mask] = close[mask] / bv[mask]
@@ -103,7 +103,7 @@ class FundamentalFeatures:
             eps = aligned['eps']
             close = df['close'].astype(float).values
             # PE proxy = close / eps (TTM)
-            eps_val = eps.values
+            eps_val = pd.to_numeric(eps, errors='coerce').values
             mask = eps_val > 0
             pe = np.full(len(close), np.nan)
             pe[mask] = close[mask] / eps_val[mask]
@@ -136,12 +136,16 @@ class FundamentalFeatures:
         """将财务数据对齐到日线日期 (前向填充)"""
         if col not in fund.columns:
             return None
+        date_idx = pd.DatetimeIndex(dates)
+        # 处理重复日期
+        if date_idx.has_duplicates:
+            date_idx = date_idx.drop_duplicates()
         series = fund[col].reindex(
-            fund.index.union(pd.DatetimeIndex(dates))
+            fund.index.union(date_idx)
         )
         series = series.ffill()
-        result = series.reindex(pd.DatetimeIndex(dates))
-        return pd.Series(result.values, index=pd.RangeIndex(len(dates)))
+        result = series.reindex(date_idx)
+        return pd.Series(result.values, index=pd.RangeIndex(len(date_idx)))
 
 
 # 延迟加载单例
