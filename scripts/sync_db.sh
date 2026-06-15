@@ -59,7 +59,6 @@ else
 fi
 
     echo "宏观数据: $MACRO_COUNT 条"
-fi
 
 if [ "$DAILY_COUNT" -lt 100 ] || [ "${MACRO_COUNT:-0}" -lt 100 ]; then
     echo ""
