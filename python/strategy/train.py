@@ -23,8 +23,9 @@ LGBM 生产级训练脚本 v11 — 市场中性排名 + 基本面特征
 
 import sys, os, argparse, pickle, json, sqlite3, warnings, time
 
-# 抑制 sklearn 特征名警告 (numpy array predict 无列名)
-warnings.filterwarnings('ignore', message='X does not have valid feature names')
+# 抑制所有警告 (包括 sklearn 子进程警告)
+os.environ['PYTHONWARNINGS'] = 'ignore'
+warnings.filterwarnings('ignore')
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -42,8 +43,6 @@ except ImportError:
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from strategy.features import FeaturePipeline
-
-warnings.filterwarnings('ignore')
 
 # ============ 路径 ============
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
