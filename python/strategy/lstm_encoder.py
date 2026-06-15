@@ -161,6 +161,7 @@ def load_and_prepare() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, 
             # 计算 LSTM 输入特征
             feats = compute_lstm_inputs(df)
             feats = feats.fillna(0)
+            feats = feats.replace([np.inf, -np.inf], 0)
             feat_arr = feats.values.astype(np.float32)
 
             # 计算目标: 未来5日收益率
@@ -291,7 +292,7 @@ def extract_embeddings(model, output_path: str, norm_stats=None):
                 continue
             df['date'] = pd.to_datetime(df['date'], format='mixed')
 
-            feats = compute_lstm_inputs(df).fillna(0).values.astype(np.float32)
+            feats = compute_lstm_inputs(df).fillna(0).replace([np.inf, -np.inf], 0).values.astype(np.float32)
 
             # 应用标准化
             if norm_stats is not None:
