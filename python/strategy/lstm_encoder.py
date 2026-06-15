@@ -147,12 +147,14 @@ def load_and_prepare() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, 
     train_seqs, train_targets = [], []
     val_seqs, val_targets = [], []
 
-    for sym in symbols[:300]:  # 限制300只, 覆盖主要股票
+    n_ok, n_skip, n_err = 0, 0, 0
+    for sym in symbols:
         try:
             df = pd.read_sql(
                 "SELECT date, open, high, low, close, volume FROM kline_daily "
                 "WHERE symbol=? ORDER BY date", conn, params=(sym,))
             if len(df) < SEQ_LEN + HORIZON + 20:
+                n_skip += 1
                 continue
             df['date'] = pd.to_datetime(df['date'])
 
@@ -177,7 +179,7 @@ def load_and_prepare() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, 
                     continue
 
                 date = df['date'].iloc[i]
-                date_str = str(date)[:10]
+                date_str = pd.Timestamp(date).strftime('%Y-%m-%d')
 
                 if date_str <= TRAIN_CUTOFF:
                     train_seqs.append(seq)
@@ -185,8 +187,13 @@ def load_and_prepare() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, 
                 elif date_str <= VAL_CUTOFF:
                     val_seqs.append(seq)
                     val_targets.append(tgt)
-        except Exception:
-            continue
+            n_ok += 1
+        except Exception as e:
+            n_err += 1
+            if n_err <= 3:
+                print(f"   ⚠️ {sym}: {e}")
+
+    print(f"   成功: {n_ok} | 数据不足: {n_skip} | 错误: {n_err}")
 
     conn.close()
 
@@ -196,7 +203,11 @@ def load_and_prepare() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, 
     val_y = np.array(val_targets, dtype=np.float32)
 
     print(f"   训练: {len(train_X):,} 条 | 验证: {len(val_X):,} 条")
-    return train_X, train_y, val_X, val_y, list(compute_lstm_inputs(pd.DataFrame()).columns or [''] * 15)
+    # LSTM 输入列名 (与 compute_lstm_inputs 保持一致)
+    lstm_feature_names = ['ret_1','ret_5','ret_20','logret_1','vol_5','vol_20',
+                          'vol_ratio','vol_chg','hl_ratio','co_ratio',
+                          'rsi_14','pos_20','ma20_dev','ma60_dev']
+    return train_X, train_y, val_X, val_y, lstm_feature_names
 
 
 # ============ 训练 ============
