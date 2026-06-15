@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-特征工程 v3 — 对标 Qlib Alpha158/360 + 截面增强
+特征工程 v4 — 对标 Qlib Alpha158/360 + 截面增强 + 宏观环境
 
 设计原则:
   - 严格向后看: 所有特征只用 ≤ 当前日期的数据
@@ -26,6 +26,11 @@ import os
 from typing import Dict, List, Optional, Tuple
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data/stock_data.db')
+
+# 延迟导入, 避免循环依赖
+def _get_macro_features():
+    from strategy.macro_features import MacroFeatures
+    return MacroFeatures
 
 # ============ 默认周期配置 ============
 DEFAULT_PRICE_PERIODS = [1, 2, 3, 5, 10, 15, 20, 30, 40, 60, 80, 100, 120, 200, 250]
@@ -743,15 +748,62 @@ class MarketFeatures:
 
 
 # ============ 特征流水线 ============
+class MacroInteractionFeatures:
+    """宏观×个股交互特征: 在不同宏观环境下个股特征的表现差异"""
+
+    @staticmethod
+    def calculate(features: pd.DataFrame) -> pd.DataFrame:
+        """计算宏观环境下的个股特征交互"""
+        f = pd.DataFrame(index=features.index)
+        cols = set(features.columns)
+
+        # 波动率环境 × 个股波动率
+        if 'macro_hs300_vol_high' in cols and 'price_vol_20' in cols:
+            f['mi_vol_regime_x_vol'] = features['macro_hs300_vol_high'] * features['price_vol_20']
+
+        # 流动性环境 × 成交量
+        if 'macro_liquidity_tight' in cols and 'vol_ratio_20' in cols:
+            f['mi_liquidity_x_vol'] = features['macro_liquidity_tight'] * features['vol_ratio_20']
+
+        # 汇率环境 × 北向资金
+        if 'macro_cny_depreciate' in cols and 'mkt_north_cum5' in cols:
+            f['mi_cny_x_north'] = features['macro_cny_depreciate'] * features['mkt_north_cum5']
+
+        # 市场状态 × 个股动量
+        if 'macro_market_regime' in cols and 'price_ret_20' in cols:
+            f['mi_regime_x_ret'] = features['macro_market_regime'] * features['price_ret_20']
+
+        # 市场波动率 × 个股beta
+        if 'macro_hs300_vol_20' in cols and 'macro_stock_beta' in cols:
+            f['mi_mktvol_x_beta'] = features['macro_hs300_vol_20'] * features['macro_stock_beta']
+
+        # 利率变化 × 高beta股票
+        if 'macro_cn_10y_chg' in cols and 'macro_stock_beta' in cols:
+            f['mi_yield_x_beta'] = features['macro_cn_10y_chg'] * features['macro_stock_beta']
+
+        # 市场广度 × 个股相对强弱
+        if 'macro_breadth_strong' in cols and 'macro_stock_rs' in cols:
+            f['mi_breadth_x_rs'] = features['macro_breadth_strong'] * features['macro_stock_rs']
+
+        return f
+
+
 class FeaturePipeline:
     """统一特征计算流水线"""
 
     def __init__(self, cfg: dict = None):
         self.cfg = cfg or {}
         self.north_shift = self.cfg.get('north_shift_days', 0)
+        self._macro_features = None
+
+    def _get_macro(self):
+        """延迟加载宏观特征类"""
+        if self._macro_features is None:
+            self._macro_features = _get_macro_features()
+        return self._macro_features
 
     def compute_stock(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-        """计算单只股票的所有特征"""
+        """计算单只股票的所有特征 (含宏观)"""
         price = PriceFeatures.calculate(df)
         volume = VolumeFeatures.calculate(df)
         pattern = PatternFeatures.calculate(df)
@@ -759,10 +811,16 @@ class FeaturePipeline:
         market = MarketFeatures.calculate(df, symbol=symbol, north_shift_days=self.north_shift)
         sentiment = SentimentFeatures.calculate(df, symbol=symbol)
 
-        base = pd.concat([price, volume, pattern, momentum, market, sentiment], axis=1)
+        # 宏观特征 (v8 新增)
+        macro = self._get_macro().calculate(df, symbol)
+
+        base = pd.concat([price, volume, pattern, momentum, market, sentiment, macro], axis=1)
         interact = InteractionFeatures.calculate(base)
 
-        return pd.concat([base, interact], axis=1)
+        # 宏观交互特征 (v8 新增)
+        macro_interact = MacroInteractionFeatures.calculate(base)
+
+        return pd.concat([base, interact, macro_interact], axis=1)
 
     def compute_cross_section(self, all_stock_features: Dict[str, pd.DataFrame],
                               all_dates: List) -> Dict[str, pd.DataFrame]:
