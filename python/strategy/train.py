@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LGBM 生产级训练脚本 v9 — 截面排名回归 Bagging Ensemble + 宏观 + LSTM时序
+LGBM 生产级训练脚本 v10 — 绝对收益预测 + 截面排名 (双模式)
 
 架构:
   日线模型 → 预测截面排名分位 (α选股层)
@@ -125,6 +125,9 @@ CORR_THRESHOLD = 0.88
 # 收益率异常值过滤 (绝对值超过此阈值的样本丢弃)
 RETURN_CLIP = 0.20
 
+# 目标类型: 'rank'=截面排名分位, 'return'=绝对5日收益率
+TARGET_TYPE = 'return'  # 默认改为绝对收益 (v10)
+
 
 # ============ 数据加载 ============
 def load_data(db_path: str, table: str) -> Dict[str, pd.DataFrame]:
@@ -219,33 +222,35 @@ def prepare_data(data: Dict, conn, cfg: dict,
     print("  计算截面排名特征...")
     cs_features = pipeline.compute_cross_section(all_features, get_all_dates(data))
 
-    # 第三遍: 按日期截面排名, 构建目标
-    print("  计算截面排名目标...")
-    # 收集每个日期的所有股票收益率
-    date_returns: Dict[str, Dict[str, float]] = {}  # {date: {symbol: return}}
-    for sym, ret_map in stock_returns.items():
-        for d, r in ret_map.items():
-            if d not in date_returns:
-                date_returns[d] = {}
-            date_returns[d][sym] = r
+    # 第三遍: 按日期截面排名, 构建目标 (仅 rank 模式)
+    if TARGET_TYPE == 'rank':
+        print("  计算截面排名目标...")
+        # 收集每个日期的所有股票收益率
+        date_returns: Dict[str, Dict[str, float]] = {}  # {date: {symbol: return}}
+        for sym, ret_map in stock_returns.items():
+            for d, r in ret_map.items():
+                if d not in date_returns:
+                    date_returns[d] = {}
+                date_returns[d][sym] = r
 
-    # 对每个日期, 截面排名 → 分位值 0~1
-    stock_rank_target: Dict[str, Dict[str, float]] = {}  # {symbol: {date: rank_pct}}
-    for sym in stock_returns:
-        stock_rank_target[sym] = {}
+        # 对每个日期, 截面排名 → 分位值 0~1
+        stock_rank_target: Dict[str, Dict[str, float]] = {}  # {symbol: {date: rank_pct}}
+        for sym in stock_returns:
+            stock_rank_target[sym] = {}
 
-    n_dates_ranked = 0
-    for d, sym_rets in date_returns.items():
-        if len(sym_rets) < 10:  # 至少10只股票才有排名意义
-            continue
-        rets = np.array(list(sym_rets.values()))
-        # 百分位排名: 0=最差, 1=最好
-        ranks = (pd.Series(rets).rank(pct=True) - 0.5).values  # 中心化到 -0.5 ~ 0.5
-        for i, sym in enumerate(sym_rets.keys()):
-            stock_rank_target[sym][d] = float(ranks[i])
-        n_dates_ranked += 1
-
-    print(f"  截面排名完成: {n_dates_ranked} 个交易日, {len(stock_returns)} 只股票")
+        n_dates_ranked = 0
+        for d, sym_rets in date_returns.items():
+            if len(sym_rets) < 10:  # 至少10只股票才有排名意义
+                continue
+            rets = np.array(list(sym_rets.values()))
+            ranks = (pd.Series(rets).rank(pct=True) - 0.5).values  # 中心化到 -0.5 ~ 0.5
+            for i, sym in enumerate(sym_rets.keys()):
+                stock_rank_target[sym][d] = float(ranks[i])
+            n_dates_ranked += 1
+        print(f"  截面排名完成: {n_dates_ranked} 个交易日, {len(stock_returns)} 只股票")
+    else:
+        print("  目标: 绝对5日收益率 (跳过截面排名)")
+        stock_rank_target = stock_returns  # 直接用收益率
 
     # 第四遍: 合并特征 + 排名目标 + 实际收益率 + 切分
     feature_names = None
@@ -384,9 +389,10 @@ def evaluate_ensemble(models_info: List[Dict], X_test, y_test,
     print(f"{'='*70}")
 
     # 目标统计
-    print(f"  排名目标: mean={y_test.mean():.4f} std={y_test.std():.4f} "
+    target_label = '绝对收益' if TARGET_TYPE == 'return' else '排名目标'
+    print(f"  {target_label}: mean={y_test.mean():.4f} std={y_test.std():.4f} "
           f"min={y_test.min():.4f} max={y_test.max():.4f}")
-    if y_test_raw is not None:
+    if y_test_raw is not None and TARGET_TYPE != 'return':
         print(f"  实际收益: mean={y_test_raw.mean():.4f} std={y_test_raw.std():.4f} "
               f"min={y_test_raw.min():.4f} max={y_test_raw.max():.4f}")
 
@@ -461,8 +467,9 @@ def main():
     params = QUICK_PARAMS if args.quick else LGBM_PARAMS
 
     print("=" * 70)
-    print(f"  LGBM {cfg['label']}模型训练 v9 — {n_models}模型 Bagging Ensemble + 宏观 + LSTM")
-    print(f"  目标: 截面排名回归 (0~1分位) | 预测周期: {cfg['horizon']}根K线")
+    target_desc = '绝对5日收益率' if TARGET_TYPE == 'return' else '截面排名分位 (0~1)'
+    print(f"  LGBM {cfg['label']}模型训练 v10 — {n_models}模型 Bagging Ensemble + 宏观 + LSTM")
+    print(f"  目标: {target_desc} | 预测周期: {cfg['horizon']}根K线")
     print(f"  时序: train({TRAIN_RATIO:.0%}) → val({VAL_RATIO:.0%}) → test({TEST_RATIO:.0%})")
     print(f"  并行: {n_models}模型并行 (joblib n_jobs={N_JOBS_PARALLEL})")
     print(f"  {'⚠️ 快速模式' if args.quick else '🚀 生产模式'}: "
@@ -556,7 +563,7 @@ def main():
         'keep_features': feature_names,
         'n_models': n_models,
         'horizon': cfg['horizon'],
-        'model_type': 'rank_regression',
+        'model_type': 'return_regression' if TARGET_TYPE == 'return' else 'rank_regression',
         'train_date': datetime.now().strftime('%Y-%m-%d'),
         'train_samples': len(X_full),
         'seeds': seeds,
@@ -602,12 +609,21 @@ def main():
     print(f"    测试 IC: {test_ic:.4f} | MSE: {test_mse:.6f}")
     print(f"    总训练耗时: {train_time/60:.1f}min")
 
-    if test_ic > 0.05:
-        print(f" ✅ 样本外有效 (IC > 0.05)")
-    elif test_ic > 0.03:
-        print(f" ⚠️ 弱有效 (IC > 0.03)，可优化")
+    if TARGET_TYPE == 'return':
+        # 绝对收益模式: IC 更难, 阈值降低
+        if test_ic > 0.04:
+            print(f" ✅ 有效 (收益预测 IC > 0.04)")
+        elif test_ic > 0.02:
+            print(f" ⚠️ 弱有效 (IC > 0.02)，可优化")
+        else:
+            print(f" ❌ 无效 (IC <= 0.02)")
     else:
-        print(f" ❌ 样本外不足 (IC <= 0.03)")
+        if test_ic > 0.05:
+            print(f" ✅ 样本外有效 (IC > 0.05)")
+        elif test_ic > 0.03:
+            print(f" ⚠️ 弱有效 (IC > 0.03)，可优化")
+        else:
+            print(f" ❌ 样本外不足 (IC <= 0.03)")
     print(f"{'='*70}")
 
 
