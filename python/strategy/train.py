@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LGBM 生产级训练脚本 v10 — 绝对收益预测 + 截面排名 (双模式)
+LGBM 生产级训练脚本 v11 — 市场中性排名 + 基本面特征
 
 架构:
   日线模型 → 预测截面排名分位 (α选股层)
@@ -131,6 +131,9 @@ RETURN_CLIP = 0.20
 # 目标类型: 'rank'=截面排名分位, 'return'=绝对5日收益率
 TARGET_TYPE = 'rank'  # 回退到排名模式 (绝对收益预测无效, IC=-0.016)
 
+# 市场中性: True=排名超额收益(剔除市场beta), False=排名原始收益
+NEUTRAL_TARGET = True
+
 
 # ============ 数据加载 ============
 def load_data(db_path: str, table: str) -> Dict[str, pd.DataFrame]:
@@ -246,11 +249,18 @@ def prepare_data(data: Dict, conn, cfg: dict,
             if len(sym_rets) < 10:  # 至少10只股票才有排名意义
                 continue
             rets = np.array(list(sym_rets.values()))
-            ranks = (pd.Series(rets).rank(pct=True) - 0.5).values  # 中心化到 -0.5 ~ 0.5
+            # 市场中性: 用超额收益排名 (剔除市场beta, 纯alpha)
+            if NEUTRAL_TARGET:
+                market_ret = np.nanmean(rets)  # 等权市场收益
+                alpha_rets = rets - market_ret
+            else:
+                alpha_rets = rets
+            ranks = (pd.Series(alpha_rets).rank(pct=True) - 0.5).values  # 中心化到 -0.5 ~ 0.5
             for i, sym in enumerate(sym_rets.keys()):
                 stock_rank_target[sym][d] = float(ranks[i])
             n_dates_ranked += 1
-        print(f"  截面排名完成: {n_dates_ranked} 个交易日, {len(stock_returns)} 只股票")
+        neutral_tag = '市场中性' if NEUTRAL_TARGET else '原始收益'
+        print(f"  截面排名完成 ({neutral_tag}): {n_dates_ranked} 个交易日, {len(stock_returns)} 只股票")
     else:
         print("  目标: 绝对5日收益率 (跳过截面排名)")
         stock_rank_target = stock_returns  # 直接用收益率

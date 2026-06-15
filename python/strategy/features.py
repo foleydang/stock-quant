@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-特征工程 v5 — 对标 Qlib Alpha158/360 + 截面增强 + 宏观环境 + LSTM时序
+特征工程 v6 — 对标 Qlib Alpha158/360 + 截面增强 + 宏观 + LSTM + 基本面
 
 设计原则:
   - 严格向后看: 所有特征只用 ≤ 当前日期的数据
@@ -30,6 +30,7 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # 延迟导入, 避免循环依赖
 def _get_macro_features():
     from strategy.macro_features import MacroFeatures
+    from strategy.fundamental_features import _get_fundamental_features
     return MacroFeatures
 
 # ============ 默认周期配置 ============
@@ -796,12 +797,19 @@ class FeaturePipeline:
         self.north_shift = self.cfg.get('north_shift_days', 0)
         self._macro_features = None
         self._lstm_embeddings = None
+        self._fundamental_features = None
 
     def _get_macro(self):
         """延迟加载宏观特征类"""
         if self._macro_features is None:
             self._macro_features = _get_macro_features()
         return self._macro_features
+
+    def _get_fundamental(self):
+        """延迟加载基本面特征类"""
+        if self._fundamental_features is None:
+            self._fundamental_features = _get_fundamental_features()
+        return self._fundamental_features
 
     def _load_lstm(self):
         """延迟加载 LSTM embeddings"""
@@ -830,7 +838,10 @@ class FeaturePipeline:
         # 宏观特征 (v8 新增)
         macro = self._get_macro().calculate(df, symbol)
 
-        base = pd.concat([price, volume, pattern, momentum, market, sentiment, macro], axis=1)
+        # 基本面特征 (v11 新增)
+        fundamental = self._get_fundamental().calculate(df, symbol)
+
+        base = pd.concat([price, volume, pattern, momentum, market, sentiment, macro, fundamental], axis=1)
         interact = InteractionFeatures.calculate(base)
 
         # 宏观交互特征 (v8 新增)
