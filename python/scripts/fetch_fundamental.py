@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """
-基本面数据采集 v1
+基本面数据采集 v2
 
-数据源: akshare
-输出: fundamental_daily 表 (PE/PB/PS/市值等)
+数据源: akshare stock_financial_abstract_ths
+输出: fundamental_daily 表
 
 字段:
-  symbol, trade_date,
-  pe_ttm, pb, ps_ttm, pcf_ttm,
-  total_mv, circ_mv,  # 总市值/流通市值(亿)
-  roe_ttm,  # 净资产收益率
+  symbol, trade_date (报告期),
+  net_profit, net_profit_yoy,  # 净利润/同比
+  revenue, revenue_yoy,        # 营收/同比
+  roe,                         # 净资产收益率
+  bv_per_share,                # 每股净资产
+  debt_ratio,                  # 资产负债率
+  eps                          # 每股收益
 """
 
-import os, sys, sqlite3, time, argparse
+import os, sys, sqlite3, time
 import numpy as np
 import pandas as pd
 import akshare as ak
@@ -26,69 +29,81 @@ except ImportError:
     def tqdm(iterable, **kw): return iterable
 
 
-def fetch_pe_pb(symbol: str) -> pd.DataFrame:
-    """获取单只股票的 PE/PB 历史 (akshare)"""
+def fetch_financial(symbol: str) -> pd.DataFrame:
+    """获取单只股票的财务摘要"""
     try:
-        # akshare: stock_a_pe_and_pb → 返回 date, pe, pb
+        # 提取纯数字代码
         code = symbol.replace('.SZ', '').replace('.SH', '')
-        # 判断交易所
-        if symbol.endswith('.SH'):
-            raw = f"sh{code}"
-        else:
-            raw = f"sz{code}"
-        df = ak.stock_a_pe_and_pb(symbol=raw)
+        df = ak.stock_financial_abstract_ths(symbol=code, indicator='按报告期')
         if df is None or len(df) == 0:
             return pd.DataFrame()
-        df = df.rename(columns={'date': 'trade_date', 'pe': 'pe_ttm', 'pb': 'pb'})
-        df['trade_date'] = pd.to_datetime(df['trade_date'], format='mixed')
-        return df[['trade_date', 'pe_ttm', 'pb']]
+
+        # 重命名列
+        col_map = {
+            '报告期': 'trade_date',
+            '净利润': 'net_profit',
+            '净利润同比增长率': 'net_profit_yoy',
+            '营业总收入': 'revenue',
+            '营业总收入同比增长率': 'revenue_yoy',
+            '净资产收益率': 'roe',
+            '每股净资产': 'bv_per_share',
+            '资产负债率': 'debt_ratio',
+            '基本每股收益': 'eps',
+        }
+        df = df.rename(columns=col_map)
+        keep_cols = [c for c in col_map.values() if c in df.columns]
+        df = df[keep_cols].copy()
+
+        # 清理数据: 百分比转数值
+        for col in ['net_profit_yoy', 'revenue_yoy', 'roe', 'debt_ratio']:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.replace('%', '', regex=False)
+                df[col] = pd.to_numeric(df[col], errors='coerce') / 100
+
+        # 净利润转数值 (去除"万"、"亿"等)
+        if 'net_profit' in df.columns:
+            df['net_profit'] = df['net_profit'].astype(str).apply(_parse_amount)
+        if 'revenue' in df.columns:
+            df['revenue'] = df['revenue'].astype(str).apply(_parse_amount)
+
+        df['trade_date'] = pd.to_datetime(df['trade_date'])
+        df['symbol'] = symbol
+        return df
     except Exception:
         return pd.DataFrame()
 
 
-def fetch_individual_info(symbol: str) -> dict:
-    """获取股票基本信息: 总市值、流通市值、ROE"""
+def _parse_amount(val: str) -> float:
+    """解析金额字符串: '1.13亿' → 113000000, '4302.00万' → 43020000"""
     try:
-        code = symbol.replace('.SZ', '').replace('.SH', '')
-        if symbol.endswith('.SH'):
-            raw = f"sh{code}"
+        if '亿' in val:
+            return float(val.replace('亿', '')) * 1e8
+        elif '万' in val:
+            return float(val.replace('万', '')) * 1e4
         else:
-            raw = f"sz{code}"
-        info = ak.stock_individual_info_em(symbol=raw)
-        if info is None or len(info) == 0:
-            return {}
-        info_dict = dict(zip(info['item'].values, info['value'].values))
-        return {
-            'total_mv': float(info_dict.get('总市值', 0)) / 1e8,  # 转为亿
-            'circ_mv': float(info_dict.get('流通市值', 0)) / 1e8,
-        }
+            return float(val)
     except Exception:
-        return {}
+        return np.nan
 
 
-def fetch_all(symbols: list, start_date: str = '2015-01-01'):
-    """批量获取所有股票的基本面数据"""
-    print(f"📊 获取 {len(symbols)} 只股票基本面数据...")
+def fetch_all(symbols: list):
+    """批量获取所有股票的财务数据"""
+    print(f"📊 获取 {len(symbols)} 只股票财务数据...")
     all_data = []
 
-    for sym in tqdm(symbols, desc='   PE/PB', unit='stock'):
-        df = fetch_pe_pb(sym)
-        if len(df) == 0:
-            continue
-        df['symbol'] = sym
-        df = df[df['trade_date'] >= start_date]
-        all_data.append(df)
-        time.sleep(0.05)  # 限速
+    for sym in tqdm(symbols, desc='   财务数据', unit='stock'):
+        df = fetch_financial(sym)
+        if len(df) > 0:
+            all_data.append(df)
+        time.sleep(0.1)  # 限速
 
     if not all_data:
         print("   ⚠️ 未获取到任何数据")
         return pd.DataFrame()
 
     result = pd.concat(all_data, ignore_index=True)
-    result = result.dropna(subset=['pe_ttm', 'pb'])
-    # 过滤异常值
-    result = result[(result['pe_ttm'] > 0) & (result['pe_ttm'] < 1000)]
-    result = result[(result['pb'] > 0) & (result['pb'] < 100)]
+    result = result.dropna(subset=['roe', 'revenue_yoy', 'net_profit_yoy'])
+    result = result[result['trade_date'] >= '2015-01-01']
 
     print(f"   {len(result):,} 条 | {result['symbol'].nunique()} 只股票 | "
           f"{result['trade_date'].min().date()} ~ {result['trade_date'].max().date()}")
