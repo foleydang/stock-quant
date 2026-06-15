@@ -2,6 +2,9 @@
 # Python 3.9+ (建议 3.12+)
 # 安装: pip install -r requirements.txt
 
+# === 深度学习 (LSTM 时序编码器) ===
+torch>=2.0  # CPU/MPS 版本, M4 Pro 自动启用 GPU 加速
+
 # === 核心量化 ===
 numpy>=2.0
 pandas>=2.0,<3
