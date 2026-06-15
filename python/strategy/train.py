@@ -286,6 +286,9 @@ def prepare_data(data: Dict, conn, cfg: dict,
 
             if feature_names is None:
                 feature_names = list(feats.columns)
+            else:
+                # 对齐特征列: 不同股票可能有不同的特征维度
+                feats = feats.reindex(columns=feature_names, fill_value=0)
 
             # 截面排名目标 + 实际收益率
             rank_target = stock_rank_target.get(sym, {})
