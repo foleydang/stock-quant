@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-特征工程 v4 — 对标 Qlib Alpha158/360 + 截面增强 + 宏观环境
+特征工程 v5 — 对标 Qlib Alpha158/360 + 截面增强 + 宏观环境 + LSTM时序
 
 设计原则:
   - 严格向后看: 所有特征只用 ≤ 当前日期的数据
@@ -795,6 +795,7 @@ class FeaturePipeline:
         self.cfg = cfg or {}
         self.north_shift = self.cfg.get('north_shift_days', 0)
         self._macro_features = None
+        self._lstm_embeddings = None
 
     def _get_macro(self):
         """延迟加载宏观特征类"""
@@ -802,8 +803,23 @@ class FeaturePipeline:
             self._macro_features = _get_macro_features()
         return self._macro_features
 
+    def _load_lstm(self):
+        """延迟加载 LSTM embeddings"""
+        if self._lstm_embeddings is not None:
+            return self._lstm_embeddings
+        import pickle
+        emb_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                'data/lstm_embeddings.pkl')
+        try:
+            with open(emb_path, 'rb') as f:
+                self._lstm_embeddings = pickle.load(f)
+            print(f"   ✅ LSTM embeddings 已加载 ({len(self._lstm_embeddings)} 只股票)")
+        except FileNotFoundError:
+            self._lstm_embeddings = {}
+        return self._lstm_embeddings
+
     def compute_stock(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-        """计算单只股票的所有特征 (含宏观)"""
+        """计算单只股票的所有特征 (含宏观 + LSTM)"""
         price = PriceFeatures.calculate(df)
         volume = VolumeFeatures.calculate(df)
         pattern = PatternFeatures.calculate(df)
@@ -820,7 +836,29 @@ class FeaturePipeline:
         # 宏观交互特征 (v8 新增)
         macro_interact = MacroInteractionFeatures.calculate(base)
 
-        return pd.concat([base, interact, macro_interact], axis=1)
+        # LSTM 时序特征 (v9 新增)
+        lstm_feats = self._compute_lstm_features(df, symbol)
+
+        return pd.concat([base, interact, macro_interact, lstm_feats], axis=1)
+
+    def _compute_lstm_features(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
+        """从预计算 embedding 中提取 LSTM 特征"""
+        f = pd.DataFrame(index=df.index)
+        embeddings = self._load_lstm()
+        if symbol not in embeddings:
+            return f
+
+        emb_dict = embeddings[symbol]  # {date_str: np.array(64,)}
+        dates = df['date'].values
+
+        for i, d in enumerate(dates):
+            d_str = str(pd.Timestamp(d))[:10]
+            if d_str in emb_dict:
+                emb = emb_dict[d_str]
+                for j in range(len(emb)):
+                    f.loc[i, f'lstm_{j}'] = emb[j]
+
+        return f.fillna(0)
 
     def compute_cross_section(self, all_stock_features: Dict[str, pd.DataFrame],
                               all_dates: List) -> Dict[str, pd.DataFrame]:
