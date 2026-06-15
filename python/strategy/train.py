@@ -274,7 +274,12 @@ def prepare_data(data: Dict, conn, cfg: dict,
         stock_rank_target = stock_returns  # 直接用收益率
 
     # 第四遍: 合并特征 + 排名目标 + 实际收益率 + 切分
-    feature_names = None
+    # 先确定统一特征列 (部分股票缺少基本面/LSTM特征)
+    all_cols = set()
+    for feats in all_features.values():
+        all_cols.update(feats.columns)
+    feature_names = sorted(all_cols)
+    
     X_tr, y_tr, X_va, y_va, X_te, y_te = [], [], [], [], [], []
     y_te_raw = []  # 测试集实际收益率 (用于分组回测展示)
 
@@ -283,12 +288,8 @@ def prepare_data(data: Dict, conn, cfg: dict,
             feats = all_features[sym]
             if sym in cs_features:
                 feats = pd.concat([feats, cs_features[sym]], axis=1)
-
-            if feature_names is None:
-                feature_names = list(feats.columns)
-            else:
-                # 对齐特征列: 不同股票可能有不同的特征维度
-                feats = feats.reindex(columns=feature_names, fill_value=0)
+            # 对齐到统一列
+            feats = feats.reindex(columns=feature_names, fill_value=0)
 
             # 截面排名目标 + 实际收益率
             rank_target = stock_rank_target.get(sym, {})
