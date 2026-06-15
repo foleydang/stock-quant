@@ -30,6 +30,12 @@ from typing import Dict, List, Tuple, Optional
 from joblib import Parallel, delayed
 from scipy.stats import spearmanr
 from sklearn.metrics import mean_squared_error
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+except ImportError:
+    HAS_TQDM = False
+    def tqdm(iterable, **kw): return iterable
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from strategy.features import FeaturePipeline
@@ -182,7 +188,7 @@ def prepare_data(data: Dict, conn, cfg: dict,
     stock_returns = {}  # {symbol: {date_str: return_val}}
     success = 0
 
-    for sym, df in data.items():
+    for sym, df in tqdm(data.items(), desc='   计算个股特征', unit='stock'):
         try:
             feats = pipeline.compute_stock(df, sym)
             if has_sent:
@@ -208,8 +214,6 @@ def prepare_data(data: Dict, conn, cfg: dict,
             success += 1
         except Exception:
             continue
-        if success % 100 == 0:
-            print(f"    {success}/{len(data)}")
 
     # 第二遍: 截面排名特征
     print("  计算截面排名特征...")
@@ -248,7 +252,7 @@ def prepare_data(data: Dict, conn, cfg: dict,
     X_tr, y_tr, X_va, y_va, X_te, y_te = [], [], [], [], [], []
     y_te_raw = []  # 测试集实际收益率 (用于分组回测展示)
 
-    for sym, df in list(stock_data.items()):
+    for sym, df in tqdm(list(stock_data.items()), desc='   合并特征+目标', unit='stock'):
         try:
             feats = all_features[sym]
             if sym in cs_features:
