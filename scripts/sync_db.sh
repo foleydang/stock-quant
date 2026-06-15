@@ -53,12 +53,24 @@ except Exception:
     conn.close()
     print(0)
 ")
+    FUND_COUNT=$(python3 -c "
+import sqlite3
+conn = sqlite3.connect('$DB')
+try:
+    cnt = conn.execute('SELECT COUNT(*) FROM fundamental_daily').fetchone()[0]
+    conn.close()
+    print(cnt)
+except Exception:
+    conn.close()
+    print(0)
+")
 else
     echo "DB 文件不存在"
     DAILY_COUNT=0
 fi
 
     echo "宏观数据: $MACRO_COUNT 条"
+    echo "基本面: $FUND_COUNT 条"
 
 if [ "$DAILY_COUNT" -lt 100 ] || [ "${MACRO_COUNT:-0}" -lt 100 ]; then
     echo ""
