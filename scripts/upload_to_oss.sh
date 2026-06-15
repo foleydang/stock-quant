@@ -42,3 +42,14 @@ else
 fi
 
 echo "✅ 上传完成: $(date)"
+
+# LSTM embeddings (如果本地有)
+EMB_FILE="$DATA_DIR/lstm_embeddings.pkl"
+if [ -f "$EMB_FILE" ]; then
+    echo "   lstm_embeddings.pkl: $(ls -lh $EMB_FILE | awk '{print $5}')"
+    ossutil cp "$EMB_FILE" "oss://${OSS_BUCKET}/stock-quant/lstm_embeddings.pkl" \
+        --update \
+        --access-key-id="$OSS_ACCESS_KEY_ID" \
+        --access-key-secret="$OSS_ACCESS_KEY_SECRET" \
+        --endpoint="$OSS_ENDPOINT"
+fi
