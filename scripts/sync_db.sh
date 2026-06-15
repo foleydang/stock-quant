@@ -72,7 +72,7 @@ fi
     echo "宏观数据: $MACRO_COUNT 条"
     echo "基本面: $FUND_COUNT 条"
 
-if [ "$DAILY_COUNT" -lt 100 ] || [ "${MACRO_COUNT:-0}" -lt 100 ]; then
+if [ "$DAILY_COUNT" -lt 100 ] || [ "${MACRO_COUNT:-0}" -lt 100 ] || [ "${FUND_COUNT:-0}" -lt 100 ]; then
     echo ""
     echo "⬇️ 正在从 OSS 下载..."
     python3 -c "
