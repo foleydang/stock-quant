@@ -156,7 +156,7 @@ def load_and_prepare() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, 
             if len(df) < SEQ_LEN + HORIZON + 20:
                 n_skip += 1
                 continue
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
 
             # 计算 LSTM 输入特征
             feats = compute_lstm_inputs(df)
@@ -217,6 +217,7 @@ def train_model(model, train_loader, val_loader, epochs=50):
     criterion = nn.MSELoss()
     best_loss = float('inf')
     patience = 0
+    best_path = os.path.join(MODEL_DIR, 'best_model.pt')
 
     for epoch in range(epochs):
         model.train()
@@ -225,6 +226,9 @@ def train_model(model, train_loader, val_loader, epochs=50):
             x, y = x.to(DEVICE), y.to(DEVICE)
             optimizer.zero_grad()
             loss = criterion(model(x), y)
+            if torch.isnan(loss):
+                print(f"   ❌ NaN loss @ epoch {epoch}, 数据可能有问题")
+                return model, float('nan')
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -247,19 +251,20 @@ def train_model(model, train_loader, val_loader, epochs=50):
         if val_loss < best_loss:
             best_loss = val_loss
             patience = 0
-            torch.save(model.state_dict(), os.path.join(MODEL_DIR, 'best_model.pt'))
+            torch.save(model.state_dict(), best_path)
         else:
             patience += 1
             if patience >= 10:
                 print(f"  早停 @ epoch {epoch}")
                 break
 
-    model.load_state_dict(torch.load(os.path.join(MODEL_DIR, 'best_model.pt')))
+    if os.path.exists(best_path):
+        model.load_state_dict(torch.load(best_path))
     return model, best_loss
 
 
 # ============ 推理: 提取 embedding ============
-def extract_embeddings(model, output_path: str):
+def extract_embeddings(model, output_path: str, norm_stats=None):
     """为所有股票的所有日期提取 LSTM embedding, 存入 .pkl"""
     print("\n🔮 提取 LSTM embeddings...")
     model.eval()
@@ -268,6 +273,12 @@ def extract_embeddings(model, output_path: str):
     conn = sqlite3.connect(DB_PATH)
     symbols = [r[0] for r in conn.execute("SELECT DISTINCT symbol FROM kline_daily")]
     print(f"   {len(symbols)} 只股票")
+
+    # 加载标准化参数
+    if norm_stats is None:
+        stats_path = os.path.join(MODEL_DIR, 'norm_stats.pt')
+        if os.path.exists(stats_path):
+            norm_stats = torch.load(stats_path, map_location='cpu')
 
     embeddings = {}  # {symbol: {date_str: np.array(64,)}}
 
@@ -278,9 +289,13 @@ def extract_embeddings(model, output_path: str):
                 "WHERE symbol=? ORDER BY date", conn, params=(sym,))
             if len(df) < SEQ_LEN + 20:
                 continue
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
 
             feats = compute_lstm_inputs(df).fillna(0).values.astype(np.float32)
+
+            # 应用标准化
+            if norm_stats is not None:
+                feats = (feats - norm_stats['x_mean']) / norm_stats['x_std']
 
             emb_dict = {}
             for i in range(SEQ_LEN, len(feats)):
@@ -339,6 +354,20 @@ def main():
     train_X, train_y, val_X, val_y, feature_names = load_and_prepare()
     print(f"  数据准备耗时: {time.time()-t0:.0f}s")
 
+    # 1.5 数据标准化 (防止 NaN loss)
+    print("  标准化数据...")
+    # 按特征维度计算 mean/std
+    train_mean = train_X.mean(axis=(0, 1), keepdims=True)
+    train_std = train_X.std(axis=(0, 1), keepdims=True) + 1e-8
+    train_X = (train_X - train_mean) / train_std
+    val_X = (val_X - train_mean) / train_std
+    # 目标也标准化
+    y_mean, y_std = train_y.mean(), train_y.std() + 1e-8
+    train_y = (train_y - y_mean) / y_std
+    val_y = (val_y - y_mean) / y_std
+    print(f"   训练集均值: {train_X.mean():.4f} std: {train_X.std():.4f}")
+    print(f"   目标均值: {y_mean:.4f} std: {y_std:.4f}")
+
     train_ds = SeqDataset(train_X, train_y)
     val_ds = SeqDataset(val_X, val_y)
     train_loader = DataLoader(train_ds, BATCH_SIZE, shuffle=True)
@@ -358,9 +387,12 @@ def main():
     model, best_loss = train_model(model, train_loader, val_loader, args.epochs)
     print(f"  训练耗时: {time.time()-t0:.0f}s | best val loss: {best_loss:.6f}")
 
-    # 3. 保存模型
+    # 3. 保存模型 + 标准化参数
     model_path = os.path.join(MODEL_DIR, 'encoder.pt')
     torch.save(model.state_dict(), model_path)
+    # 保存标准化参数 (推理时复用)
+    stats = {'x_mean': train_mean, 'x_std': train_std, 'y_mean': y_mean, 'y_std': y_std}
+    torch.save(stats, os.path.join(MODEL_DIR, 'norm_stats.pt'))
     print(f"\n💾 模型已保存: {model_path}")
 
     # 4. 提取 embedding
