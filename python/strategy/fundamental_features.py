@@ -1,10 +1,13 @@
 """
-基本面特征 v1 — PE/PB/市值/ROE 衍生特征
+基本面特征 v2 — 财务数据衍生特征
+
+数据来源: fundamental_daily 表 (stock_financial_abstract_ths)
+特征: ROE, 营收增速, 净利增速, 估值, 市值
 
 设计原则:
-  1. 所有特征截面可比 (行业中性暂不处理, 后期可加)
-  2. 用历史分位数替代绝对值, 避免量纲差异
-  3. 变化率特征捕捉估值变动趋势
+  1. 财务数据按季度发布, 前向填充到每日
+  2. 用变化率和历史分位替代绝对值
+  3. 结合日线价格计算 PB_proxy = close / bv_per_share
 """
 
 import os, sqlite3
@@ -14,10 +17,7 @@ from typing import Optional
 
 
 class FundamentalFeatures:
-    """基本面特征 (PE/PB/市值等)
-
-    数据来源: fundamental_daily 表
-    """
+    """基本面特征 (财务数据)"""
 
     def __init__(self):
         self._data = None
@@ -42,7 +42,6 @@ class FundamentalFeatures:
         return self._data
 
     def get_stock_data(self, symbol: str) -> pd.DataFrame:
-        """获取单只股票的基本面历史"""
         df = self._load()
         if len(df) == 0:
             return pd.DataFrame()
@@ -58,59 +57,91 @@ class FundamentalFeatures:
         fund = fund.set_index('trade_date').sort_index()
         dates = df['date'].values
 
-        # 提取基本字段
-        pe = self._align(fund, 'pe_ttm', dates)
-        pb = self._align(fund, 'pb', dates)
+        # 对齐: 财务数据按季度, 前向填充到每日
+        cols = ['roe', 'revenue_yoy', 'net_profit_yoy', 'debt_ratio', 'bv_per_share', 'eps']
+        aligned = {}
+        for col in cols:
+            val = self._align(fund, col, dates)
+            if val is not None:
+                aligned[col] = val
 
-        if pe is None or pb is None:
+        if not aligned:
             return f
 
-        # --- PE 特征 ---
-        f['fund_pe'] = pe
-        f['fund_pe_pct_1y'] = self._rolling_pct(pe, 250)  # 1年百分位
-        f['fund_pe_chg_1m'] = pe.pct_change(20)            # 1月变化率
-        f['fund_pe_chg_3m'] = pe.pct_change(60)            # 3月变化率
-        f['fund_pe_ma5'] = pe.rolling(5).mean()
-        f['fund_pe_ma20'] = pe.rolling(20).mean()
-        f['fund_pe_ma20_dev'] = pe / pe.rolling(20).mean() - 1  # 偏离20日均值
+        # --- 盈利能力 ---
+        if 'roe' in aligned:
+            roe = aligned['roe']
+            f['fund_roe'] = roe
+            f['fund_roe_chg'] = roe.diff()  # 季度变化
+            f['fund_roe_high'] = (roe > 0.15).astype(float)  # ROE>15% 高盈利
 
-        # --- PB 特征 ---
-        f['fund_pb'] = pb
-        f['fund_pb_pct_1y'] = self._rolling_pct(pb, 250)
-        f['fund_pb_chg_1m'] = pb.pct_change(20)
-        f['fund_pb_chg_3m'] = pb.pct_change(60)
-        f['fund_pb_ma20_dev'] = pb / pb.rolling(20).mean() - 1
+        # --- 成长性 ---
+        if 'revenue_yoy' in aligned:
+            rev = aligned['revenue_yoy']
+            f['fund_rev_yoy'] = rev
+            f['fund_rev_accel'] = rev.diff()  # 营收加速
 
-        # --- PE/PB 关系 ---
-        f['fund_pe_pb_ratio'] = pe / (pb + 1e-10)
+        if 'net_profit_yoy' in aligned:
+            np_yoy = aligned['net_profit_yoy']
+            f['fund_np_yoy'] = np_yoy
+            f['fund_np_accel'] = np_yoy.diff()  # 净利加速
 
-        # --- 市值特征 (从 price × volume 估算) ---
-        # 用日线 close 和 volume 的乘积作为市值代理
+        # --- 估值 ---
+        if 'bv_per_share' in aligned:
+            close = df['close'].astype(float).values
+            bv = aligned['bv_per_share'].values
+            mask = bv > 0
+            pb = np.full(len(close), np.nan)
+            pb[mask] = close[mask] / bv[mask]
+            pb = pd.Series(pb, index=df.index).fillna(method='ffill').fillna(2.0)
+            f['fund_pb_proxy'] = pb
+            f['fund_pb_pct'] = pb.rolling(250, min_periods=20).apply(
+                lambda x: (x.iloc[-1] < x).mean(), raw=False
+            ).fillna(0.5)  # PB 越低越好, 所以用 <
+
+        if 'eps' in aligned:
+            eps = aligned['eps']
+            close = df['close'].astype(float).values
+            # PE proxy = close / eps (TTM)
+            eps_val = eps.values
+            mask = eps_val > 0
+            pe = np.full(len(close), np.nan)
+            pe[mask] = close[mask] / eps_val[mask]
+            pe = pd.Series(pe, index=df.index).fillna(method='ffill').fillna(20.0)
+            f['fund_pe_proxy'] = pe
+            f['fund_pe_pct'] = pe.rolling(250, min_periods=20).apply(
+                lambda x: (x.iloc[-1] < x).mean(), raw=False
+            ).fillna(0.5)
+
+        # --- 财务健康 ---
+        if 'debt_ratio' in aligned:
+            dr = aligned['debt_ratio']
+            f['fund_debt_ratio'] = dr
+            f['fund_low_debt'] = (dr < 0.5).astype(float)  # 低负债
+
+        # --- 市值特征 (从日线) ---
         close = df['close'].astype(float).values
         volume = df['volume'].astype(float).values
         mv_proxy = pd.Series(close * volume / 1e8, index=df.index)  # 亿
-        f['fund_mv_proxy'] = mv_proxy
+        f['fund_mv'] = mv_proxy
         f['fund_mv_chg_1m'] = mv_proxy.pct_change(20)
         f['fund_mv_chg_3m'] = mv_proxy.pct_change(60)
-        f['fund_mv_ma20_dev'] = mv_proxy / mv_proxy.rolling(20).mean() - 1
+        f['fund_mv_rank'] = mv_proxy.rolling(250, min_periods=20).apply(
+            lambda x: (x.iloc[-1] > x).mean(), raw=False
+        ).fillna(0.5)
 
         return f.fillna(0)
 
     def _align(self, fund: pd.DataFrame, col: str, dates) -> Optional[pd.Series]:
-        """将基本面数据对齐到日线日期"""
+        """将财务数据对齐到日线日期 (前向填充)"""
         if col not in fund.columns:
             return None
-        series = fund[col].reindex(fund.index.union(pd.DatetimeIndex(dates)))
-        series = series.ffill()  # 前向填充 (基本面数据非每日更新)
+        series = fund[col].reindex(
+            fund.index.union(pd.DatetimeIndex(dates))
+        )
+        series = series.ffill()
         result = series.reindex(pd.DatetimeIndex(dates))
         return pd.Series(result.values, index=pd.RangeIndex(len(dates)))
-
-    def _rolling_pct(self, series: pd.Series, window: int) -> pd.Series:
-        """滚动百分位: 当前值在窗口内的排位"""
-        pct = series.rolling(window, min_periods=20).apply(
-            lambda x: (x.iloc[-1] > x).mean(), raw=False
-        )
-        return pct.fillna(0.5)
 
 
 # 延迟加载单例
