@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LGBM 生产级训练脚本 v5 — 截面排名回归 Bagging Ensemble
+LGBM 生产级训练脚本 v8 — 截面排名回归 Bagging Ensemble + 宏观特征
 
 架构:
   日线模型 → 预测截面排名分位 (α选股层)
