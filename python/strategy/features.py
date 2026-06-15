@@ -842,23 +842,22 @@ class FeaturePipeline:
         return pd.concat([base, interact, macro_interact, lstm_feats], axis=1)
 
     def _compute_lstm_features(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-        """从预计算 embedding 中提取 LSTM 特征"""
-        f = pd.DataFrame(index=df.index)
+        """从预计算 embedding 中提取 LSTM 特征 (向量化)"""
         embeddings = self._load_lstm()
         if symbol not in embeddings:
-            return f
+            return pd.DataFrame(index=df.index)
 
         emb_dict = embeddings[symbol]  # {date_str: np.array(64,)}
         dates = df['date'].values
+        dim = 64
+        arr = np.zeros((len(dates), dim), dtype=np.float32)
 
         for i, d in enumerate(dates):
             d_str = str(pd.Timestamp(d))[:10]
             if d_str in emb_dict:
-                emb = emb_dict[d_str]
-                for j in range(len(emb)):
-                    f.loc[i, f'lstm_{j}'] = emb[j]
+                arr[i] = emb_dict[d_str]
 
-        return f.fillna(0)
+        return pd.DataFrame(arr, index=df.index, columns=[f'lstm_{j}' for j in range(dim)])
 
     def compute_cross_section(self, all_stock_features: Dict[str, pd.DataFrame],
                               all_dates: List) -> Dict[str, pd.DataFrame]:
