@@ -294,10 +294,11 @@ def extract_embeddings(model, output_path: str, norm_stats=None):
 
             feats = compute_lstm_inputs(df).fillna(0).replace([np.inf, -np.inf], 0).values.astype(np.float32)
 
-            # 应用标准化
+            # 应用标准化 (squeeze去掉 keepdims 维度, 适配 2D 推理数据)
             if norm_stats is not None:
-                feats = np.nan_to_num((feats - norm_stats['x_mean']) / norm_stats['x_std'],
-                                      nan=0.0, posinf=0.0, neginf=0.0)
+                mean = np.squeeze(norm_stats['x_mean'])  # (1,1,14) → (14,)
+                std = np.squeeze(norm_stats['x_std'])
+                feats = np.nan_to_num((feats - mean) / std, nan=0.0, posinf=0.0, neginf=0.0)
 
             emb_dict = {}
             for i in range(SEQ_LEN, len(feats)):
