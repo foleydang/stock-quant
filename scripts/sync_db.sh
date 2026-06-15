@@ -42,12 +42,26 @@ cnt = conn.execute(\"SELECT COUNT(*) FROM (SELECT symbol FROM kline_daily GROUP 
 conn.close()
 print(cnt)
 ")
+    MACRO_COUNT=$(python3 -c "
+import sqlite3
+conn = sqlite3.connect('$DB')
+try:
+    cnt = conn.execute('SELECT COUNT(*) FROM macro_daily').fetchone()[0]
+    conn.close()
+    print(cnt)
+except Exception:
+    conn.close()
+    print(0)
+")
 else
     echo "DB 文件不存在"
     DAILY_COUNT=0
 fi
 
-if [ "$DAILY_COUNT" -lt 100 ]; then
+    echo "宏观数据: $MACRO_COUNT 条"
+fi
+
+if [ "$DAILY_COUNT" -lt 100 ] || [ "${MACRO_COUNT:-0}" -lt 100 ]; then
     echo ""
     echo "⬇️ 正在从 OSS 下载..."
     python3 -c "
