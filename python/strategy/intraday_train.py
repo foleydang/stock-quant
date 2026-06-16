@@ -367,12 +367,13 @@ def train_one(seed: int, X_train, y_train, X_val, y_val,
     p.pop('n_jobs', None)
 
     model = lgb.LGBMRegressor(**p)
+    # 诊断模式: 固定300棵树 + verbose, 看loss是否收敛
     model.fit(X_train, y_train,
               eval_set=[(X_val, y_val)] if len(X_val) > 0 else None,
-              callbacks=[lgb.early_stopping(es_rounds, verbose=False),
-                         lgb.log_evaluation(0)])
+              eval_metric='l2',
+              callbacks=[lgb.log_evaluation(50)])
 
-    n_trees = model.best_iteration_ or n_est
+    n_trees = model.n_estimators_  # 实际训练树数
     elapsed = time.time() - t0
 
     if len(X_val) > 0:
