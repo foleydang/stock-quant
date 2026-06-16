@@ -32,6 +32,13 @@ from typing import Dict, List, Tuple, Optional
 from scipy.stats import spearmanr
 from sklearn.metrics import mean_squared_error, accuracy_score
 
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+except ImportError:
+    HAS_TQDM = False
+    def tqdm(iterable, **kw): return iterable
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from strategy.intraday_features import IntradayFeaturePipeline
 
@@ -42,43 +49,38 @@ MODEL_DIR = os.path.join(ROOT, 'models/lgb_intraday')
 DAILY_MODEL_PATH = os.path.join(ROOT, 'models/lgb_daily/model.pkl')
 
 # ============ 配置 ============
-# 数据
 DB_TABLE = 'kline_30m'
-MIN_HISTORY_BARS = 100  # 最少需要的历史K线数量
+MIN_HISTORY_BARS = 100
 
-# 时序切分
 TRAIN_RATIO = 0.80
 VAL_RATIO = 0.10
 TEST_RATIO = 0.10
 
-# 目标
-HORIZON = 3          # 预测未来N根K线
-SKIP_BARS = 5        # 下采样间隔 (减少自相关)
-RETURN_CLIP = 0.10   # 收益率截断
+HORIZON = 3
+SKIP_BARS = 5
+RETURN_CLIP = 0.10
+MIN_VOLUME = 1000
+MIN_POOL_SIZE = 20
 
-# 样本过滤
-MIN_VOLUME = 1000    # 最小成交量
-MIN_POOL_SIZE = 20   # 股票池最少股票数
-
-# 训练参数 (分钟级模型: 更保守)
+# 训练参数 (分钟级: 更保守)
 LGBM_PARAMS = {
     'objective': 'regression',
     'metric': 'l2',
     'boosting_type': 'gbdt',
-    'num_leaves': 31,              # 小树
-    'max_depth': 5,                # 浅树
-    'learning_rate': 0.003,        # 慢学习
+    'num_leaves': 31,
+    'max_depth': 5,
+    'learning_rate': 0.003,
     'n_estimators': 10000,
     'early_stopping_rounds': 80,
-    'subsample': 0.4,              # 少样本
+    'subsample': 0.4,
     'subsample_freq': 1,
-    'colsample_bytree': 0.3,       # 少特征
+    'colsample_bytree': 0.3,
     'feature_fraction_bynode': 0.5,
-    'reg_alpha': 2.0,              # 强L1
-    'reg_lambda': 10.0,            # 强L2
-    'min_child_samples': 500,      # 大叶子
+    'reg_alpha': 2.0,
+    'reg_lambda': 10.0,
+    'min_child_samples': 500,
     'min_child_weight': 0.01,
-    'min_split_gain': 0.1,         # 难分裂
+    'min_split_gain': 0.1,
     'path_smooth': 20,
     'verbosity': -1,
     'random_state': None,
@@ -86,7 +88,6 @@ LGBM_PARAMS = {
     'force_row_wise': True,
 }
 
-# 快速验证参数
 QUICK_PARAMS = {
     'objective': 'regression',
     'metric': 'l2',
@@ -99,27 +100,22 @@ QUICK_PARAMS = {
     'n_jobs': 3, 'force_row_wise': True,
 }
 
-# 特征去相关阈值
 CORR_THRESHOLD = 0.90
-
-# 随机种子
 SEED = 42
 
 
 # ============ 数据加载 ============
 def load_intraday_data(db_path: str, table: str, min_bars: int = MIN_HISTORY_BARS) -> Dict[str, pd.DataFrame]:
-    """加载所有股票的分钟级数据"""
     conn = sqlite3.connect(db_path)
     symbols = [r[0] for r in conn.execute(f"SELECT DISTINCT symbol FROM {table}")]
     data = {}
-    for sym in symbols:
+    for sym in tqdm(symbols, desc='   加载股票', unit='stock'):
         try:
             df = pd.read_sql(
                 f"SELECT * FROM {table} WHERE symbol=? ORDER BY date", conn, params=(sym,))
             if len(df) >= min_bars:
                 df['date'] = pd.to_datetime(df['date'], format='mixed')
                 df = df.sort_values('date').reset_index(drop=True)
-                # 去重
                 df = df.drop_duplicates(subset=['date']).reset_index(drop=True)
                 if len(df) >= min_bars:
                     data[sym] = df
@@ -131,7 +127,6 @@ def load_intraday_data(db_path: str, table: str, min_bars: int = MIN_HISTORY_BAR
 
 
 def get_all_timestamps(data: Dict) -> np.ndarray:
-    """获取所有唯一时间戳"""
     ts = set()
     for df in data.values():
         ts.update(df['date'].values)
@@ -139,7 +134,6 @@ def get_all_timestamps(data: Dict) -> np.ndarray:
 
 
 def detect_suspended(df: pd.DataFrame) -> np.ndarray:
-    """检测停牌: 连续多根K线close不变"""
     close = df['close'].values
     same = np.zeros(len(close), dtype=bool)
     for i in range(3, len(close)):
@@ -149,54 +143,40 @@ def detect_suspended(df: pd.DataFrame) -> np.ndarray:
 
 
 def detect_limit_prices(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-    """检测涨跌停 (简化版: 用涨跌幅)"""
     close = df['close'].values.astype(float)
-    # 涨停: 涨幅 > 9.5% (A股10%涨停板)
     ret = pd.Series(close).pct_change().values
-    limit_up = ret > 0.095
-    limit_down = ret < -0.095
-    return limit_up, limit_down
+    return ret > 0.095, ret < -0.095
 
 
 # ============ 目标构造 ============
 def build_targets(data: Dict[str, pd.DataFrame], horizon: int,
                   return_clip: float = RETURN_CLIP) -> Dict[str, np.ndarray]:
-    """构建每只股票的预测目标: 未来N根K线收益率"""
     targets = {}
     n_filtered = {'limit': 0, 'suspended': 0, 'extreme': 0, 'total': 0}
 
-    for sym, df in data.items():
+    for sym, df in tqdm(data.items(), desc='   构建目标', unit='stock'):
         close = df['close'].values.astype(float)
         n = len(close)
         ret = np.full(n, np.nan)
-
         suspended = detect_suspended(df)
         limit_up, limit_down = detect_limit_prices(df)
 
         for i in range(n - horizon):
-            # 检查是否可交易
             if limit_up[i] or limit_down[i]:
                 n_filtered['limit'] += 1
                 continue
             if suspended[i]:
                 n_filtered['suspended'] += 1
                 continue
-
-            # 计算未来收益率
             future_close = close[i + horizon]
             if future_close <= 0 or close[i] <= 0:
                 continue
-
             r = (future_close - close[i]) / close[i]
-
-            # 极端收益率截断
             if abs(r) > return_clip:
                 n_filtered['extreme'] += 1
                 r = np.sign(r) * return_clip
-
             ret[i] = r
             n_filtered['total'] += 1
-
         targets[sym] = ret
 
     print(f"  目标构造: 有效={n_filtered['total']:,} "
@@ -213,12 +193,6 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
                     pipeline: IntradayFeaturePipeline,
                     skip_bars: int = SKIP_BARS,
                     pool_size: int = 0) -> Optional[Tuple]:
-    """准备训练样本: 特征工程 + 下采样 + 时序切分
-
-    Args:
-        pool_size: 股票池大小 (0=全部)
-    """
-    # 时序切分点
     n_dates = len(all_timestamps)
     train_cutoff = all_timestamps[int(n_dates * TRAIN_RATIO)]
     val_cutoff = all_timestamps[int(n_dates * (TRAIN_RATIO + VAL_RATIO))]
@@ -226,10 +200,8 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
     print(f"  时序切分: train={str(train_cutoff)[:16]}  "
           f"val={str(val_cutoff)[:16]}  test={str(all_timestamps[-1])[:16]}")
 
-    # 如果指定了pool_size, 按成交量筛选股票池
     symbols = list(data.keys())
     if pool_size > 0 and pool_size < len(symbols):
-        # 按总成交量排序, 选top N
         vol_ranks = {}
         for sym in symbols:
             vol_ranks[sym] = data[sym]['volume'].sum()
@@ -238,11 +210,11 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
 
     # 第一遍: 计算所有股票特征
     print("  计算分钟级特征...")
+    t0 = time.time()
     all_features = {}
     success = 0
-    t0 = time.time()
 
-    for sym in symbols:
+    for sym in tqdm(symbols, desc='   个股特征', unit='stock'):
         try:
             df = data[sym]
             feats = pipeline.compute_stock(df, sym)
@@ -257,9 +229,10 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
 
     # 第二遍: 截面特征
     print("  计算截面特征...")
+    t0 = time.time()
     cs_features = pipeline.compute_cross_section(all_features, all_timestamps)
+    print(f"  截面特征: 耗时 {time.time()-t0:.0f}s")
 
-    # 合并截面特征
     for sym in all_features:
         if sym in cs_features:
             all_features[sym] = pd.concat([all_features[sym], cs_features[sym]], axis=1)
@@ -273,7 +246,7 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
     # 第三遍: 构建样本 (下采样)
     X_tr, y_tr, X_va, y_va, X_te, y_te = [], [], [], [], [], []
 
-    for sym in symbols:
+    for sym in tqdm(symbols, desc='   合并样本', unit='stock'):
         if sym not in all_features or sym not in targets:
             continue
 
@@ -288,7 +261,6 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
         if len(valid_indices) < MIN_HISTORY_BARS:
             continue
 
-        # 下采样: 每隔skip_bars个有效样本取一个
         sampled_indices = valid_indices[::skip_bars]
 
         for idx in sampled_indices:
@@ -322,7 +294,6 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
 
 # ============ 特征去冗余 ============
 def remove_redundant(X: np.ndarray, feature_names: List[str]) -> Tuple:
-    """去掉高度相关的特征"""
     if X.shape[0] < 1000:
         return X, feature_names, np.ones(len(feature_names), dtype=bool)
 
@@ -344,7 +315,6 @@ def remove_redundant(X: np.ndarray, feature_names: List[str]) -> Tuple:
 
 # ============ 训练 ============
 def train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=SEED):
-    """训练单个LGBM模型"""
     print(f"\n🏋️ 训练 LGBM (seed={seed})...")
     t0 = time.time()
 
@@ -362,7 +332,6 @@ def train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=SEED
     n_trees = model.best_iteration_ or n_est
     elapsed = time.time() - t0
 
-    # 验证集评估
     if len(X_val) > 0:
         val_pred = model.predict(X_val)
         val_ic = spearmanr(y_val, val_pred)[0]
@@ -374,7 +343,6 @@ def train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=SEED
         val_ic, val_mse, val_hit = 0, 0, 0
         print(f"  ✅ 训练完成: {n_trees}棵 | {elapsed:.0f}s")
 
-    # 特征重要性
     imp = model.feature_importances_
     top_idx = np.argsort(imp)[-20:][::-1]
     top_feats = [(feature_names[i], int(imp[i])) for i in top_idx]
@@ -388,7 +356,6 @@ def train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=SEED
 
 # ============ 评估 ============
 def evaluate_model(model_info, X_test, y_test, feature_names):
-    """测试集评估"""
     model = model_info['model']
     pred = model.predict(X_test)
 
@@ -405,7 +372,6 @@ def evaluate_model(model_info, X_test, y_test, feature_names):
     print(f"  IC={ic:.4f} | MSE={mse:.6f} | Hit Ratio={hit:.3f}")
     print(f"  树数: {model_info['n_trees']}")
 
-    # 分组回测
     print(f"\n  📊 分组回测 (按预测值分5组):")
     sort_idx = np.argsort(pred)
     n_per_group = len(sort_idx) // 5
@@ -424,7 +390,6 @@ def evaluate_model(model_info, X_test, y_test, feature_names):
     short_ret = y_test[sort_idx[:n_per_group]].mean()
     print(f"    多空收益差: {long_ret - short_ret:+.4%} (买入G5, 卖出G1)")
 
-    # 特征重要性 Top 20
     print(f"\n  Top 20 特征:")
     imp = model.feature_importances_
     top = np.argsort(imp)[-20:][::-1]
@@ -457,18 +422,15 @@ def main():
           f"trees={params['n_estimators']}")
     print("=" * 60)
 
-    # 1. 加载数据
     print(f"\n📊 加载数据 ({DB_TABLE})...")
     t0 = time.time()
     data = load_intraday_data(args.db, DB_TABLE)
     all_ts = get_all_timestamps(data)
     print(f"  加载耗时: {time.time()-t0:.0f}s | {len(all_ts)} 个时间戳")
 
-    # 2. 构建目标
     print(f"\n🎯 构建目标 (horizon={args.horizon})...")
     targets = build_targets(data, args.horizon)
 
-    # 3. 特征工程 + 样本准备
     print(f"\n🔧 特征工程 + 样本准备...")
     t0 = time.time()
     pipeline = IntradayFeaturePipeline(daily_model_path=args.daily_model)
@@ -482,7 +444,6 @@ def main():
     (X_train, y_train), (X_val, y_val), (X_test, y_test), feature_names = result
     print(f"  准备耗时: {time.time()-t0:.0f}s")
 
-    # 4. 特征去冗余
     print(f"\n🔧 特征去冗余...")
     X_train, feature_names, corr_mask = remove_redundant(X_train, feature_names)
     if len(X_val) > 0:
@@ -491,16 +452,13 @@ def main():
         X_test = X_test[:, corr_mask]
     print(f"  最终特征: {len(feature_names)}")
 
-    # 5. 训练
     model_info = train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=args.seed)
 
-    # 6. 测试集评估
     if len(X_test) > 0:
         test_ic, test_mse, test_hit = evaluate_model(model_info, X_test, y_test, feature_names)
     else:
         test_ic, test_mse, test_hit = 0, 0, 0
 
-    # 7. 最终模型 (全量数据)
     print(f"\n🏋️ 训练最终模型 (train+val 全量)...")
     if len(X_val) > 0:
         X_full = np.vstack([X_train, X_val])
@@ -517,7 +475,6 @@ def main():
     )
     final_model.fit(X_full, y_full)
 
-    # 8. 保存
     print(f"\n💾 保存模型...")
     os.makedirs(MODEL_DIR, exist_ok=True)
 
