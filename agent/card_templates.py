@@ -360,10 +360,12 @@ def make_alert_card_with_hint(alert_type, symbol, name, details, action_hint, ta
         vol_ratio = ta_data.get('volume_ratio')
         rsi_val = ta_data.get('rsi')
         is_etf = 'ETF' in name or symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50')
+        is_hk = ta_data.get('is_hk', False) or symbol.endswith('.HK')
+        currency = 'HK$' if is_hk else '¥'
 
         ind_columns = [
             {"tag": "column", "width": "weighted", "weight": 1,
-             "elements": [{"tag": "markdown", "content": f"**现价**\n<font color='{color}'>¥{_fmt_price(current, is_etf)} ({sign}{change_pct:.2f}%)</font>"}]},
+             "elements": [{"tag": "markdown", "content": f"**现价**\n<font color='{color}'>{currency}{_fmt_price(current, is_etf)} ({sign}{change_pct:.2f}%)</font>"}]},
         ]
         if vol_ratio:
             vol_color = 'red' if vol_ratio > 2 else 'default'
@@ -388,7 +390,7 @@ def make_alert_card_with_hint(alert_type, symbol, name, details, action_hint, ta
         if supports or resistances:
             elements.append({"tag": "hr"})
             elements.append({"tag": "markdown", "content": "**关键价位**"})
-            sr_elements = _build_sr_columns(supports, resistances, current, is_etf)
+            sr_elements = _build_sr_columns(supports, resistances, current, is_etf, is_hk)
             elements.extend(sr_elements)
 
     # 异动详情
@@ -512,15 +514,16 @@ def _build_indicator_grid(indicators: list, row_size: int = 5) -> list:
     return rows
 
 
-def _build_sr_columns(supports: list, resistances: list, current: float, is_etf: bool = False) -> list:
+def _build_sr_columns(supports: list, resistances: list, current: float, is_etf: bool = False, is_hk: bool = False) -> list:
     """将支撑压力位转为紧凑布局——支撑一行，压力一行"""
+    currency = 'HK$' if is_hk else '¥'
     elements = []
     # 支撑位：一行横排所有价位
     if supports:
         support_parts = []
         for s in supports:
             dist = (current - s) / current * 100 if current > 0 else 0
-            support_parts.append(f"¥{_fmt_price(s, is_etf)} ({dist:.1f}%)")
+            support_parts.append(f"{currency}{_fmt_price(s, is_etf)} ({dist:.1f}%)")
         support_text = "🛡️ **支撑**: " + " | ".join(support_parts)
         elements.append({"tag": "markdown", "content": support_text})
     # 压力位：一行横排所有价位
@@ -528,7 +531,7 @@ def _build_sr_columns(supports: list, resistances: list, current: float, is_etf:
         resist_parts = []
         for r in resistances:
             dist = (r - current) / current * 100 if current > 0 else 0
-            resist_parts.append(f"¥{_fmt_price(r, is_etf)} ({dist:.1f}%)")
+            resist_parts.append(f"{currency}{_fmt_price(r, is_etf)} ({dist:.1f}%)")
         resist_text = "🚧 **压力**: " + " | ".join(resist_parts)
         elements.append({"tag": "markdown", "content": resist_text})
     return elements
@@ -541,6 +544,8 @@ def make_technical_card(data: dict) -> dict:
     current = data.get('current', 0)
     change_pct = data.get('change_pct', 0)
     is_etf = 'ETF' in name or symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50')
+    is_hk = data.get('is_hk', False) or symbol.endswith('.HK')
+    currency = 'HK$' if is_hk else '¥'
     color = "red" if change_pct > 0 else "green" if change_pct < 0 else "default"
     sign = "+" if change_pct > 0 else ""
 
@@ -583,7 +588,7 @@ def make_technical_card(data: dict) -> dict:
 
     # 构建元素列表
     elements = [
-        {"tag": "markdown", "content": f"**当前** <font color='{color}'>¥{_fmt_price(current, is_etf)} ({sign}{change_pct:.2f}%)</font>"},
+        {"tag": "markdown", "content": f"**当前** <font color='{color}'>{currency}{_fmt_price(current, is_etf)} ({sign}{change_pct:.2f}%)</font>"},
     ]
 
     # 指标网格（每行3个）
@@ -613,7 +618,7 @@ def make_technical_card(data: dict) -> dict:
     if supports or resistances:
         elements.append({"tag": "hr"})
         elements.append({"tag": "markdown", "content": "**关键价位**"})
-        sr_elements = _build_sr_columns(supports, resistances, current, is_etf)
+        sr_elements = _build_sr_columns(supports, resistances, current, is_etf, is_hk)
         elements.extend(sr_elements)
 
     # 操作建议
@@ -921,20 +926,6 @@ def make_risk_card(data: dict) -> dict:
 
 
 
-def _fmt_price(value, is_etf=False):
-    """价格格式化：ETF用3位小数(0.600)，个股用2位(74.52)"""
-    if value is None:
-        return "-"
-    if is_etf or (value < 1 and value > 0):
-        return f"{value:.3f}"
-    return f"{value:.2f}"
-
-def _fmt_pct(value):
-    """百分比格式化"""
-    if value is None:
-        return "-"
-    return f"{value:.2f}"
-
 def make_recommend_card(data: dict) -> dict:
     """综合操作建议卡片 - 每只股票独立区块，column_set+table布局"""
     recs = data.get('recommendations', [])
@@ -1044,8 +1035,13 @@ def make_recommend_card(data: dict) -> dict:
         if news_sent:
             ns_score = news_sent.get('score', 0.5)
             ns_emoji = "🟢" if ns_score > 0.6 else "🔴" if ns_score < 0.4 else "🟡"
+            ns_label = news_sent.get('sentiment_label', '中性')
+            ns_summary = news_sent.get('summary', '')
+            ns_line = ns_emoji + " " + ns_label + "（" + str(round(ns_score, 2)) + "）"
+            if ns_summary:
+                ns_line += " — " + ns_summary
             elements.append({"tag": "markdown",
-                "content": ns_emoji + " " + news_sent.get('summary', '') + "  " + news_sent.get('sentiment_label', f'情绪{ns_score:.2f}')})
+                "content": ns_line})
 
         # 每只股票之间加分隔线
         elements.append({"tag": "hr"})
@@ -1072,12 +1068,17 @@ def make_news_card(data: dict) -> dict:
     if not news:
         return make_text_card("暂无相关财经新闻")
     
-    sentiment_text = sentiment.get('summary', '中性')
+    sentiment_label = sentiment.get('sentiment_label', '中性')
     sentiment_score = sentiment.get('score', 0.5)
     sentiment_emoji = "🟢" if sentiment_score > 0.6 else "🔴" if sentiment_score < 0.4 else "🟡"
+    sentiment_summary = sentiment.get('summary', '')
     
     NL = chr(10)
-    lines = "**新闻情绪**: " + sentiment_emoji + " " + sentiment_text + NL + NL
+    lines = "**新闻情绪**: " + sentiment_emoji + " " + sentiment_label + "（" + str(round(sentiment_score, 2)) + "）" + NL
+    if sentiment_summary:
+        lines += sentiment_summary + NL + NL
+    else:
+        lines += NL
     
     for n in news[:8]:
         title = n.get('title', '')
@@ -1090,7 +1091,7 @@ def make_news_card(data: dict) -> dict:
         "header": {"title": {"tag": "plain_text", "content": "📰 财经要闻 | " + keyword[:20]}, "template": "blue"},
         "elements": [
             {"tag": "markdown", "content": lines},
-            {"tag": "note", "elements": [{"tag": "plain_text", "content": "DuckDuckGo搜索 + LLM情绪分析"}]}
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": "Bing News RSS + LLM情绪分析（近7日）"}]}
         ]
     }
 

@@ -31,6 +31,7 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from scipy.stats import spearmanr
 from sklearn.metrics import mean_squared_error, accuracy_score
+from joblib import Parallel, delayed
 
 try:
     from tqdm import tqdm
@@ -68,21 +69,21 @@ LGBM_PARAMS = {
     'objective': 'regression',
     'metric': 'l2',
     'boosting_type': 'gbdt',
-    'num_leaves': 63,              # 31→63, 样本量够大, 增加表达能力
-    'max_depth': 7,                # 5→7
-    'learning_rate': 0.01,         # 0.003→0.01, 加速收敛 (1.3M样本)
-    'n_estimators': 10000,
-    'early_stopping_rounds': 50,   # 80→50
-    'subsample': 0.6,              # 0.4→0.6, 每轮用60%样本
+    'num_leaves': 63,
+    'max_depth': 7,
+    'learning_rate': 0.003,        # 0.01→0.003, 降lr让树更多 (预期500-1000棵/模型)
+    'n_estimators': 20000,         # 10000→20000
+    'early_stopping_rounds': 100,  # 50→100, 给更多耐心
+    'subsample': 0.6,
     'subsample_freq': 1,
-    'colsample_bytree': 0.5,       # 0.3→0.5
+    'colsample_bytree': 0.5,
     'feature_fraction_bynode': 0.6,
-    'reg_alpha': 0.5,              # 2.0→0.5, 放松L1 (样本量大, 不易过拟合)
-    'reg_lambda': 2.0,             # 10.0→2.0, 放松L2
-    'min_child_samples': 200,      # 500→200, 允许更细节的分裂
+    'reg_alpha': 0.5,
+    'reg_lambda': 2.0,
+    'min_child_samples': 200,
     'min_child_weight': 0.001,
-    'min_split_gain': 0.01,        # 0.1→0.01, 允许捕获微弱信号
-    'path_smooth': 10,             # 20→10
+    'min_split_gain': 0.01,
+    'path_smooth': 10,
     'verbosity': -1,
     'random_state': None,
     'n_jobs': 3,
@@ -102,7 +103,11 @@ QUICK_PARAMS = {
 }
 
 CORR_THRESHOLD = 0.90
-SEED = 42
+
+# Bagging Ensemble
+N_MODELS = 5
+N_JOBS_PARALLEL = 5
+SEEDS = [42, 123, 456, 789, 1024]
 
 
 # ============ 数据加载 ============
@@ -315,8 +320,9 @@ def remove_redundant(X: np.ndarray, feature_names: List[str]) -> Tuple:
 
 
 # ============ 训练 ============
-def train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=SEED):
-    print(f"\n🏋️ 训练 LGBM (seed={seed})...")
+def train_one(seed: int, X_train, y_train, X_val, y_val,
+              feature_names: List[str], params: dict) -> Dict:
+    """训练单个 LGBM 回归器"""
     t0 = time.time()
 
     p = {**params, 'random_state': seed}
@@ -328,7 +334,7 @@ def train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=SEED
     model.fit(X_train, y_train,
               eval_set=[(X_val, y_val)] if len(X_val) > 0 else None,
               callbacks=[lgb.early_stopping(es_rounds, verbose=False),
-                         lgb.log_evaluation(100)])
+                         lgb.log_evaluation(0)])
 
     n_trees = model.best_iteration_ or n_est
     elapsed = time.time() - t0
@@ -338,64 +344,106 @@ def train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=SEED
         val_ic = spearmanr(y_val, val_pred)[0]
         val_mse = mean_squared_error(y_val, val_pred)
         val_hit = accuracy_score(np.sign(y_val), np.sign(val_pred))
-        print(f"  ✅ 训练完成: {n_trees}棵 | {elapsed:.0f}s "
-              f"| val IC={val_ic:.4f} MSE={val_mse:.6f} Hit={val_hit:.3f}")
+        print(f"  [seed={seed}] {n_trees}棵 | val IC={val_ic:.4f} MSE={val_mse:.6f} Hit={val_hit:.3f} | {elapsed:.0f}s")
     else:
         val_ic, val_mse, val_hit = 0, 0, 0
-        print(f"  ✅ 训练完成: {n_trees}棵 | {elapsed:.0f}s")
+        print(f"  [seed={seed}] {n_trees}棵 | {elapsed:.0f}s")
 
     imp = model.feature_importances_
-    top_idx = np.argsort(imp)[-20:][::-1]
+    top_idx = np.argsort(imp)[-5:][::-1]
     top_feats = [(feature_names[i], int(imp[i])) for i in top_idx]
 
     return {
         'model': model, 'seed': seed, 'n_trees': n_trees,
-        'val_ic': val_ic, 'val_mse': val_mse, 'val_hit': val_hit,
-        'train_time_s': elapsed, 'top_features': top_feats,
+        'val_ic': round(val_ic, 4), 'val_mse': round(val_mse, 6), 'val_hit': round(val_hit, 4),
+        'train_time_s': round(elapsed, 1), 'top_features': top_feats,
     }
 
 
+def train_ensemble(X_train, y_train, X_val, y_val, feature_names, params,
+                   n_models=N_MODELS, seeds=SEEDS, n_jobs=N_JOBS_PARALLEL) -> List[Dict]:
+    """Bagging Ensemble: 并行训练多个模型"""
+    print(f"\n🏋️ 并行训练 {n_models} 个模型...")
+    t0 = time.time()
+
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(train_one)(seeds[i], X_train, y_train, X_val, y_val, feature_names, params)
+        for i in range(n_models)
+    )
+
+    avg_trees = sum(r['n_trees'] for r in results) / len(results)
+    avg_ic = sum(r['val_ic'] for r in results) / len(results)
+    avg_hit = sum(r['val_hit'] for r in results) / len(results)
+
+    print(f"\n  ✅ {n_models}模型训练完成: 总耗时 {time.time()-t0:.0f}s, "
+          f"平均 {avg_trees:.0f}棵/模型, 平均 val IC={avg_ic:.4f}, Hit={avg_hit:.3f}")
+
+    return results
+
+
 # ============ 评估 ============
-def evaluate_model(model_info, X_test, y_test, feature_names):
-    model = model_info['model']
-    pred = model.predict(X_test)
-
-    ic = spearmanr(y_test, pred)[0]
-    mse = mean_squared_error(y_test, pred)
-    hit = accuracy_score(np.sign(y_test), np.sign(pred))
-
+def evaluate_ensemble(models_info: List[Dict], X_test, y_test, feature_names):
+    """测试集评估: 单模型 + Ensemble"""
+    n = len(models_info)
     print(f"\n{'='*60}")
-    print(f" 🧪 测试集评估 ({len(X_test):,}条)")
+    print(f" 🧪 测试集评估 ({len(X_test):,}条, {n}模型)")
     print(f"{'='*60}")
     print(f"  目标: mean={y_test.mean():.4f} std={y_test.std():.4f} "
           f"min={y_test.min():.4f} max={y_test.max():.4f}")
-    print(f"  预测: mean={pred.mean():.4f} std={pred.std():.4f}")
-    print(f"  IC={ic:.4f} | MSE={mse:.6f} | Hit Ratio={hit:.3f}")
-    print(f"  树数: {model_info['n_trees']}")
 
-    print(f"\n  📊 分组回测 (按预测值分5组):")
-    sort_idx = np.argsort(pred)
-    n_per_group = len(sort_idx) // 5
-    for g in range(5):
-        start = g * n_per_group
-        end = start + n_per_group if g < 4 else len(sort_idx)
-        group_actual = y_test[sort_idx[start:end]].mean()
-        group_pred = pred[sort_idx[start:end]].mean()
-        group_hit = accuracy_score(
-            np.sign(y_test[sort_idx[start:end]]),
-            np.sign(pred[sort_idx[start:end]])
-        )
-        print(f"    G{g+1}: 预测={group_pred:+.4f} | 实际={group_actual:+.4%} | Hit={group_hit:.3f}")
+    all_preds = []
+    for info in models_info:
+        model = info['model']
+        pred = model.predict(X_test)
+        all_preds.append(pred)
+        ic = spearmanr(y_test, pred)[0]
+        mse = mean_squared_error(y_test, pred)
+        hit = accuracy_score(np.sign(y_test), np.sign(pred))
+        print(f"  [seed={info['seed']}] IC={ic:.4f} | MSE={mse:.6f} | Hit={hit:.3f} | {info['n_trees']}棵")
 
-    long_ret = y_test[sort_idx[-n_per_group:]].mean()
-    short_ret = y_test[sort_idx[:n_per_group]].mean()
-    print(f"    多空收益差: {long_ret - short_ret:+.4%} (买入G5, 卖出G1)")
+    # Ensemble
+    if n > 1:
+        ensemble_pred = np.mean(all_preds, axis=0)
+        ic = spearmanr(y_test, ensemble_pred)[0]
+        mse = mean_squared_error(y_test, ensemble_pred)
+        hit = accuracy_score(np.sign(y_test), np.sign(ensemble_pred))
+        print(f"  {'─'*50}")
+        print(f"  🏆 Ensemble({n}) → IC={ic:.4f} | MSE={mse:.6f} | Hit={hit:.3f}")
+    else:
+        ensemble_pred = all_preds[0]
+        ic = spearmanr(y_test, ensemble_pred)[0]
+        mse = mean_squared_error(y_test, ensemble_pred)
+        hit = accuracy_score(np.sign(y_test), np.sign(ensemble_pred))
 
+    # 分组回测
+    if n > 1:
+        print(f"\n  📊 分组回测 (按预测值分5组):")
+        sort_idx = np.argsort(ensemble_pred)
+        n_per_group = len(sort_idx) // 5
+        for g in range(5):
+            start = g * n_per_group
+            end = start + n_per_group if g < 4 else len(sort_idx)
+            group_actual = y_test[sort_idx[start:end]].mean()
+            group_pred = ensemble_pred[sort_idx[start:end]].mean()
+            group_hit = accuracy_score(
+                np.sign(y_test[sort_idx[start:end]]),
+                np.sign(ensemble_pred[sort_idx[start:end]])
+            )
+            print(f"    G{g+1}: 预测={group_pred:+.4f} | 实际={group_actual:+.4%} | Hit={group_hit:.3f}")
+
+        long_ret = y_test[sort_idx[-n_per_group:]].mean()
+        short_ret = y_test[sort_idx[:n_per_group]].mean()
+        print(f"    多空收益差: {long_ret - short_ret:+.4%} (买入G5, 卖出G1)")
+
+    # 特征重要性 (取平均)
     print(f"\n  Top 20 特征:")
-    imp = model.feature_importances_
-    top = np.argsort(imp)[-20:][::-1]
+    avg_imp = np.zeros(len(feature_names))
+    for info in models_info:
+        avg_imp += info['model'].feature_importances_
+    avg_imp /= n
+    top = np.argsort(avg_imp)[-20:][::-1]
     for idx in top:
-        print(f"    {feature_names[idx]}: {int(imp[idx])}")
+        print(f"    {feature_names[idx]}: {int(avg_imp[idx])}")
 
     return ic, mse, hit
 
@@ -409,18 +457,20 @@ def main():
     parser.add_argument('--quick', action='store_true', help='快速验证')
     parser.add_argument('--db', type=str, default=DB_PATH)
     parser.add_argument('--daily-model', type=str, default=DAILY_MODEL_PATH)
-    parser.add_argument('--seed', type=int, default=SEED)
+    parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
 
     params = QUICK_PARAMS if args.quick else LGBM_PARAMS
+    is_quick = args.quick
 
     print("=" * 60)
     print(f" 分钟级择时模型训练 v1 — LGBM + 时序CV")
     print(f" 目标: 未来{args.horizon}根K线收益率 | 下采样: 每{args.skip}根")
     print(f" 时序: train({TRAIN_RATIO:.0%}) → val({VAL_RATIO:.0%}) → test({TEST_RATIO:.0%})")
-    mode = '⚠️ 快速模式' if args.quick else '🚀 生产模式'
-    print(f" {mode}: lr={params['learning_rate']} leaves={params['num_leaves']} "
-          f"trees={params['n_estimators']}")
+    if is_quick:
+        print(f" ⚠️ 快速模式: lr={params['learning_rate']} leaves={params['num_leaves']}")
+    else:
+        print(f" 🚀 生产模式: {N_MODELS}模型 Bagging Ensemble | lr={params['learning_rate']} leaves={params['num_leaves']}")
     print("=" * 60)
 
     print(f"\n📊 加载数据 ({DB_TABLE})...")
@@ -453,14 +503,20 @@ def main():
         X_test = X_test[:, corr_mask]
     print(f"  最终特征: {len(feature_names)}")
 
-    model_info = train_model(X_train, y_train, X_val, y_val, feature_names, params, seed=args.seed)
+    # 训练
+    if is_quick:
+        models_info = [train_one(args.seed, X_train, y_train, X_val, y_val, feature_names, params)]
+    else:
+        models_info = train_ensemble(X_train, y_train, X_val, y_val, feature_names, params)
 
+    # 测试集评估
     if len(X_test) > 0:
-        test_ic, test_mse, test_hit = evaluate_model(model_info, X_test, y_test, feature_names)
+        test_ic, test_mse, test_hit = evaluate_ensemble(models_info, X_test, y_test, feature_names)
     else:
         test_ic, test_mse, test_hit = 0, 0, 0
 
-    print(f"\n🏋️ 训练最终模型 (train+val 全量)...")
+    # 最终模型 (全量数据)
+    print(f"\n🏋️ 训练最终模型 (train+val 全量, 复用最佳树数)...")
     if len(X_val) > 0:
         X_full = np.vstack([X_train, X_val])
         y_full = np.concatenate([y_train, y_val])
@@ -468,29 +524,33 @@ def main():
         X_full = X_train
         y_full = y_train
 
-    final_model = lgb.LGBMRegressor(
-        **{k: v for k, v in params.items()
-           if k not in ('n_estimators', 'early_stopping_rounds', 'n_jobs', 'random_state')},
-        n_estimators=model_info['n_trees'],
-        random_state=args.seed
-    )
-    final_model.fit(X_full, y_full)
+    final_models = []
+    for info in models_info:
+        m = lgb.LGBMRegressor(
+            **{k: v for k, v in params.items()
+               if k not in ('n_estimators', 'early_stopping_rounds', 'n_jobs', 'random_state')},
+            n_estimators=info['n_trees'],
+            random_state=info['seed']
+        )
+        m.fit(X_full, y_full)
+        final_models.append(m)
 
     print(f"\n💾 保存模型...")
     os.makedirs(MODEL_DIR, exist_ok=True)
 
     model_pkg = {
-        'model': final_model,
+        'models': final_models,
         'feature_names': feature_names,
         'horizon': args.horizon,
         'skip_bars': args.skip,
         'model_type': 'intraday_timing',
+        'n_models': len(models_info),
         'train_date': datetime.now().strftime('%Y-%m-%d'),
         'train_samples': len(X_full),
-        'n_trees': model_info['n_trees'],
-        'val_ic': model_info['val_ic'],
-        'val_mse': model_info['val_mse'],
-        'val_hit': model_info['val_hit'],
+        'n_trees': [m['n_trees'] for m in models_info],
+        'avg_trees': sum(m['n_trees'] for m in models_info) / len(models_info),
+        'val_ic': [m['val_ic'] for m in models_info],
+        'val_hit': [m['val_hit'] for m in models_info],
         'test_ic': round(test_ic, 4),
         'test_mse': round(test_mse, 6),
         'test_hit': round(test_hit, 4),
@@ -498,7 +558,6 @@ def main():
                    if k not in ('verbosity', 'random_state', 'force_row_wise',
                                 'n_jobs', 'objective', 'metric',
                                 'n_estimators', 'early_stopping_rounds')},
-        'top_features': model_info['top_features'][:20],
     }
 
     model_path = os.path.join(MODEL_DIR, 'model.pkl')
@@ -512,13 +571,14 @@ def main():
         'horizon': args.horizon,
         'skip_bars': args.skip,
         'n_features': len(feature_names),
+        'n_models': len(models_info),
         'n_train': len(X_full),
         'n_test': len(X_test),
-        'n_trees': model_info['n_trees'],
+        'n_trees': [m['n_trees'] for m in models_info],
+        'avg_trees': sum(m['n_trees'] for m in models_info) / len(models_info),
         'test_ic': round(test_ic, 4),
         'test_mse': round(test_mse, 6),
         'test_hit': round(test_hit, 4),
-        'val_ic': model_info['val_ic'],
         'trained_at': datetime.now().isoformat(),
         'size_mb': round(size_mb, 1),
     }
@@ -527,7 +587,8 @@ def main():
 
     print(f"\n{'='*60}")
     print(f" ✅ 模型已保存: {model_path} ({size_mb:.1f} MB)")
-    print(f"    特征: {len(feature_names)} | 树数: {model_info['n_trees']}")
+    print(f"    特征: {len(feature_names)} | 模型数: {len(models_info)}")
+    print(f"    树数: {[m['n_trees'] for m in models_info]} (avg={sum(m['n_trees'] for m in models_info)/len(models_info):.0f})")
     print(f"    测试 IC: {test_ic:.4f} | MSE: {test_mse:.6f} | Hit: {test_hit:.3f}")
 
     if test_hit > 0.55:

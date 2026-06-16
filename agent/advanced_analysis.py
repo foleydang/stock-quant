@@ -74,7 +74,9 @@ def get_smart_t_strategy() -> List[Dict]:
         vol_ratio = calc_volume_ratio(kline)
         
         # 3. 支撑压力位
-        sr = calc_support_resistance(kline)
+        is_etf = 'ETF' in name or symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50')
+        is_hk = symbol.endswith('.HK')
+        sr = calc_support_resistance(kline, is_etf=is_etf, is_hk=is_hk)
         supports = sr.get('supports', [])
         resistances = sr.get('resistances', [])
         
@@ -385,62 +387,80 @@ def search_stock_news(keyword: str = None) -> Dict:
                 if not stock_name:
                     stock_name = keyword
         
-        # 如果指定了具体股票，先搜百度
+        # 如果指定了具体股票，先搜百度/DuckDuckGo
         if _search_stock_news_brief and stock_name:
             news_data = _search_stock_news_brief(stock_symbol or keyword, stock_name)
             if news_data and news_data.get('headlines'):
                 items = [{'title': h.get('title', ''), 'content': h.get('snippet', ''),
-                          'time': '', 'url': ''} for h in news_data['headlines']]
+                          'time': h.get('time', ''), 'url': h.get('url', '')} for h in news_data['headlines']]
                 # LLM情绪分析
                 try:
                     from llm_client import analyze_news_sentiment
                     sentiment = analyze_news_sentiment(items)
                 except Exception:
-                    sentiment = {'sentiment': '中性', 'score': 0.5, 'summary': '基于百度新闻'}
+                    sentiment = {'sentiment': '中性', 'score': 0.5, 'summary': '中性（未分析）'}
                 return {
-                    'news': [{'title': h.get('title', ''), 'snippet': '',
-                             'date': '', 'url': ''} for h in news_data['headlines'][:8]],
+                    'news': [{'title': h.get('title', ''), 'snippet': h.get('snippet', ''),
+                             'date': h.get('time', ''), 'url': h.get('url', '')} for h in news_data['headlines'][:8]],
                     'sentiment': sentiment,
                     'keyword': keyword or stock_name,
                 }
         
-        # ===== 方案2: DuckDuckGo =====
+        # ===== 方案2: Bing News RSS =====
         try:
-            from search import search_duckduckgo
-        except ImportError:
-            return _search_news_via_api(keyword)
-        
-        if keyword is None:
-            positions_data = get_positions_data()
-            keywords = []
-            if 'error' not in positions_data:
-                for p in positions_data['positions'][:3]:
-                    keywords.append(p['stock_name'])
-            from config import WATCHLIST
-            for w in WATCHLIST[:2]:
-                keywords.append(w.get('name', ''))
-            keyword = ' '.join(keywords) + ' 股市'
-
-        results = search_duckduckgo(keyword + ' 股市 金融', max_results=8)
-        
-        if not results:
+            import requests, re
+            url = 'https://www.bing.com/news/search'
+            params = {'q': keyword or '股市', 'qft': 'interval="7"', 'format': 'rss'}
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            r = requests.get(url, params=params, headers=headers, timeout=10)
+            r.raise_for_status()
+            
+            items = re.findall(r'<item>(.*?)</item>', r.text, re.DOTALL)
+            if not items:
+                return _search_news_via_api(keyword)
+            
+            skip_patterns = ['最新价格', '行情_走势图', '股价行情_财报', '个股资金流向', '股票股价_股价行情',
+                            '东方财富网', '同花顺财经', '英为财情', '五档盘口', '实时行情数据', '最新行情']
+            
+            filtered = []
+            for item in items:
+                title_m = re.search(r'<title>(.*?)</title>', item)
+                desc_m = re.search(r'<description>(.*?)</description>', item)
+                link_m = re.search(r'<link>(.*?)</link>', item)
+                date_m = re.search(r'<pubDate>(.*?)</pubDate>', item)
+                if not title_m:
+                    continue
+                title = title_m.group(1).strip()
+                if len(title) < 12 or any(p in title for p in skip_patterns):
+                    continue
+                filtered.append({
+                    'title': title,
+                    'snippet': desc_m.group(1).strip()[:200] if desc_m else '',
+                    'url': link_m.group(1).strip() if link_m else '',
+                    'date': date_m.group(1)[:16] if date_m else '',
+                })
+            
+            if not filtered:
+                return _search_news_via_api(keyword)
+        except Exception as e:
+            logger.warning(f"Bing News搜索失败: {e}")
             return _search_news_via_api(keyword)
 
         # LLM摘要
         try:
             from llm_client import analyze_news_sentiment
-            news_items = [{'title': r.get('title', ''), 'content': r.get('snippet', ''), 'time': r.get('date', '')} for r in results[:8]]
+            news_items = [{'title': r.get('title', ''), 'content': r.get('snippet', ''), 'time': r.get('date', '')} for r in filtered[:8]]
             sentiment = analyze_news_sentiment(news_items)
         except Exception:
             sentiment = {'sentiment': '中性', 'score': 0.5, 'summary': '无法分析'}
 
         formatted = []
-        for r in results[:8]:
+        for r in filtered[:8]:
             formatted.append({
                 'title': r.get('title', ''),
                 'snippet': r.get('snippet', ''),
                 'date': r.get('date', ''),
-                'url': r.get('link', ''),
+                'url': r.get('url', ''),
             })
 
         return {
