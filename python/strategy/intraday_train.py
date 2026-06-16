@@ -71,18 +71,18 @@ LGBM_PARAMS = {
     'boosting_type': 'gbdt',
     'num_leaves': 63,
     'max_depth': 7,
-    'learning_rate': 0.001,        # 0.003→0.001, 降lr让树更多 (预期300-500棵/模型)
-    'n_estimators': 20000,         # 10000→20000
-    'early_stopping_rounds': 100,  # 50→100, 给更多耐心
+    'learning_rate': 0.005,        # lr=0.001太慢(245特征信号被噪声淹没), 0.005是安全折中
+    'n_estimators': 20000,
+    'early_stopping_rounds': 150,  # 100→150, 给更多耐心让慢特征信号浮现
     'subsample': 0.6,
     'subsample_freq': 1,
     'colsample_bytree': 0.5,
     'feature_fraction_bynode': 0.6,
     'reg_alpha': 0.5,
     'reg_lambda': 2.0,
-    'min_child_samples': 200,
+    'min_child_samples': 100,      # 200→100, 放宽以支持245维特征空间
     'min_child_weight': 0.001,
-    'min_split_gain': 0.01,
+    'min_split_gain': 0.001,       # 0.01→0.001, 允许弱特征分裂
     'path_smooth': 10,
     'verbosity': -1,
     'random_state': None,
@@ -305,7 +305,36 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
     return (X_train, y_train), (X_val, y_val), (X_test, y_test), feature_names
 
 
-# ============ 特征去冗余 ============
+# ============ 特征去冗余 + 预筛选 ============
+def prefilter_features(X_train: np.ndarray, y_train: np.ndarray,
+                       X_val: np.ndarray, X_test: np.ndarray,
+                       feature_names: List[str],
+                       min_abs_corr: float = 0.002) -> Tuple:
+    """
+    去除与目标几乎零相关的噪声特征。
+    训练样本少/特征多时, 太多噪声特征会淹没LGBM早期梯度, 导致early stopping秒停。
+    """
+    if len(X_train) < 1000 or len(feature_names) <= 80:
+        return X_train, X_val, X_test, feature_names
+
+    # 计算每个特征与target的相关性
+    corrs = np.array([abs(np.corrcoef(X_train[:, i], y_train)[0, 1])
+                      if np.std(X_train[:, i]) > 1e-10 else 0
+                      for i in range(len(feature_names))])
+    keep = corrs >= min_abs_corr
+    n_removed = sum(~keep)
+
+    if n_removed > 0:
+        print(f"  预筛选: 移除 {n_removed} 个弱相关特征 (|corr|<{min_abs_corr}), "
+              f"保留 {sum(keep)}/{len(feature_names)}")
+        X_train = X_train[:, keep]
+        X_val = X_val[:, keep] if len(X_val) > 0 else X_val
+        X_test = X_test[:, keep] if len(X_test) > 0 else X_test
+        feature_names = [f for f, k in zip(feature_names, keep) if k]
+
+    return X_train, X_val, X_test, feature_names
+
+
 def remove_redundant(X: np.ndarray, feature_names: List[str]) -> Tuple:
     if X.shape[0] < 1000:
         return X, feature_names, np.ones(len(feature_names), dtype=bool)
@@ -501,6 +530,11 @@ def main():
 
     (X_train, y_train), (X_val, y_val), (X_test, y_test), feature_names = result
     print(f"  准备耗时: {time.time()-t0:.0f}s")
+
+    # 特征预筛选: 去掉与目标零相关的噪声特征
+    print(f"\n🔧 特征预筛选...")
+    X_train, X_val, X_test, feature_names = prefilter_features(
+        X_train, y_train, X_val, X_test, feature_names)
 
     print(f"\n🔧 特征去冗余...")
     X_train, feature_names, corr_mask = remove_redundant(X_train, feature_names)
