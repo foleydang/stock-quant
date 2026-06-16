@@ -292,6 +292,13 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
     X_test = np.vstack(X_te).astype(np.float32) if X_te else np.array([])
     y_test = np.array(y_te).astype(np.float32) if y_te else np.array([])
 
+    # 极端值裁剪: 防止OBV等累积特征溢出破坏模型
+    for X in [X_train, X_val, X_test]:
+        if len(X) == 0:
+            continue
+        X = np.nan_to_num(X, nan=0, posinf=1e6, neginf=-1e6)
+        np.clip(X, -1e6, 1e6, out=X)
+
     print(f"  样本: train={len(X_train):,} | val={len(X_val):,} | test={len(X_test):,}")
     print(f"  特征: {len(feature_names)} | 下采样: 每{skip_bars}根K线取1个")
 

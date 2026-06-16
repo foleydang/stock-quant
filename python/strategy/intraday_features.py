@@ -229,7 +229,7 @@ class MicroVolumeFeatures:
         f['mv_volume_dry'] = (vol < 0.3 * vol_ma20).astype(int)
         f['mv_volume_spike_60'] = (vol > 2 * vol_ma60).astype(int)
 
-        # ---- 7. OBV ----
+        # ---- 7. OBV (归一化) ----
         obv = np.zeros(len(close))
         obv[0] = volume[0]
         for i in range(1, len(close)):
@@ -239,10 +239,18 @@ class MicroVolumeFeatures:
                 obv[i] = obv[i - 1] - volume[i]
             else:
                 obv[i] = obv[i - 1]
+        obv_s = pd.Series(obv)
         for p in (5, 10, 20):
-            f[f'mv_obv_chg_{p}'] = pd.Series(obv).pct_change(p)
-        f['mv_obv_ma'] = pd.Series(obv).rolling(20, min_periods=10).mean()
-        f['mv_obv_vs_ma'] = obv / (f['mv_obv_ma'].values + 1e-10)
+            f[f'mv_obv_chg_{p}'] = obv_s.pct_change(p).clip(-5, 5)
+        # 归一化OBV: 除以滚动均值 (比值, 不受累积规模影响)
+        obv_ma20 = obv_s.rolling(20, min_periods=10).mean()
+        f['mv_obv_vs_ma'] = obv / (obv_ma20.values + 1e-10)
+        # OBV趋势: 短期均线 vs 长期均线
+        obv_ma5 = obv_s.rolling(5, min_periods=3).mean()
+        obv_ma60 = obv_s.rolling(60, min_periods=30).mean()
+        f['mv_obv_trend'] = obv_ma5 / (obv_ma60 + 1e-10) - 1
+        # OBV斜率 (归一化)
+        f['mv_obv_slope'] = (obv_s.diff(5) / (obv_ma20 + 1e-10)).clip(-1, 1)
 
         # ---- 8. MFI (Money Flow Index) ----
         tp = (pd.Series(high) + pd.Series(low) + pd.Series(close)) / 3
