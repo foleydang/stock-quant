@@ -306,11 +306,18 @@ def calc_volume_ratio(kline: List[Dict], period: int = 5) -> float:
 
 # ========== 支撑压力位 ==========
 
-def calc_support_resistance(kline: List[Dict], levels: int = 3, cost_price: float = None) -> Dict:
-    """计算支撑位和压力位（基于局部极值法 + 均线支撑 + 持仓成本价）
-
-    规则：支撑位必须明显低于当前价（差距>1%），压力位必须明显高于当前价（差距>1%）
-    持仓成本价自动作为重要支撑位（成本价附近是心理支撑）
+def calc_support_resistance(kline: List[Dict], levels: int = 3, cost_price: float = None,
+                            is_etf: bool = False, is_hk: bool = False) -> Dict:
+    """计算支撑位和压力位
+    
+    基于多源融合：
+    1. 近期高低点（20日/60日极值，100%真实成交价位）
+    2. 斐波那契回撤（38.2%/50%/61.8%，交易员最常用的技术位）
+    3. 均线（MA5/10/20/60，机构和大户的关键参考）
+    4. 整数关口（8.00/8.50等，心理价位）
+    5. 持仓成本价（持仓者的心理关口）
+    
+    规则：支撑 < 当前价（差距>1%，ETF用0.3%），压力 > 当前价（差距>1%，ETF用0.3%）
     """
     if len(kline) < 20:
         return {'supports': [], 'resistances': []}
@@ -319,96 +326,166 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3, cost_price: floa
     closes = [k['close'] for k in recent]
     highs = [k['high'] for k in recent]
     lows = [k['low'] for k in recent]
+    volumes = [k.get('volume', 0) for k in recent]
     current = closes[-1]
+    
+    # ETF波动小，用更小的最小间距（0.3% vs 1%），否则会过滤掉所有有效支撑压力位
+    min_gap_pct = 0.003 if is_etf else 0.01
+    support_candidates = []
+    resistance_candidates = []
 
-    # 1. 找局部极值（高点=压力候选，低点=支撑候选）
-    local_highs = []
-    local_lows = []
+    # ====== 1. 近期高低点（最近20日和60日的极值，真实成交位） ======
+    high_60d = max(highs)
+    low_60d = min(lows)
+    high_20d = max(highs[-20:]) if len(highs) >= 20 else high_60d
+    low_20d = min(lows[-20:]) if len(lows) >= 20 else low_60d
+    
+    for label, val in [("60日高", high_60d), ("20日高", high_20d), ("60日低", low_60d), ("20日低", low_20d)]:
+        if 0 < val < current and (current - val) / current >= min_gap_pct:
+            support_candidates.append(val)
+        elif val > current and (val - current) / current >= min_gap_pct:
+            resistance_candidates.append(val)
 
-    for i in range(2, len(highs) - 2):
-        if highs[i] >= highs[i - 1] and highs[i] >= highs[i - 2] and highs[i] >= highs[i + 1] and highs[i] >= highs[i + 2]:
-            local_highs.append(highs[i])
-        if lows[i] <= lows[i - 1] and lows[i] <= lows[i - 2] and lows[i] <= lows[i + 1] and lows[i] <= lows[i + 2]:
-            local_lows.append(lows[i])
+    # ====== 2. 斐波那契回撤（交易员最常用的技术位） ======
+    fib_range = high_60d - low_60d
+    if fib_range > 0:
+        # 上升趋势：从低点向上回撤 | 下跌趋势：从高点向下回撤
+        # 两个方向都算，取靠近当前价的
+        fib_levels_up = [low_60d + fib_range * r for r in [0.236, 0.382, 0.5, 0.618, 0.786]]
+        fib_levels_down = [high_60d - fib_range * r for r in [0.236, 0.382, 0.5, 0.618, 0.786]]
+        
+        for f in fib_levels_up + fib_levels_down:
+            f = round(f, 2)
+            if f < current and (current - f) / current >= min_gap_pct:
+                support_candidates.append(f)
+            elif f > current and (f - current) / current >= min_gap_pct:
+                resistance_candidates.append(f)
 
-    # 2. 均线作为支撑压力候选（更有意义的技术位）
-    ma_candidates = []
+    # ====== 3. 均线（MA5/10/20/60，机构和趋势跟踪者的关键参考） ======
     for period in [5, 10, 20, 60]:
         ma_vals = calc_ma(closes, period)
         if ma_vals:
-            ma_candidates.append((period, ma_vals[-1]))
+            ma = ma_vals[-1]
+            if ma < current and (current - ma) / current >= min_gap_pct:
+                support_candidates.append(ma)
+            elif ma > current and (ma - current) / current >= min_gap_pct:
+                resistance_candidates.append(ma)
 
-    # 支撑位：低于当前价的均线 + 局部低点 + 持仓成本价，差距>1%
-    min_gap_pct = 0.01  # 至少1%的距离才算有效支撑/压力
-    support_candidates = []
-    for s in local_lows:
-        if s < current and (current - s) / current >= min_gap_pct:
-            support_candidates.append(s)
-    for period, ma_val in ma_candidates:
-        if ma_val < current and (current - ma_val) / current >= min_gap_pct:
-            support_candidates.append(ma_val)
-    # 持仓成本价作为重要支撑位（成本价附近是心理支撑）
-    if cost_price and cost_price < current and (current - cost_price) / current >= min_gap_pct:
-        support_candidates.append(cost_price)
+    # ====== 4. 整数关口（心理价位，根据股价量级和品种决定间隔） ======
+    if is_etf:
+        # ETF价格通常较低（0.5~5元），波动小，需要更细的步长
+        if current >= 10:
+            step = 0.5
+        elif current >= 5:
+            step = 0.2
+        elif current >= 1:
+            step = 0.1
+        else:
+            step = 0.05
+    else:
+        # 个股（含港股）
+        if current >= 100:
+            step = 5.0
+        elif current >= 50:
+            step = 2.0
+        elif current >= 10:
+            step = 1.0
+        elif current >= 5:
+            step = 0.5
+        else:
+            step = 0.2
+    
+    for i in range(-3, 4):
+        round_price = round(round(current / step) * step + i * step, 2)
+        if round_price <= 0:
+            continue
+        if round_price < current and (current - round_price) / current >= min_gap_pct:
+            support_candidates.append(round_price)
+        elif round_price > current and (round_price - current) / current >= min_gap_pct:
+            resistance_candidates.append(round_price)
 
-    # 压力位：高于当前价的均线 + 局部高点 + 持仓成本价（浮亏时成本价是心理压力位），差距>1%
-    resistance_candidates = []
-    for r in local_highs:
-        if r > current and (r - current) / current >= min_gap_pct:
-            resistance_candidates.append(r)
-    for period, ma_val in ma_candidates:
-        if ma_val > current and (ma_val - current) / current >= min_gap_pct:
-            resistance_candidates.append(ma_val)
-    # 持仓成本价高于当前价时，作为心理压力位（成本价是浮亏卖出心理关口）
-    if cost_price and cost_price > current and (cost_price - current) / current >= min_gap_pct:
-        resistance_candidates.append(cost_price)
+    # ====== 5. 持仓成本价 ======
+    if cost_price:
+        if cost_price < current and (current - cost_price) / current >= min_gap_pct:
+            support_candidates.append(cost_price)
+        elif cost_price > current and (cost_price - current) / current >= min_gap_pct:
+            resistance_candidates.append(cost_price)
 
-    # 去重、排序、取最近的几个
-    # 支撑位：离当前价越近的越重要（但必须低于当前价>1%）
-    supports = sorted(set(support_candidates), reverse=True)[:levels]
-    # 压力位：离当前价越近的越重要（但必须高于当前价>1%）
-    resistances = sorted(set(resistance_candidates))[:levels]
+    # ====== 去重合并（相近价位合并，取均值） ======
+    # ETF用更小的去重阈值（0.3%），个股用0.5%
+    dedup_threshold = 0.003 if is_etf else 0.005
+    
+    def dedup_close_prices(prices: list, threshold: float = None) -> list:
+        """合并距离<threshold的相近价位"""
+        if threshold is None:
+            threshold = dedup_threshold
+        if not prices:
+            return []
+        sorted_prices = sorted(set(prices))
+        merged = []
+        group = [sorted_prices[0]]
+        # 根据价格量级决定小数位（ETF价格<1用3位，否则2位）
+        decimal_places = 3 if is_etf else 2
+        for p in sorted_prices[1:]:
+            if (p - group[-1]) / group[-1] < threshold:
+                group.append(p)
+            else:
+                merged.append(round(sum(group) / len(group), decimal_places))
+                group = [p]
+        merged.append(round(sum(group) / len(group), decimal_places))
+        return merged
 
-    # 如果还不够，用标准差补充（但确保差距至少2%以上，有实际参考意义）
+    supports = dedup_close_prices(support_candidates)
+    resistances = dedup_close_prices(resistance_candidates)
+
+    # ====== 排序：离当前价越近越优先 ======
+    supports = sorted(supports, reverse=True)[:levels]  # 降序 = 离当前价最近的在前面
+    resistances = sorted(resistances)[:levels]  # 升序 = 离当前价最近的在前面
+
+    # ====== 兜底：如果仍然不够，用斐波那契补充 ======
     if len(supports) < levels:
-        std = math.sqrt(sum((x - sum(closes) / len(closes)) ** 2 for x in closes) / len(closes))
-        # 用至少2%或2倍标准差作为间距，取较大值保证有意义
-        step = max(current * 0.02, 2 * std)
-        for i in range(1, levels + 1):
-            s = current - i * step
-            if s > 0 and s not in supports:
-                supports.append(round(s, 2))
+        existing = set(supports)
+        fib_s = [round(low_60d + fib_range * r, 2) for r in [0.236, 0.382, 0.5, 0.618, 0.786]]
+        fib_s += [round(high_60d - fib_range * r, 2) for r in [0.236, 0.382, 0.5, 0.618, 0.786]]
+        for f in sorted(set(fib_s), reverse=True):
+            if f < current and (current - f) / current >= min_gap_pct and f not in existing and f > 0:
+                supports.append(f)
+                existing.add(f)
+                if len(supports) >= levels:
+                    break
         supports.sort(reverse=True)
 
     if len(resistances) < levels:
-        std = math.sqrt(sum((x - sum(closes) / len(closes)) ** 2 for x in closes) / len(closes))
-        step = max(current * 0.02, 2 * std)
-        for i in range(1, levels + 1):
-            r = current + i * step
-            if r not in resistances:
-                resistances.append(round(r, 2))
+        existing = set(resistances)
+        fib_r = [round(low_60d + fib_range * r, 2) for r in [0.236, 0.382, 0.5, 0.618, 0.786]]
+        fib_r += [round(high_60d - fib_range * r, 2) for r in [0.236, 0.382, 0.5, 0.618, 0.786]]
+        for f in sorted(set(fib_r)):
+            if f > current and (f - current) / current >= min_gap_pct and f not in existing:
+                resistances.append(f)
+                existing.add(f)
+                if len(resistances) >= levels:
+                    break
         resistances.sort()
 
-    # 持仓成本价作为特殊支撑/压力位：必须出现在结果中
-    # 成本价低于当前价 → 重要支撑位（优先级最高）
-    # 成本价高于当前价 → 重要压力位（优先级最高，必须包含）
+    # ====== 持仓成本价优先级最高 ======
     if cost_price:
         if cost_price < current:
-            # 成本价插入支撑位最前面
-            supports = [cost_price] + [s for s in supports if s != cost_price]
+            supports = [cost_price] + [s for s in supports if abs(s - cost_price) / cost_price >= 0.01]
             supports = supports[:levels]
         elif cost_price > current:
-            # 成本价插入压力位（即使距离远也要包含，因为这是持仓者的心理关口）
-            resistances = [r for r in resistances if r != cost_price]
+            resistances = [r for r in resistances if abs(r - cost_price) / cost_price >= 0.01]
             resistances.append(cost_price)
             resistances.sort()
-            # 取最近的2个 + 成本价，确保成本价永远在列表中
-            if cost_price not in resistances[:levels]:
-                resistances = resistances[:levels-1] + [cost_price]
-            else:
-                resistances = resistances[:levels]
+            if cost_price not in resistances[-levels:]:
+                resistances = resistances[-(levels-1):] + [cost_price] if len(resistances) >= levels else [cost_price] + resistances
+            resistances = resistances[-levels:]
 
-    return {'supports': supports[:levels], 'resistances': resistances[:levels], 'current': current, 'cost_price': cost_price}
+    return {
+        'supports': supports[:levels],
+        'resistances': resistances[:levels],
+        'current': round(current, 2),
+        'cost_price': cost_price
+    }
 
 
 # ========== 动态异动阈值 ==========
@@ -524,12 +601,18 @@ def get_technical_analysis(symbol: str) -> Dict:
     except Exception:
         pass
 
-    sr = calc_support_resistance(kline, cost_price=cost_price)
+    # 检测ETF和港股（用于支撑压力位计算参数调整）
+    is_hk = symbol.endswith('.HK')
+    is_etf = symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50')
+    currency = 'HK$' if is_hk else '¥'
+
+    sr = calc_support_resistance(kline, cost_price=cost_price, is_etf=is_etf, is_hk=is_hk)
     sr['current'] = final_current
 
     # 如果实时价明显高于K线收盘价（盘中缺今天数据），局部高点可能低于实时价
     # 需要重新校验：确保支撑位低于实时价，压力位高于实时价
-    if rt_current is not None and abs(rt_current - current) / current > 0.005:
+    # 只在实时价 > K线收盘时触发（正常盘中场景），实时价低于收盘时通常是数据源问题（如港股）
+    if rt_current is not None and rt_current > current and (rt_current - current) / current > 0.005:
         # 实时价和K线收盘价差距>0.5%，说明盘中数据缺失
         sr['supports'] = [s for s in sr.get('supports', []) if s < final_current]
         sr['resistances'] = [r for r in sr.get('resistances', []) if r > final_current]
@@ -635,28 +718,32 @@ def get_technical_analysis(symbol: str) -> Dict:
     if new_hl_60['new_low']:
         signals.append('创60日新低')
 
-    # 量价信号
+    # 量价信号（用实时涨跌幅判断方向，避免日线和盘中方向不一致）
     if vol_ratio > 2:
-        pct = (kline[-1]['close'] - kline[-2]['close']) / kline[-2]['close'] * 100
-        if pct > 0:
+        if final_change_pct > 0:
             signals.append(f'放量上涨(量比{vol_ratio:.1f})')
-        else:
+        elif final_change_pct < 0:
             signals.append(f'放量下跌(量比{vol_ratio:.1f})')
-    elif vol_ratio < 0.5:
-        pct = (kline[-1]['close'] - kline[-2]['close']) / kline[-2]['close'] * 100
-        if pct < 0:
-            signals.append('缩量回调（可能反弹）')
         else:
+            signals.append(f'放量平盘(量比{vol_ratio:.1f})')
+    elif vol_ratio < 0.5:
+        if final_change_pct < 0:
+            signals.append('缩量回调（可能反弹）')
+        elif final_change_pct > 0:
             signals.append('缩量上涨（动力不足）')
+        else:
+            signals.append('缩量平盘（方向不明）')
 
-    # 接近支撑压力位
+    # 接近支撑压力位（用正确的货币符号和价格格式）
     for s in sr.get('supports', []):
         if abs(final_current - s) / final_current < 0.02 and final_current > s:
-            signals.append(f'接近支撑位¥{s:.2f}')
+            price_str = f'{s:.3f}' if is_etf else f'{s:.2f}'
+            signals.append(f'接近支撑位{currency}{price_str}')
             break
     for r in sr.get('resistances', []):
         if abs(final_current - r) / final_current < 0.02 and final_current < r:
-            signals.append(f'接近压力位¥{r:.2f}')
+            price_str = f'{r:.3f}' if is_etf else f'{r:.2f}'
+            signals.append(f'接近压力位{currency}{price_str}')
             break
 
     # 股名
@@ -667,13 +754,48 @@ def get_technical_analysis(symbol: str) -> Dict:
     name = row[0] if row else symbol
     conn.close()
 
-    # 港股标识
-    is_hk = symbol.endswith('.HK')
-    currency = 'HK$' if is_hk else '¥'
+    # 信号分与总结（区分强弱信号，避免误判）
+    # 强信号：明确的多空方向（趋势类信号，不含KDJ等短期指标）
+    strong_bearish = ['空头排列', '均线死叉', 'MACD死叉', '跌破', '新低', '放量下跌', '缩量上涨', 'DIF跌破零轴']
+    strong_bullish = ['多头排列', '均线金叉', 'MACD金叉', '突破', '新高', '放量上涨', 'DIF突破零轴']
+    # 弱/中性信号：短期指标或警示类，不参与方向打分
+    neutral_warning = ['超买', '超卖', '缩量回调', '缩量平盘', '接近支撑', '接近压力', 'KDJ', '死叉', '金叉']
+    
+    strong_b = sum(1 for s in signals if any(kw in s for kw in strong_bearish))
+    strong_u = sum(1 for s in signals if any(kw in s for kw in strong_bullish))
+    
+    # 加权打分：强信号权重 2
+    score = strong_u * 2 - strong_b * 2
+    
+    # 检查是否有超卖反弹信号（在偏空时要提示）
+    has_oversold = any('超卖' in s for s in signals)
+    has_overbought = any('超买' in s for s in signals)
+    has_reversal = any(kw in ''.join(signals) for kw in ['金叉', '反弹'])
+    has_warning = any('死叉' in s or '超买' in s for s in signals)
+    
+    if score < -1:
+        if has_oversold or has_reversal:
+            action_hint = '⚠️ 偏空但有超卖反弹信号，观望等待企稳'
+        else:
+            action_hint = '🔴 偏空，建议减仓或观望'
+    elif score < 0:
+        action_hint = '⚠️ 略偏空，谨慎持有'
+    elif score > 1:
+        if has_overbought or has_warning:
+            action_hint = '⚠️ 偏多但有回调风险，注意止盈'
+        else:
+            action_hint = '🟢 偏多，可持有或逢低加仓'
+    elif score > 0:
+        action_hint = '🟡 略偏多，可继续观察'
+    else:
+        if has_oversold or has_overbought:
+            action_hint = '⚪ 多空均衡，关注超买超卖信号'
+        else:
+            action_hint = '⚪ 多空均衡，震荡行情，观望为主'
 
     return {
         'symbol': symbol, 'name': name, 'current': final_current,
-        'is_hk': is_hk, 'currency': currency,
+        'is_hk': is_hk, 'is_etf': is_etf, 'currency': currency,
         'ma5': ma5[-1] if ma5 else None, 'ma10': ma10[-1] if ma10 else None,
         'ma20': ma20[-1] if ma20 else None, 'ma60': ma60[-1] if ma60 else None,
         'macd_dif': macd['dif'][-1] if macd['dif'] else None,
@@ -691,6 +813,7 @@ def get_technical_analysis(symbol: str) -> Dict:
         'resistances': sr.get('resistances', []),
         'dynamic_threshold': threshold,
         'signals': signals,
+        'action_hint': action_hint,
         'change_pct': final_change_pct,
         'new_high_20': new_hl_20['new_high'],
         'new_low_20': new_hl_20['new_low'],

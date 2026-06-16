@@ -38,6 +38,13 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+except ImportError:
+    HAS_TQDM = False
+    def tqdm(iterable, **kw): return iterable
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from strategy.intraday_features import IntradayFeaturePipeline
 
@@ -144,7 +151,7 @@ class EnsembleBacktest:
 
         # 加载模型
         self.daily_model = None
-        self.intraday_model = None
+        self.intraday_models = []  # Ensemble: list of LGBM models
         self.intraday_feature_names = None
         self._load_models()
 
@@ -173,15 +180,27 @@ class EnsembleBacktest:
             except Exception as e:
                 print(f"⚠️ 日线模型加载失败: {e}")
 
-        # 分钟级模型
+        # 分钟级模型 (支持单个模型和 Ensemble 两种格式)
         if self.intraday_model_path and os.path.exists(self.intraday_model_path):
             try:
                 with open(self.intraday_model_path, 'rb') as f:
                     pkg = pickle.load(f)
-                self.intraday_model = pkg['model']
                 self.intraday_feature_names = pkg['feature_names']
+
+                # 兼容新旧格式
+                if 'models' in pkg:
+                    self.intraday_models = pkg['models']
+                    n_models = len(self.intraday_models)
+                    n_trees = sum(m.best_iteration_ or 100 for m in self.intraday_models)
+                elif 'model' in pkg:
+                    self.intraday_models = [pkg['model']]
+                    n_models = 1
+                    n_trees = pkg.get('n_trees', 0)
+                else:
+                    raise ValueError("模型文件格式不正确")
+
                 print(f"✅ 分钟级模型已加载: {pkg.get('train_date', 'unknown')} "
-                      f"({pkg.get('n_trees', 0)}棵树, {pkg.get('n_features', 0)}特征)")
+                      f"({n_models}模型, {n_trees}棵树, {pkg.get('n_features', len(self.intraday_feature_names))}特征)")
             except Exception as e:
                 print(f"⚠️ 分钟级模型加载失败: {e}")
                 raise
@@ -245,9 +264,10 @@ class EnsembleBacktest:
             if self.intraday_feature_names:
                 feats = feats.reindex(columns=self.intraday_feature_names, fill_value=0)
 
-            # 预测
+            # 预测 (Ensemble平均)
             latest = feats.iloc[-1:].values.astype(np.float32)
-            pred = self.intraday_model.predict(latest)[0]
+            preds = [m.predict(latest)[0] for m in self.intraday_models]
+            pred = np.mean(preds)
             return float(pred)
         except Exception:
             return None
@@ -291,7 +311,7 @@ class EnsembleBacktest:
         daily_equity_start = self.initial_capital
 
         # 逐日回测
-        for day_idx, day in enumerate(unique_dates):
+        for day_idx, day in enumerate(tqdm(unique_dates, desc='   回测进度', unit='day')):
             # 盘前: 更新股票池
             self.daily_pool = self.get_daily_pool(day)
 

@@ -42,67 +42,76 @@ FEISHU_TARGET_CHAT_ID = os.environ.get("FEISHU_TARGET_CHAT_ID", "")
 
 
 def _search_stock_news_brief(symbol: str, name: str) -> Optional[dict]:
-    """搜索个股近3日相关新闻（百度），带日期过滤"""
+    """搜索个股近7日相关新闻（Bing News RSS），带日期过滤"""
     from datetime import timedelta
-    recent_days = [(datetime.now() - timedelta(days=i)).strftime('%m月%d日') for i in range(3)]
-    date_filter = '|'.join(recent_days)  # 例: "06月13日|06月14日"
+    short_name = name.replace('股份', '').replace('集团', '').replace('有限', '').replace('-W', '')
+    
+    skip_patterns = ['最新价格', '行情_走势图', '股价行情_财报', '个股资金流向', '股票股价_股价行情',
+                    '东方财富网', '同花顺财经', '英为财情', '五档盘口', '实时行情数据',
+                    '法律意见书', '研究报告', 'F10', '最新行情', '净申购', '净赎回']
 
+    # 方案1: Bing News RSS（最可靠，带日期）
     try:
         import requests, re
-        short_name = name.replace('股份', '').replace('集团', '').replace('有限', '').replace('-W', '')
-        url = 'https://news.baidu.com/ns'
-        params = {'word': short_name, 'tn': 'news', 'ie': 'utf-8', 'rn': 10, 'pn': 0}
+        url = 'https://www.bing.com/news/search'
+        params = {'q': short_name, 'qft': 'interval="7"', 'format': 'rss'}
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         r = requests.get(url, params=params, headers=headers, timeout=10)
-        # 提取标题和来源时间
-        matches = re.findall(
-            r'<h3[^>]*>.*?<a[^>]*>(.*?)</a>.*?(?:<span[^>]*class="c-color-gray2[^"]*"[^>]*>(.*?)</span>)',
-            r.text, re.DOTALL
-        )
-        if not matches:
-            # 宽松匹配：只要标题，不强制匹配时间
-            titles = re.findall(r'<h3[^>]*>.*?<a[^>]*>(.*?)</a>', r.text, re.DOTALL)
-            titles = [re.sub(r'<[^>]+>', '', t).strip() for t in titles if t.strip()]
-            matches = [(t, '') for t in titles]
-
-        skip_patterns = ['最新价格', '行情_走势图', '净申购', '净赎回', '份额增长', '资金流向',
-                        '股价行情_财报', '个股资金流向', '股票股价', '实时行情']
-
+        r.raise_for_status()
+        
+        items = re.findall(r'<item>(.*?)</item>', r.text, re.DOTALL)
         headlines = []
-        for raw_title, raw_time in matches:
-            title = re.sub(r'<[^>]+>', '', raw_title).strip()
-            if not title or len(title) < 12:
+        for item in items:
+            title_m = re.search(r'<title>(.*?)</title>', item)
+            desc_m = re.search(r'<description>(.*?)</description>', item)
+            link_m = re.search(r'<link>(.*?)</link>', item)
+            date_m = re.search(r'<pubDate>(.*?)</pubDate>', item)
+            if not title_m:
                 continue
-            if any(p in title for p in skip_patterns):
+            title = title_m.group(1).strip()
+            if len(title) < 12 or any(p in title for p in skip_patterns):
                 continue
-            # 检查是否在近3天内或者时间信息匹配近3日
-            time_str = re.sub(r'<[^>]+>', '', raw_time).strip() if raw_time else ''
-            is_recent = any(d in title or d in time_str for d in recent_days)
-            if not is_recent:
-                # Baidu news sometimes shows "X小时前", "昨天", "X分钟前"
-                is_recent = any(kw in time_str for kw in ['小时前', '分钟前', '昨天', '今天'])
-            if not is_recent and headlines:
-                continue  # 已有近期新闻后跳过旧闻
-            headlines.append({'title': title, 'snippet': '', 'url': '', 'time': time_str})
-
+            snippet = desc_m.group(1).strip()[:200] if desc_m else ''
+            url = link_m.group(1).strip() if link_m else ''
+            time_str = date_m.group(1)[:16] if date_m else ''
+            headlines.append({'title': title, 'snippet': snippet, 'url': url, 'time': time_str})
+        
         if headlines:
             return {'headlines': headlines[:5], 'keyword': name}
     except Exception as e:
-        logger.warning(f"百度新闻搜索失败 {name}: {e}")
+        logger.warning(f"Bing新闻搜索失败 {name}: {e}")
 
     # 备用: DuckDuckGo
     try:
         from search import search
+        from datetime import timedelta
         short_name = name.replace('股份', '').replace('集团', '').replace('有限', '').replace('-W', '')
-        results = search(f"{short_name} 最新消息", count=5)
+        results = search(f"{short_name} 最新消息", count=8)
         if not results:
             return None
         headlines = []
-        skip_patterns = ['最新价格', '行情_走势图', '股价行情_财报', '个股资金流向', '股票股价_股价行情']
-        for r in results[:3]:
+        skip_patterns = ['最新价格', '行情_走势图', '股价行情_财报', '个股资金流向', '股票股价_股价行情',
+                        '东方财富网', '同花顺财经', '英为财情', '五档盘口', '实时行情数据',
+                        '法律意见书', '研究报告', 'F10', '最新行情']
+        # 近7天日期列表，用于识别旧闻
+        recent_days = [(datetime.now() - timedelta(days=i)).strftime('%m月%d日') for i in range(7)]
+        old_days = [(datetime.now() - timedelta(days=i)).strftime('%m月%d日') for i in range(8, 15)]
+        for r in results:
             title = r.get('title', '').strip()
-            if title and len(title) > 12 and not any(p in title for p in skip_patterns):
-                headlines.append({'title': title, 'snippet': r.get('snippet', '')[:80], 'url': r.get('url', '')})
+            snippet = r.get('snippet', '')
+            if not title or len(title) < 12:
+                continue
+            if any(p in title for p in skip_patterns):
+                continue
+            # 时间过滤：只有明确旧闻（>7天）才过滤
+            combined = title + snippet
+            has_date = any(d in combined for d in recent_days + old_days)
+            if has_date:
+                is_old = any(d in combined for d in old_days)
+                if is_old:
+                    continue
+            # 无日期信息 → 保留
+            headlines.append({'title': title, 'snippet': snippet[:120], 'url': r.get('url', '')})
         if not headlines:
             return None
         return {'headlines': headlines[:3], 'keyword': name}
@@ -444,6 +453,17 @@ _recent_alerts = {}  # {(symbol, alert_type): [(timestamp, change_pct), ...]}
 _ALERT_MAX_PER_DAY = 3  # 同方向每天最多推3次
 _ALERT_DEEPEN_THRESHOLD = 1.0  # 跌幅/涨幅须比上次加深1%以上才再推
 
+
+def _cleanup_old_alerts():
+    """跨天清理：新的一天重置所有记录，每天独立统计3次配额"""
+    import time
+    today = time.strftime('%Y%m%d')
+    if not hasattr(_cleanup_old_alerts, '_date'):
+        _cleanup_old_alerts._date = today
+        return
+    if _cleanup_old_alerts._date != today:
+        _recent_alerts.clear()
+        _cleanup_old_alerts._date = today
 def _is_alert_duplicate(symbol: str, alert_type: str, change_pct: float) -> bool:
     """判断是否重复异动
     规则：
@@ -451,6 +471,7 @@ def _is_alert_duplicate(symbol: str, alert_type: str, change_pct: float) -> bool
     2. 跌幅/涨幅须比上次推送加深1%以上才再推
     """
     import time
+    _cleanup_old_alerts()  # 先清理过期记录
     key = (symbol, alert_type)
     records = _recent_alerts.get(key, [])
 
@@ -462,10 +483,10 @@ def _is_alert_duplicate(symbol: str, alert_type: str, change_pct: float) -> bool
     if records:
         last_pct = records[-1][1]
         # 大跌类：跌幅须更深（更负）1%以上
-        if '跌' in alert_type and change_pct > last_pct + _ALERT_DEEPEN_THRESHOLD:
+        if '跌' in alert_type and change_pct > last_pct - _ALERT_DEEPEN_THRESHOLD:
             return True  # 跌幅没加深，不推
         # 大涨类：涨幅须更高1%以上
-        if '涨' in alert_type and change_pct < last_pct - _ALERT_DEEPEN_THRESHOLD:
+        if '涨' in alert_type and change_pct < last_pct + _ALERT_DEEPEN_THRESHOLD:
             return True  # 涨幅没加深，不推
 
     # 记录本次推送
