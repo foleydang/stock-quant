@@ -318,7 +318,8 @@ class IntradayPatternFeatures:
         day_grp = dates.dt.date
         f['ip_minutes'] = df.groupby(day_grp).cumcount() * 30
         f['ip_bar_of_day'] = df.groupby(day_grp).cumcount() + 1
-        f['ip_bar_pct'] = f['ip_bar_of_day'] / df.groupby(day_grp).cumcount().transform('max')
+        max_bars = df.groupby(day_grp).cumcount().transform(lambda x: x.max()) if hasattr(df.groupby(day_grp).cumcount(), 'transform') else df.groupby(day_grp).cumcount().max()
+        f['ip_bar_pct'] = f['ip_bar_of_day'] / (max_bars + 1e-10)
 
         # 上午/下午成交量占比 (当日累计)
         morning_mask = (total_min >= 570) & (total_min < 690)
