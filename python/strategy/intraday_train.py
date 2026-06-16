@@ -62,26 +62,27 @@ RETURN_CLIP = 0.10
 MIN_VOLUME = 1000
 MIN_POOL_SIZE = 20
 
-# 训练参数 (分钟级: 更保守)
+# 训练参数 (分钟级: 样本量大 → 适度正则)
+# 核心逻辑: 1.3M样本信噪比低, 用小树+中正则避免过拟合
 LGBM_PARAMS = {
     'objective': 'regression',
     'metric': 'l2',
     'boosting_type': 'gbdt',
-    'num_leaves': 31,
-    'max_depth': 5,
-    'learning_rate': 0.003,
+    'num_leaves': 63,              # 31→63, 样本量够大, 增加表达能力
+    'max_depth': 7,                # 5→7
+    'learning_rate': 0.01,         # 0.003→0.01, 加速收敛 (1.3M样本)
     'n_estimators': 10000,
-    'early_stopping_rounds': 80,
-    'subsample': 0.4,
+    'early_stopping_rounds': 50,   # 80→50
+    'subsample': 0.6,              # 0.4→0.6, 每轮用60%样本
     'subsample_freq': 1,
-    'colsample_bytree': 0.3,
-    'feature_fraction_bynode': 0.5,
-    'reg_alpha': 2.0,
-    'reg_lambda': 10.0,
-    'min_child_samples': 500,
-    'min_child_weight': 0.01,
-    'min_split_gain': 0.1,
-    'path_smooth': 20,
+    'colsample_bytree': 0.5,       # 0.3→0.5
+    'feature_fraction_bynode': 0.6,
+    'reg_alpha': 0.5,              # 2.0→0.5, 放松L1 (样本量大, 不易过拟合)
+    'reg_lambda': 2.0,             # 10.0→2.0, 放松L2
+    'min_child_samples': 200,      # 500→200, 允许更细节的分裂
+    'min_child_weight': 0.001,
+    'min_split_gain': 0.01,        # 0.1→0.01, 允许捕获微弱信号
+    'path_smooth': 10,             # 20→10
     'verbosity': -1,
     'random_state': None,
     'n_jobs': 3,
@@ -469,7 +470,7 @@ def main():
 
     final_model = lgb.LGBMRegressor(
         **{k: v for k, v in params.items()
-           if k not in ('n_estimators', 'early_stopping_rounds', 'n_jobs')},
+           if k not in ('n_estimators', 'early_stopping_rounds', 'n_jobs', 'random_state')},
         n_estimators=model_info['n_trees'],
         random_state=args.seed
     )
