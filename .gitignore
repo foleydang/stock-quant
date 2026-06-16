@@ -46,3 +46,4 @@ logs/
 *.log
 python/data/stock_data.db
 python/data/*.db
+stock_data.db
