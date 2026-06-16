@@ -71,7 +71,7 @@ LGBM_PARAMS = {
     'boosting_type': 'gbdt',
     'num_leaves': 63,
     'max_depth': 7,
-    'learning_rate': 0.003,        # 0.01→0.003, 降lr让树更多 (预期500-1000棵/模型)
+    'learning_rate': 0.001,        # 0.003→0.001, 降lr让树更多 (预期300-500棵/模型)
     'n_estimators': 20000,         # 10000→20000
     'early_stopping_rounds': 100,  # 50→100, 给更多耐心
     'subsample': 0.6,
