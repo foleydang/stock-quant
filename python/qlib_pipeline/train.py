@@ -47,7 +47,7 @@ DAY_LENGTH = 8  # 30分钟K线, 每天4小时 = 8根
 EXPERIMENT_NAME = 'intraday_30min_hf'
 MODEL_DIR = os.path.join(ROOT, 'models', 'qlib_intraday')
 
-START_TIME = '2023-01-01 09:30:00'
+START_TIME = '2020-01-02 09:30:00'
 TRAIN_END = '2026-04-30 15:00:00'
 VAL_END = '2026-05-31 15:00:00'
 END_TIME = '2026-06-16 15:00:00'
