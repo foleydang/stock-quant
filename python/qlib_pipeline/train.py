@@ -15,9 +15,16 @@ Qlib 分钟级择时训练 — HighFreqGeneralHandler + 自定义标签
 
 import os, sys, argparse, time, json, copy, warnings
 
-# 抑制 Qlib 依赖的 FutureWarning/pandas 废弃警告
+# 抑制 Qlib 依赖的 FutureWarning/DeprecationWarning (pandas fillna 废弃)
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+# 抑制 Gym 废弃通知 (gym 直接 print 到 stderr, 不走 warnings 系统)
+try:
+    import gym_notices.notices
+    gym_notices.notices.notices = {}
+except ImportError:
+    pass
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
