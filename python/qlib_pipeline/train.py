@@ -107,8 +107,9 @@ class IntradayHandler(HighFreqGeneralHandler):
         return fields, names
 
     def get_label_config(self):
-        """未来 horizon 根K线收益率"""
-        label_expr = f"Ref($close, -{self.horizon}) / Ref($close, -1) - 1"
+        """未来 horizon 根K线收益率, 分母加 epsilon 防止停牌脏数据除零"""
+        EPS = '1e-6'
+        label_expr = f"Ref($close, -{self.horizon}) / (Ref($close, -1) + {EPS}) - 1"
         return [label_expr], ["LABEL0"]
 
 
