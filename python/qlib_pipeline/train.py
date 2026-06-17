@@ -21,10 +21,12 @@ os.environ['MLFLOW_ALLOW_FILE_STORE'] = 'true'
 
 import qlib
 from qlib.constant import REG_CN
+from qlib.config import C
 from qlib.utils import init_instance_by_config
 from qlib.workflow import R
 from qlib.workflow.record_temp import SignalRecord, PortAnaRecord, SigAnaRecord
 from qlib.contrib.data.highfreq_handler import HighFreqGeneralHandler
+from qlib.contrib.ops.high_freq import Cut
 from qlib.data.dataset import DatasetH
 
 # ============ 配置 ============
