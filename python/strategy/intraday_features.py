@@ -875,8 +875,9 @@ class IntradayCrossSection:
             mean = np.nanmean(mat_t, axis=1, keepdims=True)
             std = np.nanstd(mat_t, axis=1, keepdims=True)
             z_mat = (mat_t - mean) / (std + 1e-10)
-            z_mat[~min_valid[:, ti, np.newaxis]] = np.nan
-            rank_mat[~min_valid[:, ti, np.newaxis]] = np.nan
+            invalid_rows = ~min_valid[:, ti]  # [n_ts]
+            z_mat[invalid_rows, :] = np.nan
+            rank_mat[invalid_rows, :] = np.nan
 
             # 写回结果dict (比pandas loc快100x)
             col_rank = f'ics_rank_{target}'
