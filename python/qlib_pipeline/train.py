@@ -19,6 +19,8 @@ import os, sys, argparse, time, json
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+os.environ['MLFLOW_ALLOW_FILE_STORE'] = 'true'
+
 import qlib
 from qlib.constant import REG_CN
 from qlib.utils import init_instance_by_config
