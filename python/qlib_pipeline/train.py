@@ -13,7 +13,11 @@ Qlib 分钟级择时训练 — HighFreqGeneralHandler + 自定义标签
   python qlib_pipeline/train.py --horizon 3         # 预测3根K线后
 """
 
-import os, sys, argparse, time, json, copy
+import os, sys, argparse, time, json, copy, warnings
+
+# 抑制 Qlib 依赖的 FutureWarning/pandas 废弃警告
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)

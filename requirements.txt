@@ -37,6 +37,7 @@ ruamel.yaml  # Qlib 依赖
 pydantic>=2.0  # Qlib 依赖
 pydantic-settings>=2.0  # Qlib 依赖
 fire  # Qlib CLI 依赖
+gymnasium>=1.0  # 替代 gym (Qlib pytorch 模型依赖, 避免 FutureWarning 刷屏)
 
 # === 配置/工具 ===
 python-dotenv>=1.0
