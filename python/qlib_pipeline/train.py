@@ -49,21 +49,25 @@ class IntradayHandler(HighFreqGeneralHandler):
 
     def __init__(self, horizon=3, **kwargs):
         self.horizon = horizon
-        # 从 kwargs 中提取 HighFreqGeneralHandler 的参数
         self.day_length = kwargs.pop('day_length', DAY_LENGTH)
         self.columns = kwargs.pop('columns', ['$open', '$high', '$low', '$close'])
         freq = kwargs.get('freq', FREQ)
 
-        # 构建带标签的 data_loader (必须在 super().__init__ 之前)
+        # 构建带标签的 data_loader
         from qlib.data.dataset.loader import QlibDataLoader
+        from qlib.data.dataset.handler import DataHandlerLP
         feature_fields, feature_names = self.get_feature_config()
         label_fields, label_names = self.get_label_config()
-        kwargs['data_loader'] = QlibDataLoader(
+        data_loader = QlibDataLoader(
             config={'feature': (feature_fields, feature_names),
                     'label': (label_fields, label_names)},
             swap_level=False, freq=freq,
         )
-        super().__init__(day_length=self.day_length, columns=self.columns, **kwargs)
+        # 直接调用 DataHandlerLP.__init__, 绕过 HighFreqGeneralHandler
+        DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
+
+    def get_feature_config(self):
+        return HighFreqGeneralHandler.get_feature_config(self)
 
     def get_label_config(self):
         """未来 horizon 根K线收益率 (Qlib 负索引=未来)"""
