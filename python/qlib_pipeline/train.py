@@ -240,10 +240,10 @@ def main():
                 mean_sig = daily_pred.mean()
                 std_sig = daily_pred.std()
                 sharpe = mean_sig / (std_sig + 1e-6) * (252**0.5)
-                cum = (1 + daily_pred).prod()
-                print(f"  累计复合: {cum:.4f}")
-                print(f"  日均信号: {mean_sig:.6f}")
-                print(f"  信号夏普: {sharpe:.2f}")
+                cum = (1 + daily_pred).prod().iloc[0] if hasattr((1 + daily_pred).prod(), 'iloc') else (1 + daily_pred).prod()
+                print(f"  累计复合: {float(cum):.4f}")
+                print(f"  日均信号: {float(mean_sig):.6f}")
+                print(f"  信号夏普: {float(sharpe):.2f}")
             except Exception as e:
                 import traceback
                 traceback.print_exc()
