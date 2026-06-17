@@ -51,7 +51,10 @@ class IntradayHandler(HighFreqGeneralHandler):
         self.horizon = horizon
         self.day_length = kwargs.pop('day_length', DAY_LENGTH)
         self.columns = kwargs.pop('columns', ['$open', '$high', '$low', '$close'])
-        freq = kwargs.get('freq', FREQ)
+        freq = kwargs.pop('freq', FREQ)
+        # pop 掉 HighFreqGeneralHandler 专用参数, DataHandlerLP 不需要
+        kwargs.pop('fit_start_time', None)
+        kwargs.pop('fit_end_time', None)
 
         # 构建带标签的 data_loader
         from qlib.data.dataset.loader import QlibDataLoader
@@ -63,7 +66,6 @@ class IntradayHandler(HighFreqGeneralHandler):
                     'label': (label_fields, label_names)},
             swap_level=False, freq=freq,
         )
-        # 直接调用 DataHandlerLP.__init__, 绕过 HighFreqGeneralHandler
         DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
 
     def get_feature_config(self):

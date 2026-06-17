@@ -1,0 +1,9 @@
+artifact_location: file:///root/github/stock-quant/mlruns/0
+creation_time: 1781694726386
+effective_trace_archival_retention: null
+experiment_id: '0'
+last_update_time: 1781694726386
+lifecycle_stage: active
+name: Default
+trace_location: null
+workspace: default
