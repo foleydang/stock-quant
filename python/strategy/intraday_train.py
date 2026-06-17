@@ -63,26 +63,26 @@ RETURN_CLIP = 0.10
 MIN_VOLUME = 1000
 MIN_POOL_SIZE = 20
 
-# 训练参数 (分钟级: 样本量大 → 适度正则)
-# 核心逻辑: 1.3M样本信噪比低, 用小树+中正则避免过拟合
+# 训练参数 v3 (分钟级: 更多特征+更低lr → 大树量模型 ~100MB)
+# 核心逻辑: 信噪比低 → 极低lr让模型慢慢学, 弱正则保留弱特征信号
 LGBM_PARAMS = {
     'objective': 'regression',
     'metric': 'l2',
     'boosting_type': 'gbdt',
-    'num_leaves': 63,
-    'max_depth': 7,
-    'learning_rate': 0.005,        # lr=0.001太慢(245特征信号被噪声淹没), 0.005是安全折中
+    'num_leaves': 127,              # 63→127, 更多叶子捕获非线性
+    'max_depth': 9,                 # 7→9, 允许更深树
+    'learning_rate': 0.001,         # 0.005→0.001, 极低lr训练5000+棵树
     'n_estimators': 20000,
-    'early_stopping_rounds': 150,  # 100→150, 给更多耐心让慢特征信号浮现
+    'early_stopping_rounds': 500,   # 150→500, 给弱信号更多耐心
     'subsample': 0.6,
     'subsample_freq': 1,
     'colsample_bytree': 0.5,
     'feature_fraction_bynode': 0.6,
-    'reg_alpha': 0.5,
-    'reg_lambda': 2.0,
-    'min_child_samples': 100,      # 200→100, 放宽以支持245维特征空间
-    'min_child_weight': 0.001,
-    'min_split_gain': 0.001,       # 0.01→0.001, 允许弱特征分裂
+    'reg_alpha': 0.1,               # 0.5→0.1, 降低L1正则
+    'reg_lambda': 0.5,              # 2.0→0.5, 降低L2正则
+    'min_child_samples': 50,        # 100→50, 允许更细分叉
+    'min_child_weight': 0.0001,     # 0.001→0.0001, 降低权重门槛
+    'min_split_gain': 0.0001,       # 0.001→0.0001, 允许弱特征分裂
     'path_smooth': 10,
     'verbosity': -1,
     'random_state': None,
@@ -102,7 +102,7 @@ QUICK_PARAMS = {
     'n_jobs': 3, 'force_row_wise': True,
 }
 
-CORR_THRESHOLD = 0.90
+CORR_THRESHOLD = 0.95  # 0.90→0.95, 放宽去冗余, 保留更多特征
 
 # Bagging Ensemble
 N_MODELS = 5
@@ -309,10 +309,10 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
 def prefilter_features(X_train: np.ndarray, y_train: np.ndarray,
                        X_val: np.ndarray, X_test: np.ndarray,
                        feature_names: List[str],
-                       min_abs_corr: float = 0.002) -> Tuple:
+                       min_abs_corr: float = 0.0005) -> Tuple:
     """
-    去除与目标几乎零相关的噪声特征。
-    训练样本少/特征多时, 太多噪声特征会淹没LGBM早期梯度, 导致early stopping秒停。
+    去除与目标几乎零相关的噪声特征 (v3: 放宽到0.0005)。
+    LGBM能捕捉非线性关系, 线性弱相关不代表无用。
     """
     if len(X_train) < 1000 or len(feature_names) <= 80:
         return X_train, X_val, X_test, feature_names
