@@ -78,7 +78,7 @@ class IntradayHandler(HighFreqGeneralHandler):
         DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
 
     def get_feature_config(self):
-        """Phase 3: 基线 + RSI + MACD + 布林带 (25个)"""
+        """最优特征集: 10基础 + 收益 + 量比 + RSI + MACD (23个, IC=0.119)"""
         fields, names = HighFreqGeneralHandler.get_feature_config(self)
         EPS = '1e-6'
 
@@ -103,10 +103,6 @@ class IntradayHandler(HighFreqGeneralHandler):
         # ── MACD ──
         add("EMA($close, 12) - EMA($close, 26)", "macd")
         add("(EMA($close, 12) - EMA($close, 26)) - EMA(EMA($close, 12) - EMA($close, 26), 9)", "macd_hist")
-
-        # ── 布林带 (价格位置, 归一化到 ~[-1,1]) ──
-        for p in [10, 20]:
-            add(f"($close - Mean($close, {p})) / (2*Std($close, {p}) + {EPS})", f"bb_pos_{p}")
 
         return fields, names
 
@@ -243,7 +239,7 @@ def main():
                                                  'open_cost': 0.0005, 'close_cost': 0.0015, 'min_cost': 5}},
             }
             try:
-                par = PortAnaRecord(recorder, port_config, FREQ)
+                par = PortAnaRecord(recorder, port_config, 'day')
                 par.generate()
             except Exception as e:
                 print(f"  ⚠️ 回测跳过: {e}")
