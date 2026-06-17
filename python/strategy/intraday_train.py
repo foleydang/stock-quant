@@ -366,12 +366,11 @@ def train_one(seed: int, X_train, y_train, X_val, y_val,
     es_rounds = p.pop('early_stopping_rounds')
     p.pop('n_jobs', None)
 
-    model = lgb.LGBMRegressor(**p)
-    # 诊断模式: 固定300棵树 + verbose, 看loss是否收敛
+    model = lgb.LGBMRegressor(n_estimators=n_est, **p)
     model.fit(X_train, y_train,
               eval_set=[(X_val, y_val)] if len(X_val) > 0 else None,
               eval_metric='l2',
-              callbacks=[lgb.log_evaluation(50)])
+              callbacks=[lgb.log_evaluation(50), lgb.early_stopping(es_rounds)])
 
     n_trees = model.n_estimators_  # 实际训练树数
     elapsed = time.time() - t0
