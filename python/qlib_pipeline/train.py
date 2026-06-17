@@ -41,22 +41,20 @@ TRAIN_END = '2026-05-20 15:00:00'
 VAL_END = '2026-06-14 15:00:00'
 END_TIME = '2026-06-17 15:00:00'
 
-N_FEAT = 10  # 4列x2天 + 2成交量
+N_FEAT = 10  # 默认值, 会被实际特征数覆盖
 
 
 class IntradayHandler(HighFreqGeneralHandler):
-    """带标签的分钟级数据处理器"""
+    """丰富的分钟级特征 + 标签处理器 (~120+ features)"""
 
     def __init__(self, horizon=3, **kwargs):
         self.horizon = horizon
         self.day_length = kwargs.pop('day_length', DAY_LENGTH)
         self.columns = kwargs.pop('columns', ['$open', '$high', '$low', '$close'])
         freq = kwargs.pop('freq', FREQ)
-        # pop 掉 HighFreqGeneralHandler 专用参数, DataHandlerLP 不需要
         kwargs.pop('fit_start_time', None)
         kwargs.pop('fit_end_time', None)
 
-        # 构建带标签的 data_loader
         from qlib.data.dataset.loader import QlibDataLoader
         from qlib.data.dataset.handler import DataHandlerLP
         feature_fields, feature_names = self.get_feature_config()
@@ -69,15 +67,104 @@ class IntradayHandler(HighFreqGeneralHandler):
         DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
 
     def get_feature_config(self):
-        return HighFreqGeneralHandler.get_feature_config(self)
+        """~50 Qlib 表达式特征: 收益/波动/均线/技术指标/量价"""
+        fields, names = HighFreqGeneralHandler.get_feature_config(self)
+        EPS = '1e-6'
+
+        def add(expr, name):
+            fields.append(expr)
+            names.append(name)
+
+        # ── 收益 (多周期) ──
+        for p in [1, 2, 3, 5, 10, 15, 20, 30, 40, 60]:
+            add(f"$close / Ref($close, {p}) - 1", f"ret_{p}")
+
+        # ── 波动率 ──
+        ret1 = "$close / Ref($close, 1) - 1"
+        for p in [5, 10, 20, 30, 60]:
+            add(f"Std({ret1}, {p})", f"vol_{p}")
+
+        # ── 均线偏离 ──
+        for p in [5, 10, 20, 30, 60]:
+            add(f"$close / Mean($close, {p}) - 1", f"ma_dist_{p}")
+
+        # ── 均线斜率 ──
+        for p in [5, 10, 20, 60]:
+            add(f"(Mean($close, {p}) - Ref(Mean($close, {p}), 3)) / (Mean($close, {p}) + {EPS})", f"ma_slope_{p}")
+
+        # ── 价格位置 (Donchian Channel) ──
+        for p in [10, 20, 60, 120]:
+            add(f"($close - Min($low, {p})) / (Max($high, {p}) - Min($low, {p}) + {EPS})", f"pos_{p}")
+
+        # ── 振幅 ──
+        for p in [10, 20, 60]:
+            add(f"(Max($high, {p}) - Min($low, {p})) / (Mean($close, {p}) + {EPS})", f"range_{p}")
+
+        # ── 量比 ──
+        for p in [5, 10, 20, 60]:
+            add(f"$volume / (Mean($volume, {p}) + {EPS}) - 1", f"vol_ratio_{p}")
+
+        # ── 量变化 ──
+        for p in [1, 3, 5, 10, 20]:
+            add(f"$volume / (Ref($volume, {p}) + {EPS}) - 1", f"vol_chg_{p}")
+
+        # ── 量趋势 ──
+        add(f"Mean($volume, 5) / (Mean($volume, 20) + {EPS}) - 1", "vol_trend_5_20")
+        add(f"Mean($volume, 10) / (Mean($volume, 60) + {EPS}) - 1", "vol_trend_10_60")
+
+        # ── RSI (用 If 替代 Max 避免 parser 歧义) ──
+        for p in [6, 14, 24]:
+            up = f"If(Gt($close - Ref($close, 1), 0), $close - Ref($close, 1), 0)"
+            down = f"If(Gt(Ref($close, 1) - $close, 0), Ref($close, 1) - $close, 0)"
+            add(f"100 - 100 / (1 + Mean({up}, {p}) / (Mean({down}, {p}) + {EPS}))", f"rsi_{p}")
+
+        # ── MACD ──
+        add("EMA($close, 12) - EMA($close, 26)", "macd")
+        add("EMA(EMA($close, 12) - EMA($close, 26), 9)", "macd_signal")
+        add("(EMA($close, 12) - EMA($close, 26)) - EMA(EMA($close, 12) - EMA($close, 26), 9)", "macd_hist")
+
+        # ── 布林带 ──
+        for p in [10, 20, 60]:
+            add(f"($close - Mean($close, {p}) + 2*Std($close, {p})) / (4*Std($close, {p}) + {EPS})", f"bb_pos_{p}")
+            add(f"4*Std($close, {p}) / (Mean($close, {p}) + {EPS})", f"bb_width_{p}")
+
+        # ── ROC / MOM ──
+        for p in [5, 10, 20, 60]:
+            add(f"($close / Ref($close, {p}) - 1) * 100", f"roc_{p}")
+        for p in [5, 10, 20]:
+            add(f"$close - Ref($close, {p})", f"mom_{p}")
+
+        # ── CCI ──
+        for p in [14, 20]:
+            tp = f"($high + $low + $close) / 3"
+            add(f"({tp} - Mean({tp}, {p})) / (0.015 * Std({tp}, {p}) + {EPS})", f"cci_{p}")
+
+        # ── Williams %R ──
+        for p in [6, 14]:
+            add(f"(Max($high, {p}) - $close) / (Max($high, {p}) - Min($low, {p}) + {EPS}) * -100", f"wr_{p}")
+
+        # ── 量价相关性 ──
+        for p in [20, 60]:
+            add(f"Corr($close, $volume, {p})", f"corr_cv_{p}")
+
+        # ── 高低价/开盘特征 ──
+        add(f"($high - $low) / ($close + {EPS})", "hl_range")
+        add(f"$open / (Ref($close, 1) + {EPS}) - 1", "open_gap")
+        add(f"($close - $open) / ($open + {EPS})", "close_vs_open")
+
+        # ── 加速/减速 ──
+        for p in [3, 5, 10, 20]:
+            add(f"($close / Ref($close, {p}) - 1) - Ref($close / Ref($close, {p}) - 1, {p})", f"accel_{p}")
+
+        # ── 涨跌统计 ──
+        for p in [5, 10, 20]:
+            add(f"Sum(Gt($close, Ref($close, 1)), {p})", f"up_streak_{p}")
+            add(f"Sum(Lt($close, Ref($close, 1)), {p})", f"down_streak_{p}")
+
+        return fields, names
 
     def get_label_config(self):
-        """未来 horizon 根K线收益率 (Qlib 负索引=未来)"""
-        label_expr = f"Ref($close, -{self.horizon}) / Ref($close, -1) - 1"
-        return [label_expr], ["LABEL0"]
-
-    def get_label_config(self):
-        """未来 horizon 根K线收益率 (Qlib 负索引=未来)"""
+        """未来 horizon 根K线收益率"""
         label_expr = f"Ref($close, -{self.horizon}) / Ref($close, -1) - 1"
         return [label_expr], ["LABEL0"]
 
