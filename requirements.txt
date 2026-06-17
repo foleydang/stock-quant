@@ -31,6 +31,13 @@ apscheduler>=3.10
 # === 飞书 Bot ===
 lark-oapi>=1.3
 
+# === AI量化平台 ===
+pyqlib>=0.9  # 微软 Qlib — AI量化研究平台
+ruamel.yaml  # Qlib 依赖
+pydantic>=2.0  # Qlib 依赖
+pydantic-settings>=2.0  # Qlib 依赖
+fire  # Qlib CLI 依赖
+
 # === 配置/工具 ===
 python-dotenv>=1.0
 pyyaml>=6.0
