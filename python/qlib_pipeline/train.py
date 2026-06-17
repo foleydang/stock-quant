@@ -78,7 +78,7 @@ class IntradayHandler(HighFreqGeneralHandler):
         DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
 
     def get_feature_config(self):
-        """基础特征 + 收益率 + 量比 + 波动率 + 均线偏离 (25个)"""
+        """Phase 1 基线 + RSI + MACD (23个)"""
         fields, names = HighFreqGeneralHandler.get_feature_config(self)
         EPS = '1e-6'
 
@@ -90,18 +90,19 @@ class IntradayHandler(HighFreqGeneralHandler):
         for p in [1, 2, 3, 5, 10]:
             add(f"$close / Ref($close, {p}) - 1", f"ret_{p}")
 
-        # ── 量比 (成交放量/缩量) ──
+        # ── 量比 ──
         for p in [5, 10, 20]:
             add(f"$volume / (Mean($volume, {p}) + {EPS}) - 1", f"vol_ratio_{p}")
 
-        # ── 波动率 (收益率的滚动标准差) ──
-        ret1 = "$close / Ref($close, 1) - 1"
-        for p in [5, 10, 20]:
-            add(f"Std({ret1}, {p})", f"vol_{p}")
+        # ── RSI (If 替代 Max 避免 parser 歧义) ──
+        for p in [6, 14]:
+            up = f"If(Gt($close - Ref($close, 1), 0), $close - Ref($close, 1), 0)"
+            down = f"If(Gt(Ref($close, 1) - $close, 0), Ref($close, 1) - $close, 0)"
+            add(f"100 - 100 / (1 + Mean({up}, {p}) / (Mean({down}, {p}) + {EPS}))", f"rsi_{p}")
 
-        # ── 均线偏离 (价格 vs 均线) ──
-        for p in [5, 10, 20, 60]:
-            add(f"$close / Mean($close, {p}) - 1", f"ma_dist_{p}")
+        # ── MACD ──
+        add("EMA($close, 12) - EMA($close, 26)", "macd")
+        add("(EMA($close, 12) - EMA($close, 26)) - EMA(EMA($close, 12) - EMA($close, 26), 9)", "macd_hist")
 
         return fields, names
 
