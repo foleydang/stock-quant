@@ -47,7 +47,7 @@ DAY_LENGTH = 8  # 30分钟K线, 每天4小时 = 8根
 EXPERIMENT_NAME = 'intraday_30min_hf'
 MODEL_DIR = os.path.join(ROOT, 'models', 'qlib_intraday')
 
-START_TIME = '2024-01-02 09:30:00'
+START_TIME = '2020-01-02 09:30:00'
 TRAIN_END = '2026-04-30 15:00:00'
 VAL_END = '2026-05-31 15:00:00'
 END_TIME = '2026-06-16 15:00:00'
@@ -151,7 +151,7 @@ MODEL_CONFIGS = {
 }
 
 
-def get_dataset_config(horizon: int, quick: bool = False):
+def get_dataset_config(horizon: int, quick: bool = False, max_stocks: int = 0):
     handler_kwargs = {
         'start_time': START_TIME, 'end_time': END_TIME,
         'fit_start_time': START_TIME, 'fit_end_time': TRAIN_END,
@@ -161,6 +161,17 @@ def get_dataset_config(horizon: int, quick: bool = False):
     }
     if quick:
         handler_kwargs['instruments'] = 'csi300'
+    if max_stocks > 0:
+        # 从 all.txt 中取前 max_stocks 只股票创建临时文件
+        import tempfile
+        all_path = os.path.expanduser(f'~/.qlib/qlib_data/cn_30min/bin/instruments/all.txt')
+        with open(all_path) as f:
+            lines = [next(f).strip() for _ in range(max_stocks)]
+        tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+        tmp.write('\n'.join(lines))
+        tmp.close()
+        handler_kwargs['instruments'] = tmp.name
+        print(f"   📋 限制股票: {max_stocks} 只")
 
     return {
         'class': 'DatasetH',
@@ -186,6 +197,7 @@ def main():
     parser.add_argument('--bin-dir', default=BIN_DIR, help='Qlib .bin 数据目录')
     parser.add_argument('--horizon', type=int, default=3, help='预测未来几根K线')
     parser.add_argument('--quick', action='store_true', help='快速验证')
+    parser.add_argument('--max-stocks', type=int, default=0, help='限制股票数量 (0=全部)')
     parser.add_argument('--no-backtest', action='store_true', help='跳过回测')
     args = parser.parse_args()
 
@@ -203,7 +215,7 @@ def main():
     qlib.init(provider_uri=args.bin_dir, region=REG_CN, freq=FREQ,
               custom_ops=[Cut, DayLast, FFillNan, IsNull], expression_cache=None)
 
-    dataset_config = get_dataset_config(args.horizon, args.quick)
+    dataset_config = get_dataset_config(args.horizon, args.quick, args.max_stocks)
     model_config = MODEL_CONFIGS[args.model]
 
     print(f"\n📦 模型: {model_config['class']} | 📊 特征: {N_FEAT} | 🎯 标签: 未来{args.horizon}根K线收益率")
@@ -215,6 +227,23 @@ def main():
     with R.start(experiment_name=exp_name):
         model = init_instance_by_config(model_config)
         dataset = init_instance_by_config(dataset_config)
+
+        # ── 数据验证 ──
+        import numpy as np
+        df_check = dataset.prepare('train', col_set=["feature", "label"])
+        lab = df_check['label'].values
+        lab_mean = float(np.nanmean(lab))
+        lab_std = float(np.nanstd(lab))
+        nan_count = int(np.isnan(lab).sum())
+        inf_count = int(np.isinf(lab).sum())
+        print(f"\n🔍 数据验证: {df_check.shape[0]:,} 样本 | label mean={lab_mean:.6f} std={lab_std:.6f} | NaN={nan_count} Inf={inf_count}")
+        if abs(lab_mean) > 1e6 or lab_std > 1e6:
+            print(f"❌ 标签异常 (mean={lab_mean:.2e}, std={lab_std:.2e})！数据可能已损坏")
+            print(f"   建议: 先用 --quick 模式测试 (csi300 50只股票)")
+            sys.exit(1)
+        if nan_count > df_check.shape[0] * 0.5:
+            print(f"❌ NaN 标签过多 ({nan_count}/{df_check.shape[0]})！数据可能已损坏")
+            sys.exit(1)
 
         print(f"\n🏋️ 训练模型...")
         model.fit(dataset)
