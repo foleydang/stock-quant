@@ -78,13 +78,26 @@ class IntradayHandler(HighFreqGeneralHandler):
         DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
 
     def get_feature_config(self):
-        """最优特征集: 10基础 + 收益 + 量比 + RSI + MACD (23个, IC=0.119)"""
-        fields, names = HighFreqGeneralHandler.get_feature_config(self)
+        """最优特征集: 归一化OHLC(带epsilon防除零) + 收益 + 量比 + RSI + MACD (23个, IC=0.119)"""
         EPS = '1e-6'
+        fields, names = [], []
 
         def add(expr, name):
             fields.append(expr)
             names.append(name)
+
+        # ── 归一化 OHLC (带 epsilon 防止停牌脏数据除零) ──
+        # 与 HighFreqGeneralHandler 相同逻辑, 但分母加 EPS
+        for col in self.columns:
+            # 当日归一化: $open / (昨日收盘 + EPS), Cut 去掉前2天
+            add(f"Cut({col} / (DayLast(Ref(FFillNan($close), {self.day_length * 2})) + {EPS}), {self.day_length * 2}, None)", col)
+        for col in self.columns:
+            # 前日归一化: Ref($open, 8) / (昨日收盘 + EPS)
+            add(f"Cut(Ref({col}, {self.day_length}) / (DayLast(Ref(FFillNan($close), {self.day_length})) + {EPS}), {self.day_length * 2}, None)", f"{col}_1")
+
+        # ── 归一化成交量 ──
+        add(f"Cut($volume / (Ref(DayLast(Mean($volume, {self.day_length * 30})), {self.day_length}) + {EPS}), {self.day_length * 2}, None)", "$volume")
+        add(f"Cut(Ref($volume, {self.day_length}) / (Ref(DayLast(Mean($volume, {self.day_length * 30})), {self.day_length}) + {EPS}), {self.day_length * 2}, None)", "$volume_1")
 
         # ── 收益率 (短周期动量) ──
         for p in [1, 2, 3, 5, 10]:
