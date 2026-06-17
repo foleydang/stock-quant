@@ -230,27 +230,23 @@ def main():
         if not args.no_backtest:
             print(f"\n📈 回测...")
             try:
-                # 加载预测信号, 按日聚合 (取每天最后一根30min预测)
+                # 加载预测信号, 按日聚合
                 pred = recorder.load_object("pred.pkl")
-                daily_pred = pred.groupby(level='datetime').apply(
-                    lambda x: x.sort_values('datetime').iloc[-1]
-                )
+                daily_pred = pred.groupby('datetime').mean()
                 print(f"  日频信号: {len(daily_pred)} 天")
 
-                # 简单回测: 每天选 top 50 持仓, 等权重
-                daily_returns = []
-                for dt in daily_pred.index:
-                    top = daily_pred.loc[dt].nlargest(50, 'score')
-                    ret = top['score'].mean()  # 简化: 用信号均值近似收益
-                    daily_returns.append({'date': dt, 'return': ret})
-
+                # 简单回测指标
                 import pandas as pd
-                df = pd.DataFrame(daily_returns)
-                df['cum_return'] = (1 + df['return']).cumprod()
-                print(f"  累计收益: {df['cum_return'].iloc[-1]:.4f}")
-                print(f"  日均收益: {df['return'].mean():.6f}")
-                print(f"  夏普比率: {df['return'].mean() / (df['return'].std() + 1e-6) * (252**0.5):.2f}")
+                mean_sig = daily_pred.mean()
+                std_sig = daily_pred.std()
+                sharpe = mean_sig / (std_sig + 1e-6) * (252**0.5)
+                cum = (1 + daily_pred).prod()
+                print(f"  累计复合: {cum:.4f}")
+                print(f"  日均信号: {mean_sig:.6f}")
+                print(f"  信号夏普: {sharpe:.2f}")
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print(f"  ⚠️ 回测跳过: {e}")
 
         os.makedirs(MODEL_DIR, exist_ok=True)
