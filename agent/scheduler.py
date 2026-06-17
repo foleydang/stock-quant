@@ -185,6 +185,11 @@ def _llm_analyze_alert(alert: dict, ta: dict, news: Optional[dict] = None, posit
             "3. 如果有新闻驱动，说明是利好还是利空\n"
             "4. 每条建议不超过30字\n"
             "5. 用emoji标记：🟢看涨 🔴看跌 ⚠️风险 💡机会 🛡️防守 🎯目标\n"
+            "6. 建议必须与异动类型一致：\n"
+            "   - 接近压力位 → 说压力位风险，不要说'近支撑'\n"
+            "   - 接近支撑位 → 说支撑位机会，不要说'近压力'\n"
+            "   - 大跌/放量大跌 → 说风险控制，不要盲目乐观\n"
+            "   - 大涨/放量大涨 → 说追高风险，不要盲目看多\n"
         )
         if is_etf:
             system_prompt += (
@@ -384,7 +389,7 @@ def _generate_action_hint(alert: dict, ta: dict, position_info: dict = None) -> 
 
 
 def morning_alert():
-    """盘前提醒 9:25 - 行情 + 重要新闻 + 操作建议"""
+    """盘前提醒 9:25 - 持仓分析 + 关键位 + AI新闻摘要"""
     logger.info("盘前提醒触发")
 
     # 获取自选股行情
@@ -402,7 +407,42 @@ def morning_alert():
         except Exception as e:
             logger.warning(f"获取自选行情失败 {w['symbol']}: {e}")
 
-    # 搜索重要财经新闻（华尔街见闻API）
+    # 获取持仓股技术分析（支撑/压力位 + 信号）
+    position_advice = []
+    try:
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT symbol, stock_name, shares, cost_price FROM positions WHERE shares > 0")
+        positions = cursor.fetchall()
+        conn.close()
+        if positions:
+            from technical_indicators import get_technical_analysis
+            for sym, name, shares, cost in positions:
+                try:
+                    ta = get_technical_analysis(sym)
+                    if 'error' not in ta:
+                        current = ta['current']
+                        profit_pct = (current - cost) / cost * 100
+                        is_hk = sym.endswith('.HK')
+                        currency = 'HK$' if is_hk else '¥'
+                        advice = {
+                            'symbol': sym, 'name': name, 'shares': shares,
+                            'cost': cost, 'current': current,
+                            'profit_pct': profit_pct, 'currency': currency,
+                            'supports': ta.get('supports', [])[:2],
+                            'resistances': ta.get('resistances', [])[:2],
+                            'action_hint': ta.get('action_hint', ''),
+                            'near_support': any(abs(current - s) / current < 0.02 for s in ta.get('supports', [])),
+                            'near_resistance': any(abs(current - r) / current < 0.02 for r in ta.get('resistances', [])),
+                        }
+                        position_advice.append(advice)
+                except Exception as e:
+                    logger.warning(f"持仓分析失败 {sym}: {e}")
+    except Exception as e:
+        logger.warning(f"持仓查询失败: {e}")
+
+    # 搜索重要财经新闻
     news_headlines = []
     try:
         import requests as req
@@ -426,19 +466,58 @@ def morning_alert():
     except Exception as e:
         logger.warning(f"盘前新闻搜索失败: {e}")
 
+    # AI 新闻摘要（用LLM提炼关键信息）
+    news_summary = ''
+    if news_headlines:
+        try:
+            from llm_client import _call_dashscope_chat, is_available as _avail
+            if _avail():
+                msgs = [
+                    {"role": "system", "content": "你是财经助手，用3-4句话总结今日盘前要闻，每条不超过30字，用emoji标记方向。"},
+                    {"role": "user", "content": "今日新闻:\n" + '\n'.join(news_headlines[:6])}
+                ]
+                result = _call_dashscope_chat(msgs, max_tokens=150, temperature=0.3)
+                if result:
+                    news_summary = result.strip()
+        except Exception as e:
+            logger.warning(f"AI新闻摘要失败: {e}")
+
     # 构建消息
     lines = ["**☀️ 盘前提醒**\n"]
-    lines.append(f"日期: {datetime.now().strftime('%Y-%m-%d')}\n\n")
+    lines.append(f"日期: {datetime.now().strftime('%Y-%m-%d %A')}\n\n")
+
+    # 持仓关注
+    if position_advice:
+        lines.append("**📊 持仓关注**\n")
+        for pa in position_advice:
+            sign = "+" if pa['profit_pct'] >= 0 else ""
+            color = "green" if pa['profit_pct'] >= 0 else "red"
+            emoji = "🟢" if pa['profit_pct'] >= 0 else "🔴" if pa['profit_pct'] < -10 else "🟡"
+            lines.append(f"{emoji} {pa['name']} {pa['currency']}{pa['current']:.2f} "
+                        f"({sign}{pa['profit_pct']:.1f}%)\n")
+            # 关键位提示
+            if pa['near_support'] and pa['supports']:
+                lines.append(f"  ⚠️ 接近支撑 {pa['currency']}{pa['supports'][0]:.2f}，关注企稳信号\n")
+            if pa['near_resistance'] and pa['resistances']:
+                lines.append(f"  🎯 接近压力 {pa['currency']}{pa['resistances'][0]:.2f}，关注突破\n")
+            if pa['action_hint']:
+                lines.append(f"  💡 {pa['action_hint']}\n")
+        lines.append("\n")
+
+    # 自选股行情（精简）
     lines.append("**自选股行情:**\n")
     for wp in watchlist_prices:
         sign = "+" if wp['change_pct'] >= 0 else ""
         color = "green" if wp['change_pct'] >= 0 else "red"
-        # ETF/低价股显示3位小数，普通股票2位
         is_etf_or_low = 'ETF' in wp.get('name', '') or wp['price'] < 1.0
         price_fmt = f"{wp['price']:.3f}" if is_etf_or_low else f"{wp['price']:.2f}"
         lines.append(f"- <font color='{color}'>{wp['name']} ¥{price_fmt} ({sign}{wp['change_pct']:.2f}%)</font>\n")
 
-    if news_headlines:
+    # AI 新闻摘要
+    if news_summary:
+        lines.append("\n---\n**📰 今日要闻**\n")
+        lines.append(f"{news_summary}\n")
+    elif news_headlines:
         lines.append("\n---\n**📰 今日要闻**\n")
         for h in news_headlines[:5]:
             lines.append(f"- {h}\n")
@@ -495,21 +574,216 @@ def _is_alert_duplicate(symbol: str, alert_type: str, change_pct: float) -> bool
     return False
 
 
+def _log_alert(alert_type: str, total_loss_pct: float = None):
+    """记录报警日志，用于冷却判断"""
+    try:
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            "INSERT INTO alert_log (alert_type, total_loss_pct) VALUES (?, ?)",
+            (alert_type, total_loss_pct)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"记录报警日志失败: {e}")
+
+
+def _risk_alert_check():
+    """持仓组合风险预警：单日亏损过大 / 多只同时大跌 / 跌破支撑
+    
+    冷却机制：同类型预警每天最多发1次，除非亏损恶化>2%
+    """
+    try:
+        import sqlite3
+        from datetime import datetime, timedelta
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT symbol, stock_name, shares, cost_price, current_price FROM positions WHERE shares > 0")
+        positions = cursor.fetchall()
+        if not positions or len(positions) < 2:
+            conn.close()
+            return
+
+        # ===== 冷却检查：同类型预警今天发过没？ =====
+        today = datetime.now().strftime('%Y-%m-%d')
+        cursor.execute(
+            "SELECT alert_type, total_loss_pct, created_at FROM alert_log "
+            "WHERE created_at >= ? ORDER BY created_at DESC",
+            (today,)
+        )
+        recent_alerts = cursor.fetchall()
+        conn.close()
+        
+        # 检查今天是否已发过风险预警
+        today_risk_alert = None
+        for alert_type, loss_pct, created_at in recent_alerts:
+            if alert_type == 'risk':
+                today_risk_alert = (loss_pct, created_at)
+                break
+        
+        # 先算总亏损，用于判断是否需要更新
+        total_loss = 0
+        total_cost = 0
+        for sym, name, shares, cost, cur in positions:
+            cost_val = cost * shares
+            total_cost += cost_val
+            pnl_pct = (cur - cost) / cost * 100 if cost > 0 else 0
+            total_loss += pnl_pct * cost_val
+        total_loss_pct = total_loss / total_cost if total_cost > 0 else 0
+        
+        # 如果今天已发过且亏损没恶化>2%，跳过
+        if today_risk_alert and total_loss_pct < -5:
+            last_loss = today_risk_alert[0]
+            if total_loss_pct > last_loss - 2:  # 亏损没恶化2%以上
+                logger.info(f"风险预警已冷却: 今天已发过({last_loss:.1f}%), 当前({total_loss_pct:.1f}%), 差{total_loss_pct - last_loss:.1f}%")
+                return
+            logger.info(f"风险预警恶化: {last_loss:.1f}% → {total_loss_pct:.1f}%，重新推送")
+
+        from technical_indicators import get_technical_analysis
+
+        dropping_count = 0
+        broken_supports = []
+
+        for sym, name, shares, cost, cur in positions:
+
+            # 检查是否大跌 >2%
+            try:
+                from data_fetcher import get_stock_data
+                sd = get_stock_data(sym)
+                if 'error' not in sd and sd.get('change_pct', 0) < -2:
+                    dropping_count += 1
+            except Exception:
+                pass
+
+            # 检查是否跌破关键支撑
+            try:
+                ta = get_technical_analysis(sym)
+                if 'error' not in ta:
+                    supports = ta.get('supports', [])
+                    current = ta.get('current', 0)
+                    if supports and current < supports[0] * 0.98:
+                        is_hk = sym.endswith('.HK')
+                        c = 'HK$' if is_hk else '¥'
+                        broken_supports.append(f"{name} {c}{current:.2f} 跌破支撑 {c}{supports[0]:.2f}")
+            except Exception:
+                pass
+
+        # 触发条件1：总持仓亏损 >5%
+        if total_loss_pct < -5:
+            from card_templates import make_text_card
+            lines = ["**⚠️ 风险预警**\n"]
+            lines.append(f"总持仓亏损 {total_loss_pct:.1f}%，超过5%警戒线\n")
+            lines.append("\n**📋 持仓明细：**\n")
+            # 按亏损从大到小排序
+            stock_details = []
+            for sym, name, shares, cost, cur in positions:
+                pnl = (cur - cost) / cost * 100 if cost > 0 else 0
+                cost_val = cost * shares
+                stock_details.append((name, sym, pnl, cost_val, cur, cost))
+            stock_details.sort(key=lambda x: x[2])
+            
+            for name, sym, pnl, cost_val, cur, cost in stock_details:
+                emoji = "🟢" if pnl >= 0 else "🔴" if pnl < -15 else "🟡"
+                is_hk = sym.endswith('.HK')
+                c = 'HK$' if is_hk else '¥'
+                lines.append(f"{emoji} {name} {c}{cur:.2f} | 成本{c}{cost:.2f} | {pnl:+.1f}%\n")
+            
+            lines.append(f"\n💡 建议：检查是否需要减仓或止损\n")
+            _push_card(make_text_card("".join(lines)))
+            # 记录报警日志，防止重复推送
+            _log_alert('risk', total_loss_pct)
+            logger.info(f"风险预警: 总持仓亏损 {total_loss_pct:.1f}%")
+            return
+
+        # 触发条件2：>2只持仓同时大跌
+        if dropping_count >= 2:
+            from card_templates import make_text_card
+            lines = ["**⚠️ 联动下跌预警**\n"]
+            lines.append(f"{dropping_count}只持仓同时大跌(>2%)，可能系统性风险\n")
+            lines.append(f"建议：检查大盘走势，考虑减仓\n")
+            _push_card(make_text_card("".join(lines)))
+            _log_alert('drop', total_loss_pct)
+            logger.info(f"联动下跌预警: {dropping_count}只")
+            return
+
+        # 触发条件3：持仓跌破支撑
+        if broken_supports:
+            from card_templates import make_text_card
+            lines = ["**⚠️ 跌破支撑预警**\n"]
+            for bs in broken_supports[:3]:
+                lines.append(f"{bs}\n")
+            lines.append("建议：关注是否有效跌破，考虑止损/减仓\n")
+            _push_card(make_text_card("".join(lines)))
+            _log_alert('break_support', total_loss_pct)
+            logger.info(f"跌破支撑预警: {len(broken_supports)}只")
+
+    except Exception as e:
+        logger.warning(f"风险预警检查失败: {e}")
+
+
 def intraday_alert_monitor():
-    """盘中异动轮询（每5分钟）- 只推送涨跌异动，技术信号留给开盘全量检查"""
-    logger.info("盘中异动轮询触发")
+    """盘中异动轮询 - 分时段频率 + 技术信号限频推送"""
+    # ===== 频率控制：高波动时段每5分钟，其他时段每10分钟 =====
+    now = datetime.now()
+    m = now.minute
+    h = now.hour
+    # 早盘高波动 9:30-10:05、下午开盘 13:00-13:30 → 每5分钟
+    is_high_freq = (
+        (h == 9 and m >= 30) or (h == 10 and m <= 5) or
+        (h == 13 and m <= 30)
+    )
+    # 非高波动时段：只在分钟为0的倍数时执行
+    if not is_high_freq and m % 10 != 0:
+        return
+    # 9:30之前不执行（还没开盘）
+    if h == 9 and m < 30:
+        return
+    # 15:00之后不执行
+    if h >= 15:
+        return
+
+    logger.info(f"盘中异动轮询触发 ({h:02d}:{m:02d})")
 
     try:
         from technical_indicators import get_smart_alerts
         alerts = get_smart_alerts()
         if not alerts:
             return
-        # 只推送涨跌异动（技术信号留给开盘/盘后全量检查）
+
+        # 1. 涨跌异动（始终推送）
         move_alerts = [a for a in alerts if a['type'] in ('大涨', '大跌', '放量大涨', '放量大跌', '缩量大涨', '缩量大跌')]
-        if not move_alerts:
+
+        # 2. 技术信号（限频：相同symbol+type每天最多1次，避免频繁推送）
+        tech_alerts = [a for a in alerts if a['type'] == '技术信号']
+        # 3. 接近支撑/压力位（限频：每天最多1次）
+        sr_alerts = [a for a in alerts if a['type'] in ('接近支撑位', '接近压力位')]
+
+        # 合并去重（按symbol优先涨跌，再技术信号，再支撑压力）
+        seen_symbols = set()
+        merged = []
+        for a in move_alerts:
+            if a['symbol'] not in seen_symbols:
+                merged.append(a)
+                seen_symbols.add(a['symbol'])
+        for a in tech_alerts:
+            if a['symbol'] not in seen_symbols and len(a.get('details', '')) > 5:
+                if _is_alert_duplicate(a['symbol'], '技术信号', 0):
+                    continue
+                merged.append(a)
+                seen_symbols.add(a['symbol'])
+        for a in sr_alerts:
+            if a['symbol'] not in seen_symbols:
+                if _is_alert_duplicate(a['symbol'], a['type'], 0):
+                    continue
+                merged.append(a)
+                seen_symbols.add(a['symbol'])
+
+        if not merged:
             return
 
-        for a in move_alerts[:3]:
+        for a in merged[:5]:  # 每次最多推5条
             if _is_alert_duplicate(a['symbol'], a['type'], a.get('change_pct', 0)):
                 logger.debug(f"异动去重: {a['name']} {a['type']} {a.get('change_pct', 0):.2f}% 已推送或跌幅未加深")
                 continue
@@ -559,6 +833,9 @@ def intraday_alert_monitor():
             )
             _push_card(card)
             logger.info(f"⚡ 异动推送: {a['name']} {a['type']} {a.get('change_pct', 0):.2f}%")
+
+        # ===== 风险预警：持仓组合风险 =====
+        _risk_alert_check()
 
     except Exception as e:
         logger.error(f"盘中异动轮询失败: {e}")
@@ -648,6 +925,98 @@ def daily_summary_push():
         t_suggestions=t_data
     )
     _push_card(card)
+
+
+def evening_review():
+    """晚间复盘推送 18:00 - 今日总结 + 明日计划"""
+    logger.info("晚间复盘推送触发")
+
+    try:
+        import sqlite3
+
+        # 1. 持仓今日表现
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT symbol, stock_name, shares, cost_price, current_price FROM positions WHERE shares > 0")
+        positions = cursor.fetchall()
+        conn.close()
+
+        lines = ["**🌙 晚间复盘**\n"]
+        lines.append(f"日期: {datetime.now().strftime('%Y-%m-%d')}\n\n")
+
+        total_profit = 0
+        total_cost_val = 0
+        total_cur_val = 0
+
+        if positions:
+            from technical_indicators import get_technical_analysis
+            position_summary = []
+            for sym, name, shares, cost, cur_price in positions:
+                cost_val = cost * shares
+                cur_val = cur_price * shares
+                daily_pnl = cur_val - cost_val
+                pnl_pct = (cur_price - cost) / cost * 100 if cost > 0 else 0
+                total_profit += daily_pnl
+                total_cost_val += cost_val
+                total_cur_val += cur_val
+
+                is_hk = sym.endswith('.HK')
+                c = 'HK$' if is_hk else '¥'
+
+                # 技术分析
+                ta_info = ''
+                try:
+                    ta = get_technical_analysis(sym)
+                    if 'error' not in ta:
+                        if ta.get('action_hint'):
+                            ta_info = f" | {ta['action_hint']}"
+                except Exception:
+                    pass
+
+                emoji = "🔴" if pnl_pct < -10 else "🟡" if pnl_pct < 0 else "🟢"
+                position_summary.append(
+                    f"{emoji} **{name}** {c}{cur_price:.2f} "
+                    f"({pnl_pct:+.1f}%) ¥{daily_pnl:+,.0f}{ta_info}"
+                )
+
+            total_pnl_pct = (total_cur_val - total_cost_val) / total_cost_val * 100 if total_cost_val > 0 else 0
+            emoji_t = "🔴" if total_pnl_pct < -5 else "🟡" if total_pnl_pct < 0 else "🟢"
+            lines.append(f"**📊 持仓总览**: {emoji_t} 总市值 ¥{total_cur_val:,.0f} "
+                        f"累计盈亏 ¥{total_profit:+,.0f} ({total_pnl_pct:+.1f}%)\n\n")
+
+            for ps in position_summary:
+                lines.append(f"{ps}\n")
+            lines.append("\n")
+        else:
+            lines.append("当前无持仓\n\n")
+
+        # 2. AI 明日展望
+        try:
+            from llm_client import _call_dashscope_chat, is_available as _avail
+            if _avail() and position_summary:
+                context = "持仓: " + ', '.join([
+                    f"{name}({pnl_pct:+.1f}%)"
+                    for _, name, _, _, _, pnl_pct in position_summary
+                ])
+                msgs = [
+                    {"role": "system", "content": "你是交易复盘助手。根据今日持仓表现，给出明天操作建议。3-4条，每条不超过30字，用emoji标记方向。"},
+                    {"role": "user", "content": f"{context}\n请给出明日操作要点。"}
+                ]
+                result = _call_dashscope_chat(msgs, max_tokens=150, temperature=0.3)
+                if result:
+                    lines.append(f"---\n**💡 明日要点**\n{result.strip()}\n")
+            elif not position_summary:
+                lines.append("---\n**💡 明日要点**\n暂无持仓，关注自选股机会\n")
+        except Exception as e:
+            logger.warning(f"AI复盘失败: {e}")
+
+        from card_templates import make_text_card
+        card = make_text_card("".join(lines))
+        _push_card(card)
+        logger.info("晚间复盘推送完成")
+
+    except Exception as e:
+        logger.error(f"晚间复盘推送失败: {e}")
 
 
 def _push_card(card: dict):
@@ -765,19 +1134,12 @@ def setup_scheduler():
         misfire_grace_time=60
     )
 
-    # 盘中异动轮询（每5分钟，交易时段）- 实时检测涨跌异动
+    # 盘中异动轮询（每5分钟，交易时段）- 内部按分时段频率控制
     scheduler.add_job(
         intraday_alert_monitor,
-        CronTrigger(hour='9-11', minute='0/5', day_of_week='mon-fri'),
-        id='intraday_alert_monitor_am',
-        name='盘中异动轮询(上午)',
-        misfire_grace_time=120
-    )
-    scheduler.add_job(
-        intraday_alert_monitor,
-        CronTrigger(hour='13-14', minute='0/5', day_of_week='mon-fri'),
-        id='intraday_alert_monitor_pm',
-        name='盘中异动轮询(下午)',
+        CronTrigger(hour='9-11,13-14', minute='*/5', day_of_week='mon-fri'),
+        id='intraday_alert_monitor',
+        name='盘中异动轮询',
         misfire_grace_time=120
     )
 
@@ -806,31 +1168,40 @@ def setup_scheduler():
         misfire_grace_time=120
     )
 
-    # v8 模型预测推送 — 交易时段每30分钟 (10:00起, 15:00收尾)
+    # 晚间复盘 18:00
+    scheduler.add_job(
+        evening_review,
+        CronTrigger(hour=18, minute=0, day_of_week='mon-fri'),
+        id='evening_review',
+        name='晚间复盘',
+        misfire_grace_time=300
+    )
+
+    # v8 模型预测推送 — 精简为 10:00 / 14:30 / 15:00
     scheduler.add_job(
         v8_intraday_push,
-        CronTrigger(hour='10-11', minute='0,30', day_of_week='mon-fri'),
-        id='v8_intraday_am',
-        name='v8模型预测(上午)',
+        CronTrigger(hour=10, minute=0, day_of_week='mon-fri'),
+        id='v8_intraday_10',
+        name='v8模型预测(10:00)',
         misfire_grace_time=120
     )
     scheduler.add_job(
         v8_intraday_push,
-        CronTrigger(hour='13-14', minute='0,30', day_of_week='mon-fri'),
-        id='v8_intraday_pm',
-        name='v8模型预测(下午)',
+        CronTrigger(hour=14, minute=30, day_of_week='mon-fri'),
+        id='v8_intraday_1430',
+        name='v8模型预测(14:30)',
         misfire_grace_time=120
     )
     scheduler.add_job(
         v8_intraday_push,
-        CronTrigger(hour='15', minute='0', day_of_week='mon-fri'),
+        CronTrigger(hour=15, minute=0, day_of_week='mon-fri'),
         id='v8_intraday_close',
         name='v8模型预测(收盘)',
         misfire_grace_time=120
     )
 
-    logger.info("定时任务已配置: 盘前9:25, 上午开盘9:30, 下午开盘13:00, "
-               "盘后15:05, 异动轮询每5分钟, v8预测每30分钟")
+    logger.info("定时任务已配置: 盘前9:25, 开盘9:30/13:00, 盘后15:05, "
+               "晚间18:00, 异动轮询(分时段频率), v8预测(10:00/14:30/15:00)")
 
 
 def start_scheduler():

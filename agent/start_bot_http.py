@@ -105,6 +105,7 @@ def on_message_receive(data: P2ImMessageReceiveV1) -> None:
 
     message_id = message.message_id
     chat_id = message.chat_id
+    sender_id = str(sender.sender_id) if sender.sender_id else None
     chat_type = message.chat_type
     logger.info(f"✓✓ 收到飞书消息: chat_id={chat_id}, chat_type={chat_type}, text={text}")
 
@@ -113,7 +114,7 @@ def on_message_receive(data: P2ImMessageReceiveV1) -> None:
             SimpleRateLimiter.acquire()  # 限速：防止并发API调用
             from bot_server import process_message
             from feishu_client import reply_card
-            card = process_message(text)
+            card = process_message(text, user_id=sender_id)
             if card:
                 card_str = json.dumps(card, ensure_ascii=False)
                 logger.info(f"✓✓ 回复卡片: {card_str[:300]}")

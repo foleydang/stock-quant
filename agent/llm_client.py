@@ -77,9 +77,10 @@ def understand_intent(text: str) -> Dict:
     return {"intent": "chat", "symbol": None, "params": {"raw_text": text}}
 
 
-def chat_response(text: str, context: dict = None) -> str:
-    """自由对话 - 用 LLM 回答金融相关问题"""
+def chat_response(text: str, context: dict = None, user_id: str = None) -> str:
+    """自由对话 - 用 LLM 回答金融相关问题，支持持久化对话历史"""
     from datetime import datetime
+    import sqlite3, os
     now = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     context_str = ""
@@ -100,13 +101,62 @@ def chat_response(text: str, context: dict = None) -> str:
         "6. 风险提醒用⚠️标注\n"
         f"当前时间：{now}\n"
     )
+
+    # 加载对话历史（最近10轮）
+    history_messages = []
+    if user_id:
+        user_id = str(user_id)
+        try:
+            from config import DB_PATH
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT role, content FROM conversation_history "
+                "WHERE user_id=? ORDER BY created_at ASC LIMIT 20",
+                (user_id,)
+            )
+            for row in cursor.fetchall():
+                history_messages.append({"role": row[0], "content": row[1]})
+            conn.close()
+            if history_messages:
+                logger.info(f"加载对话历史: {len(history_messages)} 条")
+        except Exception as e:
+            logger.warning(f"加载对话历史失败: {e}")
+
     messages = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": system_prompt}
+    ] + history_messages + [
         {"role": "user", "content": f"{text}\n{context_str if context_str else ''}"}
     ]
 
     result = _call_dashscope_chat(messages, max_tokens=800, temperature=0.8)
     logger.info(f"Chat LLM 回复: {(result or 'fallback')[:200]}")
+
+    # 保存对话到数据库
+    if user_id and result:
+        user_id = str(user_id)
+        try:
+            from config import DB_PATH
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute(
+                "INSERT INTO conversation_history (user_id, role, content) VALUES (?, ?, ?)",
+                (user_id, "user", text)
+            )
+            conn.execute(
+                "INSERT INTO conversation_history (user_id, role, content) VALUES (?, ?, ?)",
+                (user_id, "assistant", result)
+            )
+            # 清理旧记录：每个用户最多保留20条
+            conn.execute(
+                "DELETE FROM conversation_history WHERE user_id=? AND id NOT IN "
+                "(SELECT id FROM conversation_history WHERE user_id=? ORDER BY created_at DESC LIMIT 20)",
+                (user_id, user_id)
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"保存对话历史失败: {e}")
+
     return result or "抱歉，我暂时无法回答这个问题。试试发送「帮助」查看我能做什么"
 
 
