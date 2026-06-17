@@ -78,7 +78,7 @@ class IntradayHandler(HighFreqGeneralHandler):
         DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
 
     def get_feature_config(self):
-        """Phase 1 基线 + RSI + MACD (23个)"""
+        """Phase 3: 基线 + RSI + MACD + 布林带 (25个)"""
         fields, names = HighFreqGeneralHandler.get_feature_config(self)
         EPS = '1e-6'
 
@@ -94,7 +94,7 @@ class IntradayHandler(HighFreqGeneralHandler):
         for p in [5, 10, 20]:
             add(f"$volume / (Mean($volume, {p}) + {EPS}) - 1", f"vol_ratio_{p}")
 
-        # ── RSI (If 替代 Max 避免 parser 歧义) ──
+        # ── RSI ──
         for p in [6, 14]:
             up = f"If(Gt($close - Ref($close, 1), 0), $close - Ref($close, 1), 0)"
             down = f"If(Gt(Ref($close, 1) - $close, 0), Ref($close, 1) - $close, 0)"
@@ -103,6 +103,10 @@ class IntradayHandler(HighFreqGeneralHandler):
         # ── MACD ──
         add("EMA($close, 12) - EMA($close, 26)", "macd")
         add("(EMA($close, 12) - EMA($close, 26)) - EMA(EMA($close, 12) - EMA($close, 26), 9)", "macd_hist")
+
+        # ── 布林带 (价格位置, 归一化到 ~[-1,1]) ──
+        for p in [10, 20]:
+            add(f"($close - Mean($close, {p})) / (2*Std($close, {p}) + {EPS})", f"bb_pos_{p}")
 
         return fields, names
 
