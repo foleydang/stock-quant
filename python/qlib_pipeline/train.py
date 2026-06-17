@@ -140,6 +140,7 @@ def get_dataset_config(model_name: str, quick: bool = False):
         'fit_start_time': START_TIME,
         'fit_end_time': TRAIN_END,
         'instruments': 'all',
+        'freq': FREQ,  # 30分钟, 默认是 day
     }
 
     if quick:
