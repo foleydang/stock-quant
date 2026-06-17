@@ -78,7 +78,7 @@ class IntradayHandler(HighFreqGeneralHandler):
         DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
 
     def get_feature_config(self):
-        """基础特征 + 收益率 + 量比 (18个, 渐进式验证)"""
+        """基础特征 + 收益率 + 量比 + 波动率 + 均线偏离 (25个)"""
         fields, names = HighFreqGeneralHandler.get_feature_config(self)
         EPS = '1e-6'
 
@@ -93,6 +93,15 @@ class IntradayHandler(HighFreqGeneralHandler):
         # ── 量比 (成交放量/缩量) ──
         for p in [5, 10, 20]:
             add(f"$volume / (Mean($volume, {p}) + {EPS}) - 1", f"vol_ratio_{p}")
+
+        # ── 波动率 (收益率的滚动标准差) ──
+        ret1 = "$close / Ref($close, 1) - 1"
+        for p in [5, 10, 20]:
+            add(f"Std({ret1}, {p})", f"vol_{p}")
+
+        # ── 均线偏离 (价格 vs 均线) ──
+        for p in [5, 10, 20, 60]:
+            add(f"$close / Mean($close, {p}) - 1", f"ma_dist_{p}")
 
         return fields, names
 
