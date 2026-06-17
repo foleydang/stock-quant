@@ -26,7 +26,7 @@ from qlib.utils import init_instance_by_config
 from qlib.workflow import R
 from qlib.workflow.record_temp import SignalRecord, PortAnaRecord, SigAnaRecord
 from qlib.contrib.data.highfreq_handler import HighFreqGeneralHandler
-from qlib.contrib.ops.high_freq import Cut
+from qlib.contrib.ops.high_freq import Cut, DayLast, FFillNan, IsNull
 from qlib.data.dataset import DatasetH
 
 # ============ 配置 ============
@@ -228,11 +228,13 @@ def main():
         print(f" ⚡ 快速验证模式")
     print(f"{'='*60}")
 
-    # 初始化 Qlib
+    # 初始化 Qlib (注册高频算子 Cut)
     qlib.init(
         provider_uri=args.bin_dir,
         region=REG_CN,
         freq=FREQ,
+        custom_ops=[Cut, DayLast, FFillNan, IsNull],
+        expression_cache=None,
     )
 
     dataset_config = get_dataset_config(args.quick)
