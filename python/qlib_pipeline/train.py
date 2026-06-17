@@ -27,7 +27,6 @@ from qlib.workflow import R
 from qlib.workflow.record_temp import SignalRecord, PortAnaRecord, SigAnaRecord
 from qlib.contrib.data.highfreq_handler import HighFreqGeneralHandler
 from qlib.contrib.ops.high_freq import Cut, DayLast, FFillNan, IsNull
-from qlib.data.dataset.handler import check_transform_proc
 from qlib.data.dataset import DatasetH
 
 # ============ 配置 ============
