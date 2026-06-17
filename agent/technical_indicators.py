@@ -307,7 +307,8 @@ def calc_volume_ratio(kline: List[Dict], period: int = 5) -> float:
 # ========== 支撑压力位 ==========
 
 def calc_support_resistance(kline: List[Dict], levels: int = 3, cost_price: float = None,
-                            is_etf: bool = False, is_hk: bool = False) -> Dict:
+                            is_etf: bool = False, is_hk: bool = False,
+                            current_price: float = None) -> Dict:
     """计算支撑位和压力位
     
     基于多源融合：
@@ -318,6 +319,8 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3, cost_price: floa
     5. 持仓成本价（持仓者的心理关口）
     
     规则：支撑 < 当前价（差距>1%，ETF用0.3%），压力 > 当前价（差距>1%，ETF用0.3%）
+    
+    current_price: 可选，传入实时价格替代K线收盘价，避免K线数据滞后导致支撑压力位失真
     """
     if len(kline) < 20:
         return {'supports': [], 'resistances': []}
@@ -327,7 +330,7 @@ def calc_support_resistance(kline: List[Dict], levels: int = 3, cost_price: floa
     highs = [k['high'] for k in recent]
     lows = [k['low'] for k in recent]
     volumes = [k.get('volume', 0) for k in recent]
-    current = closes[-1]
+    current = current_price if current_price is not None else closes[-1]
     
     # ETF波动小，用更小的最小间距（0.3% vs 1%），否则会过滤掉所有有效支撑压力位
     min_gap_pct = 0.003 if is_etf else 0.01
@@ -609,33 +612,32 @@ def get_technical_analysis(symbol: str) -> Dict:
     sr = calc_support_resistance(kline, cost_price=cost_price, is_etf=is_etf, is_hk=is_hk)
     sr['current'] = final_current
 
-    # 如果实时价明显高于K线收盘价（盘中缺今天数据），局部高点可能低于实时价
-    # 需要重新校验：确保支撑位低于实时价，压力位高于实时价
-    # 只在实时价 > K线收盘时触发（正常盘中场景），实时价低于收盘时通常是数据源问题（如港股）
-    if rt_current is not None and rt_current > current and (rt_current - current) / current > 0.005:
-        # 实时价和K线收盘价差距>0.5%，说明盘中数据缺失
-        sr['supports'] = [s for s in sr.get('supports', []) if s < final_current]
-        sr['resistances'] = [r for r in sr.get('resistances', []) if r > final_current]
+    # 如果实时价与K线收盘价差距>0.5%，用实时价重新计算支撑压力位
+    # 避免K线数据滞后导致支撑压力位失真
+    if rt_current is not None and abs(rt_current - current) / current > 0.005:
+        # 保存旧支撑压力位（基于K线收盘价），用于支撑/压力互换
+        old_supports = sr.get('supports', [])
+        old_resistances = sr.get('resistances', [])
 
-        # 用实时数据补充压力位（今天的最高价等）
+        # 用实时价重新计算支撑压力位
+        sr = calc_support_resistance(kline, cost_price=cost_price, is_etf=is_etf, is_hk=is_hk,
+                                     current_price=final_current)
+        sr['current'] = final_current
+
+        # 跌破的支撑位 → 变成压力位（支撑变压力）
+        broken_supports = [s for s in old_supports if s >= final_current]
+        if broken_supports:
+            sr['resistances'] = sorted(set(sr['resistances'] + broken_supports))[:3]
+        # 突破的压力位 → 变成支撑位（压力变支撑）
+        broken_resistances = [r for r in old_resistances if r <= final_current]
+        if broken_resistances:
+            sr['supports'] = sorted(set(sr['supports'] + broken_resistances), reverse=True)[:3]
+
+        # 用实时数据补充（今天的最高/最低价）
         if rt_data and rt_data.get('high') and rt_data['high'] > final_current:
-            sr['resistances'] = sorted(set(sr['resistances'] + [rt_data['high']]))
-
-        # 补充不足的位置
-        closes_all = [k['close'] for k in kline]
-        std = math.sqrt(sum((x - sum(closes_all) / len(closes_all)) ** 2 for x in closes_all) / len(closes_all))
-        step = max(final_current * 0.02, 2 * std)
-
-        for i in range(1, 4):
-            s = final_current - i * step
-            if s > 0 and len(sr['supports']) < 3:
-                sr['supports'].append(round(s, 2))
-        sr['supports'] = sorted(sr['supports'], reverse=True)[:3]
-
-        for i in range(1, 4):
-            r = final_current + i * step
-            if len(sr['resistances']) < 3:
-                sr['resistances'].append(round(r, 2))
+            sr['resistances'] = sorted(set(sr['resistances'] + [rt_data['high']]))[:3]
+        if rt_data and rt_data.get('low') and rt_data['low'] < final_current:
+            sr['supports'] = sorted(set(sr['supports'] + [rt_data['low']]), reverse=True)[:3]
         sr['resistances'] = sorted(sr['resistances'])[:3]
 
     # 动态阈值

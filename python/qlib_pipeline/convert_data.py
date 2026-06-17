@@ -65,7 +65,11 @@ def export_to_csv(db_path: str, table: str, out_dir: str):
 
 def convert_to_bin(csv_dir: str, bin_dir: str, freq: str):
     """调用 Qlib dump_bin 转换为 .bin 格式"""
-    from scripts.dump_bin import DumpBinAll
+    import subprocess, shutil
+
+    # 使用本地 dump_bin.py 副本
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    dump_bin_script = os.path.join(script_dir, 'dump_bin.py')
 
     os.makedirs(bin_dir, exist_ok=True)
 
@@ -73,15 +77,15 @@ def convert_to_bin(csv_dir: str, bin_dir: str, freq: str):
     print(f"  源: {csv_dir}")
     print(f"  目标: {bin_dir}")
 
-    d = DumpBinAll(
-        csv_path=csv_dir,
-        qlib_dir=bin_dir,
-        freq=freq,
-        date_field_name='date',
-        symbol_field_name='symbol',
-        include_fields=['open', 'high', 'low', 'close', 'volume', 'factor'],
-    )
-    d.dump()
+    cmd = [
+        sys.executable, dump_bin_script, 'dump_all',
+        '--data_path', csv_dir,
+        '--qlib_dir', bin_dir,
+        '--freq', freq,
+        '--max_workers', '1',
+        '--include_fields', 'open,high,low,close,volume,factor',
+    ]
+    subprocess.run(cmd, check=True)
 
     # 计算大小
     total_size = 0

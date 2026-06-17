@@ -567,8 +567,9 @@ def make_technical_card(data: dict) -> dict:
         j_color = "red" if kdj_j > 100 else "green" if kdj_j < 0 else "default"
         indicators.append(f"**KDJ-J**\n<font color='{j_color}'>{kdj_j:.1f}</font>")
 
+    # 量比（0.0表示数据缺失，不显示）
     vol_ratio = data.get('volume_ratio')
-    if vol_ratio:
+    if vol_ratio and vol_ratio > 0.01:
         vol_color = "red" if vol_ratio > 2 else "default"
         indicators.append(f"**量比**\n<font color='{vol_color}'>{vol_ratio:.1f}</font>")
 
@@ -612,7 +613,13 @@ def make_technical_card(data: dict) -> dict:
     else:
         elements.append({"tag": "markdown", "content": "*当前无重要技术信号*"})
 
-    # 支撑压力位（飞书table）
+    # 消息面（提前到支撑压力位之前，更显眼）
+    news_hint = data.get('news_hint', '')
+    if news_hint:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": news_hint})
+
+    # 支撑压力位
     supports = data.get('supports', [])
     resistances = data.get('resistances', [])
     if supports or resistances:
@@ -634,19 +641,23 @@ def make_technical_card(data: dict) -> dict:
         signal = lgbm.get('signal', '')
         win_rate = lgbm.get('win_rate', 0)
         prob_color = 'red' if up_prob > 0.5 else 'green' if up_prob < 0.5 else 'default'
+        
+        # 一致性检查：AI预测 vs 技术信号
+        is_bearish = any('空头' in s or '死叉' in s for s in signals)
+        is_bullish = any('多头' in s or '金叉' in s for s in signals)
+        conflict_note = ''
+        if signal == '看涨' and is_bearish:
+            conflict_note = '\n⚠️ 与技术面冲突，仅供参考'
+        elif signal == '看跌' and is_bullish:
+            conflict_note = '\n⚠️ 与技术面冲突，仅供参考'
+        
         elements.append({"tag": "column_set", "flex_mode": "bisect", "background_style": "grey",
             "columns": [
                 {"tag": "column", "width": "weighted", "weight": 1,
-                 "elements": [{"tag": "markdown", "content": f"**🤖 AI预测**\n<font color='{prob_color}'>{signal} ({up_prob:.0%})</font>"}]},
+                 "elements": [{"tag": "markdown", "content": f"**🤖 AI预测**\n<font color='{prob_color}'>{signal} ({up_prob:.0%})</font>{conflict_note}"}]},
                 {"tag": "column", "width": "weighted", "weight": 1,
                  "elements": [{"tag": "markdown", "content": f"**历史胜率**\n{win_rate:.1%}"}]},
             ]})
-
-    # 新闻面
-    news_hint = data.get('news_hint', '')
-    if news_hint:
-        elements.append({"tag": "hr"})
-        elements.append({"tag": "markdown", "content": news_hint})
 
     elements.append({"tag": "note", "elements": [{"tag": "plain_text", "content": "技术面+消息面+LLM | ⚠️ 不构成投资建议"}]})
 

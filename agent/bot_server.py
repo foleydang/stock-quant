@@ -26,7 +26,7 @@ sys.path.insert(0, PYTHON_DIR)
 
 from config import (
     FEISHU_APP_ID, FEISHU_APP_SECRET, FEISHU_VERIFICATION_TOKEN,
-    FEISHU_ENCRYPT_KEY, BOT_PORT,
+    FEISHU_ENCRYPT_KEY, BOT_PORT, DB_PATH,
 )
 from intent_router import classify_intent, llm_classify
 from data_fetcher import (
@@ -55,24 +55,54 @@ from llm_client import is_available, chat_response
 
 logger = logging.getLogger("feishu_bot")
 
+# ========== 简单内存缓存（避免重复计算） ==========
+import time as _time
+_cache = {}  # {key: (value, expiry_time)}
+
+def _cached(key, ttl_seconds=30):
+    """缓存装饰器，ttl_seconds内重复调用直接返回缓存"""
+    now = _time.time()
+    if key in _cache:
+        val, expiry = _cache[key]
+        if now < expiry:
+            return val
+    return None
+
+def _cache_set(key, value, ttl_seconds=30):
+    _cache[key] = (value, _time.time() + ttl_seconds)
+
 # ========== 股票深度分析处理 ==========
 
 def _build_stock_deep(symbol: str) -> dict:
     """
     构建深度分析卡片：技术指标 + 消息面 + LGBM预测 + 操作建议
-    复用原有 technical 意图的完整逻辑
+    并行执行以降低延迟，单个数据源失败不影响整体
+    30秒内重复查询同一股票直接返回缓存
     """
+    import concurrent.futures
+    
+    # 缓存检查
+    cache_key = f"stock_deep:{symbol}"
+    cached = _cached(cache_key, ttl_seconds=30)
+    if cached:
+        logger.info(f"缓存命中: {symbol}")
+        return cached
+    
+    # 1. 技术分析（必须，串行先跑）
     data = get_technical_analysis(symbol)
     if 'error' in data:
         return make_text_card(f"技术分析失败: {data['error']}")
 
     name = data.get('name', symbol)
 
-    # 注入消息面
-    try:
-        from scheduler import _search_stock_news_brief
-        news_data = _search_stock_news_brief(symbol, name)
-        if news_data and news_data.get('headlines'):
+    # 2. 并行获取：消息面 + LGBM预测 + 操作建议
+    def _fetch_news():
+        """获取消息面 + LLM情绪分析"""
+        try:
+            from scheduler import _search_stock_news_brief
+            news_data = _search_stock_news_brief(symbol, name)
+            if not news_data or not news_data.get('headlines'):
+                return None
             headlines = news_data['headlines'][:5]
             news_line = "**📰 消息面（近3日）**\n"
             for h in headlines:
@@ -90,7 +120,6 @@ def _build_stock_deep(symbol: str) -> dict:
                 s_score = sentiment.get('score', 0.5)
                 s_summary = sentiment.get('summary', '')
                 s_factors = sentiment.get('factors', [])
-
                 s_color = 'red' if s_score > 0.6 else 'green' if s_score < 0.4 else 'default'
                 news_line += f"\n**综合判断**: <font color='{s_color}'>{s_label}（{s_score:.2f}）</font>"
                 if s_summary:
@@ -99,64 +128,151 @@ def _build_stock_deep(symbol: str) -> dict:
                     news_line += "\n" + "\n".join([f"- {f}" for f in s_factors[:3]])
             except Exception:
                 pass
-            data['news_hint'] = news_line
-    except Exception as e:
-        logger.warning(f"消息面注入失败 {symbol}: {e}")
-
-    # 注入LLM推断消息面（新闻搜不到时）
-    if not data.get('news_hint'):
-        try:
-            from llm_client import _call_dashscope_chat, is_available as _avail
-            if _avail():
-                tech_summary = ' | '.join(data.get('signals', [])[:5]) if data.get('signals') else '无重要信号'
-                today_str = datetime.now().strftime('%Y-%m-%d')
-                msgs = [
-                    {"role": "system", "content": "你是金融分析助手，根据今日技术面推断消息面因素。只返回JSON: {\"summary\": \"一句话概括(标注：基于行情推断)\", \"score\": 0-1分数, \"sentiment_label\": \"偏利好/偏利空/中性\", \"factors\": [\"1-2个可能的消息面因素\"]}"},
-                    {"role": "user", "content": f"股票: {name}({symbol}) 当前¥{data.get('current', 0):.2f} 涨跌{data.get('change_pct', 0):.2f}% 信号: {tech_summary} 今日: {today_str}"}
-                ]
-                result = _call_dashscope_chat(msgs, max_tokens=150, temperature=0.3)
-                if result and '{' in result:
-                    start = result.index('{')
-                    end = result.rindex('}') + 1
-                    llm_s = json.loads(result[start:end])
-                    s_color = 'red' if llm_s.get('score', 0.5) > 0.6 else 'green' if llm_s.get('score', 0.5) < 0.4 else 'default'
-                    factors_text = '\n'.join([f"- [推断] {f}" for f in llm_s.get('factors', [])[:3]])
-                    data['news_hint'] = f"**📰 消息面**\n{factors_text}\n**情绪**: <font color='{s_color}'>{llm_s.get('sentiment_label', '中性')}（{llm_s.get('score', 0.5):.1f}）</font> — {llm_s.get('summary', '')}"
+            return news_line
         except Exception as e:
-            logger.warning(f"LLM消息面推断失败: {e}")
+            logger.warning(f"消息面获取失败 {symbol}: {e}")
+            return None
 
-    # 注入LGBM预测
+    def _fetch_lgbm():
+        """获取LGBM预测"""
+        try:
+            from lgbm_backtest import LGBMBacktesterOptimized
+            bt = LGBMBacktesterOptimized()
+            result = bt.run_backtest(symbol)
+            if result and result.get('predictions'):
+                last_pred = result['predictions'][-1]
+                up_prob = last_pred.get('up_probability', 0)
+                win_rate = result.get('summary', {}).get('winRate', 0)
+                signal = '看涨' if up_prob > 0.52 else '看跌' if up_prob < 0.48 else '中性'
+                return {'up_prob': up_prob, 'signal': signal, 'win_rate': win_rate}
+        except Exception as e:
+            logger.warning(f"LGBM预测失败 {symbol}: {e}")
+        return None
+
+    def _fetch_recommendations():
+        """获取操作建议"""
+        try:
+            rec_data = get_action_recommendations(symbol)
+            recs = rec_data.get('recommendations', [])
+            if recs:
+                r = recs[0]
+                action = r.get('action', '持有')
+                confidence = r.get('confidence', '中')
+                reason = r.get('reason', '')
+                t_sugg = r.get('t_suggestion', {})
+                t_line = ''
+                if t_sugg and t_sugg.get('buy_price'):
+                    t_line = f"\n做T: 买¥{t_sugg['buy_price']:.2f} 卖¥{t_sugg.get('sell_price', 0):.2f}"
+                return f"{action}（置信度{confidence}）— {reason}{t_line}"
+        except Exception as e:
+            logger.warning(f"操作建议获取失败 {symbol}: {e}")
+        return None
+
+    # 并行执行，超时10秒
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        future_news = executor.submit(_fetch_news)
+        future_lgbm = executor.submit(_fetch_lgbm)
+        future_recs = executor.submit(_fetch_recommendations)
+        
+        try:
+            news_hint = future_news.result(timeout=10)
+            if news_hint:
+                data['news_hint'] = news_hint
+        except Exception as e:
+            logger.warning(f"消息面超时: {e}")
+        
+        try:
+            lgbm_data = future_lgbm.result(timeout=8)
+            if lgbm_data:
+                data['lgbm'] = lgbm_data
+        except Exception as e:
+            logger.warning(f"LGBM超时: {e}")
+        
+        try:
+            action_hint = future_recs.result(timeout=8)
+            if action_hint:
+                data['action_hint'] = action_hint
+        except Exception as e:
+            logger.warning(f"操作建议超时: {e}")
+
+    # 3. 消息面兜底（新闻搜不到时，用行情数据快速生成摘要）
+    if not data.get('news_hint'):
+        sigs = data.get('signals', [])
+        cp = data.get('change_pct', 0)
+        parts = []
+        if cp > 2: parts.append('今日大幅上涨')
+        elif cp < -2: parts.append('今日大幅下跌')
+        elif cp > 0: parts.append('今日小幅上涨')
+        elif cp < 0: parts.append('今日小幅下跌')
+        else: parts.append('今日平盘')
+        if any('放量' in s for s in sigs): parts.append('成交量放大')
+        elif any('缩量' in s for s in sigs): parts.append('缩量运行')
+        if any('超卖' in s for s in sigs): parts.append('技术面超卖')
+        elif any('超买' in s for s in sigs): parts.append('技术面超买')
+        if any('空头' in s for s in sigs): parts.append('空头排列中')
+        elif any('多头' in s for s in sigs): parts.append('多头排列中')
+        if parts:
+            data['news_hint'] = f"**📰 消息面**\n📊 基于行情推断：{'，'.join(parts)}。\n💡 暂无相关新闻，关注盘后公告"
+
+    card = make_technical_card(data)
+    _cache_set(cache_key, card, ttl_seconds=30)
+    return card
+
+
+def _build_evening_review() -> dict:
+    """构建今日总结（复用晚间复盘逻辑）"""
     try:
-        from lgbm_backtest import LGBMBacktesterOptimized
-        bt = LGBMBacktesterOptimized()
-        result = bt.run_backtest(symbol)
-        if result and result.get('predictions'):
-            last_pred = result['predictions'][-1]
-            up_prob = last_pred.get('up_probability', 0)
-            win_rate = result.get('summary', {}).get('winRate', 0)
-            signal = '看涨' if up_prob > 0.52 else '看跌' if up_prob < 0.48 else '中性'
-            data['lgbm'] = {'up_prob': up_prob, 'signal': signal, 'win_rate': win_rate}
-    except Exception as e:
-        logger.warning(f"LGBM预测注入失败 {symbol}: {e}")
+        import sqlite3
+        from technical_indicators import get_technical_analysis
 
-    # 注入操作建议
-    try:
-        rec_data = get_action_recommendations(symbol)
-        recs = rec_data.get('recommendations', [])
-        if recs:
-            r = recs[0]
-            action = r.get('action', '持有')
-            confidence = r.get('confidence', '中')
-            reason = r.get('reason', '')
-            t_sugg = r.get('t_suggestion', {})
-            t_line = ''
-            if t_sugg and t_sugg.get('buy_price'):
-                t_line = f"\n做T: 买¥{t_sugg['buy_price']:.2f} 卖¥{t_sugg.get('sell_price', 0):.2f}"
-            data['action_hint'] = f"{action}（置信度{confidence}）— {reason}{t_line}"
-    except Exception as e:
-        logger.warning(f"操作建议注入失败 {symbol}: {e}")
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT symbol, stock_name, shares, cost_price, current_price FROM positions WHERE shares > 0")
+        positions = cursor.fetchall()
+        conn.close()
 
-    return make_technical_card(data)
+        lines = ["**📊 今日持仓总结**\n"]
+        lines.append(f"日期: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
+
+        total_profit = 0
+        total_cost_val = 0
+        total_cur_val = 0
+
+        for sym, name, shares, cost, cur_price in positions:
+            cost_val = cost * shares
+            cur_val = cur_price * shares
+            daily_pnl = cur_val - cost_val
+            pnl_pct = (cur_price - cost) / cost * 100 if cost > 0 else 0
+            total_profit += daily_pnl
+            total_cost_val += cost_val
+            total_cur_val += cur_val
+
+            is_hk = sym.endswith('.HK')
+            c = 'HK$' if is_hk else '¥'
+
+            ta_info = ''
+            try:
+                ta = get_technical_analysis(sym)
+                if 'error' not in ta and ta.get('action_hint'):
+                    ta_info = f" | {ta['action_hint']}"
+            except Exception:
+                pass
+
+            emoji = "🔴" if pnl_pct < -10 else "🟡" if pnl_pct < 0 else "🟢"
+            lines.append(f"{emoji} **{name}** {c}{cur_price:.2f} "
+                        f"({pnl_pct:+.1f}%) ¥{daily_pnl:+,.0f}{ta_info}\n")
+
+        if total_cost_val > 0:
+            total_pnl_pct = (total_cur_val - total_cost_val) / total_cost_val * 100
+            emoji_t = "🔴" if total_pnl_pct < -5 else "🟡" if total_pnl_pct < 0 else "🟢"
+            lines.append(f"\n**总市值**: ¥{total_cur_val:,.0f} | "
+                        f"累计盈亏: {emoji_t} ¥{total_profit:+,.0f} ({total_pnl_pct:+.1f}%)\n")
+
+        from card_templates import make_text_card
+        return make_text_card("".join(lines))
+
+    except Exception as e:
+        return make_text_card(f"获取今日总结失败: {e}")
 
 
 # ========== 持仓全家桶处理 ==========
@@ -203,7 +319,7 @@ def _build_market() -> dict:
 
 # ========== 主处理函数 ==========
 
-def process_message(text: str) -> dict:
+def process_message(text: str, user_id: str = None) -> dict:
     """核心处理逻辑：消息 → 意图 → 数据 → 卡片"""
     intent, params = classify_intent(text)
     logger.info(f"意图: {intent}, 参数: {params}")
@@ -256,6 +372,9 @@ def process_message(text: str) -> dict:
 
         # ===== 持仓全家桶 =====
         if intent == 'portfolio':
+            # 今日总结 / 复盘 → 触发晚间复盘逻辑
+            if any(kw in text for kw in ['今日总结', '复盘', '日报', '今日表现', '今天怎么样']):
+                return _build_evening_review()
             return _build_portfolio()
 
         # ===== 大盘全家桶 =====
@@ -296,10 +415,39 @@ def process_message(text: str) -> dict:
                     }
                 except Exception:
                     pass
-                reply = chat_response(text, context)
+                reply = chat_response(text, context, user_id=user_id)
                 return make_chat_card(reply)
             else:
                 return make_help_card()
+
+        # ===== 非chat意图：也保存对话历史，让chat能记住上下文 =====
+        if user_id and intent not in ('chat', 'help'):
+            try:
+                import sqlite3
+                from config import DB_PATH
+                uid = str(user_id)
+                conn = sqlite3.connect(DB_PATH)
+                # 保存用户查询
+                conn.execute(
+                    "INSERT INTO conversation_history (user_id, role, content) VALUES (?, ?, ?)",
+                    (uid, "user", text)
+                )
+                # 保存简要摘要（股票/意图）
+                summary = f"[系统] 用户查询了{intent}: {params.get('symbol', '')} - {params}"
+                conn.execute(
+                    "INSERT INTO conversation_history (user_id, role, content) VALUES (?, ?, ?)",
+                    (uid, "assistant", summary)
+                )
+                # 清理旧记录
+                conn.execute(
+                    "DELETE FROM conversation_history WHERE user_id=? AND id NOT IN "
+                    "(SELECT id FROM conversation_history WHERE user_id=? ORDER BY created_at DESC LIMIT 20)",
+                    (uid, uid)
+                )
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                logger.warning(f"保存上下文失败: {e}")
 
         return make_help_card()
 
