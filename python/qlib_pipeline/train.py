@@ -67,7 +67,7 @@ class IntradayHandler(HighFreqGeneralHandler):
         DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
 
     def get_feature_config(self):
-        """精简 ~35 个归一化特征: 收益/波动/均线/量/技术指标"""
+        """基础特征 + 收益率 + 量比 (18个, 渐进式验证)"""
         fields, names = HighFreqGeneralHandler.get_feature_config(self)
         EPS = '1e-6'
 
@@ -75,57 +75,13 @@ class IntradayHandler(HighFreqGeneralHandler):
             fields.append(expr)
             names.append(name)
 
-        # ── 收益 (短周期, 全部是归一化比例) ──
-        for p in [1, 2, 3, 5, 10, 20]:
+        # ── 收益率 (短周期动量) ──
+        for p in [1, 2, 3, 5, 10]:
             add(f"$close / Ref($close, {p}) - 1", f"ret_{p}")
 
-        # ── 波动率 (收益率的滚动标准差) ──
-        ret1 = "$close / Ref($close, 1) - 1"
-        for p in [5, 10, 20]:
-            add(f"Std({ret1}, {p})", f"vol_{p}")
-
-        # ── 均线偏离 (归一化) ──
-        for p in [5, 10, 20, 60]:
-            add(f"$close / Mean($close, {p}) - 1", f"ma_dist_{p}")
-
-        # ── 均线斜率 ──
-        for p in [5, 10, 20]:
-            add(f"(Mean($close, {p}) - Ref(Mean($close, {p}), 3)) / (Mean($close, {p}) + {EPS})", f"ma_slope_{p}")
-
-        # ── 价格位置 (0~1 归一化) ──
-        for p in [10, 20, 60]:
-            add(f"($close - Min($low, {p})) / (Max($high, {p}) - Min($low, {p}) + {EPS})", f"pos_{p}")
-
-        # ── 振幅 (归一化) ──
-        for p in [10, 20]:
-            add(f"(Max($high, {p}) - Min($low, {p})) / (Mean($close, {p}) + {EPS})", f"range_{p}")
-
-        # ── 量比 ──
+        # ── 量比 (成交放量/缩量) ──
         for p in [5, 10, 20]:
             add(f"$volume / (Mean($volume, {p}) + {EPS}) - 1", f"vol_ratio_{p}")
-
-        # ── 量变化 ──
-        for p in [1, 3, 5]:
-            add(f"$volume / (Ref($volume, {p}) + {EPS}) - 1", f"vol_chg_{p}")
-
-        # ── RSI ──
-        for p in [6, 14]:
-            up = f"If(Gt($close - Ref($close, 1), 0), $close - Ref($close, 1), 0)"
-            down = f"If(Gt(Ref($close, 1) - $close, 0), Ref($close, 1) - $close, 0)"
-            add(f"100 - 100 / (1 + Mean({up}, {p}) / (Mean({down}, {p}) + {EPS}))", f"rsi_{p}")
-
-        # ── MACD ──
-        add("EMA($close, 12) - EMA($close, 26)", "macd")
-        add("(EMA($close, 12) - EMA($close, 26)) - EMA(EMA($close, 12) - EMA($close, 26), 9)", "macd_hist")
-
-        # ── 布林带 ──
-        for p in [10, 20]:
-            add(f"($close - Mean($close, {p})) / (2*Std($close, {p}) + {EPS})", f"bb_pos_{p}")
-
-        # ── 高低价/开盘特征 ──
-        add(f"($high - $low) / ($close + {EPS})", "hl_range")
-        add(f"$open / (Ref($close, 1) + {EPS}) - 1", "open_gap")
-        add(f"($close - $open) / ($open + {EPS})", "close_vs_open")
 
         return fields, names
 
