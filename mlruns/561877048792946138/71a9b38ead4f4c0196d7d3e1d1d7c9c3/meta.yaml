@@ -1,0 +1,14 @@
+artifact_uri: file:///root/github/stock-quant/mlruns/561877048792946138/71a9b38ead4f4c0196d7d3e1d1d7c9c3/artifacts
+end_time: 1781694808519
+entry_point_name: ''
+experiment_id: '561877048792946138'
+lifecycle_stage: active
+run_id: 71a9b38ead4f4c0196d7d3e1d1d7c9c3
+run_name: mlflow_recorder
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1781694735363
+status: 3
+tags: []
+user_id: root

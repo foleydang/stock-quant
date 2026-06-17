@@ -1,0 +1,9 @@
+artifact_location: file:///root/github/stock-quant/mlruns/697971420941897448
+creation_time: 1781694726397
+effective_trace_archival_retention: null
+experiment_id: '697971420941897448'
+last_update_time: 1781694726397
+lifecycle_stage: active
+name: intraday_30min_hf_LightGBM_h3_quick
+trace_location: null
+workspace: default
