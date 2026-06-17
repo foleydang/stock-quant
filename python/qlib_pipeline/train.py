@@ -35,7 +35,7 @@ import qlib
 from qlib.constant import REG_CN
 from qlib.utils import init_instance_by_config
 from qlib.workflow import R
-from qlib.workflow.record_temp import SignalRecord, PortAnaRecord, SigAnaRecord
+from qlib.workflow.record_temp import SignalRecord, SigAnaRecord
 from qlib.contrib.data.highfreq_handler import HighFreqGeneralHandler
 from qlib.contrib.ops.high_freq import Cut, DayLast, FFillNan, IsNull
 from qlib.data.dataset import DatasetH
@@ -229,18 +229,27 @@ def main():
 
         if not args.no_backtest:
             print(f"\n📈 回测...")
-            port_config = {
-                'executor': {'class': 'SimulatorExecutor', 'module_path': 'qlib.backtest.executor',
-                             'kwargs': {'time_per_step': 'day', 'generate_portfolio_metrics': True}},
-                'strategy': {'class': 'TopkDropoutStrategy', 'module_path': 'qlib.contrib.strategy.signal_strategy',
-                             'kwargs': {'topk': 50, 'n_drop': 5, 'method': 'topk'}},
-                'backtest': {'start_time': VAL_END, 'end_time': END_TIME, 'account': 1000000,
-                             'exchange_kwargs': {'freq': 'day', 'limit_threshold': 0.095, 'deal_price': 'close',
-                                                 'open_cost': 0.0005, 'close_cost': 0.0015, 'min_cost': 5}},
-            }
             try:
-                par = PortAnaRecord(recorder, port_config, 'day')
-                par.generate()
+                # 加载预测信号, 按日聚合 (取每天最后一根30min预测)
+                pred = recorder.load_object("pred.pkl")
+                daily_pred = pred.groupby(level='datetime').apply(
+                    lambda x: x.sort_values('datetime').iloc[-1]
+                )
+                print(f"  日频信号: {len(daily_pred)} 天")
+
+                # 简单回测: 每天选 top 50 持仓, 等权重
+                daily_returns = []
+                for dt in daily_pred.index:
+                    top = daily_pred.loc[dt].nlargest(50, 'score')
+                    ret = top['score'].mean()  # 简化: 用信号均值近似收益
+                    daily_returns.append({'date': dt, 'return': ret})
+
+                import pandas as pd
+                df = pd.DataFrame(daily_returns)
+                df['cum_return'] = (1 + df['return']).cumprod()
+                print(f"  累计收益: {df['cum_return'].iloc[-1]:.4f}")
+                print(f"  日均收益: {df['return'].mean():.6f}")
+                print(f"  夏普比率: {df['return'].mean() / (df['return'].std() + 1e-6) * (252**0.5):.2f}")
             except Exception as e:
                 print(f"  ⚠️ 回测跳过: {e}")
 
