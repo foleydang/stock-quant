@@ -231,7 +231,7 @@ def main():
             print(f"\n📈 回测...")
             port_config = {
                 'executor': {'class': 'SimulatorExecutor', 'module_path': 'qlib.backtest.executor',
-                             'kwargs': {'time_per_step': FREQ, 'generate_portfolio_metrics': True}},
+                             'kwargs': {'time_per_step': 'day', 'generate_portfolio_metrics': True}},
                 'strategy': {'class': 'TopkDropoutStrategy', 'module_path': 'qlib.contrib.strategy.signal_strategy',
                              'kwargs': {'topk': 50, 'n_drop': 5, 'method': 'topk'}},
                 'backtest': {'start_time': VAL_END, 'end_time': END_TIME, 'account': 1000000,
