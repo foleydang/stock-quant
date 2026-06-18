@@ -67,6 +67,8 @@ class IntradayLabelProcessor:
     def __init__(self, horizon=3, eps=1e-6):
         self.horizon = horizon
         self.eps = eps
+        import sys
+        print(f"[IntradayLabelProcessor] INIT horizon={horizon}", file=sys.stderr)
     
     def fit(self, df: 'pd.DataFrame' = None):
         pass  # 不需要 fit
@@ -84,7 +86,9 @@ class IntradayLabelProcessor:
         else:
             label_key = 'LABEL0'
         
+        import sys
         if label_key in df.columns:
+            print(f"[IntradayLabelProcessor] APPLYING label transform, shape={df.shape}", file=sys.stderr)
             if 'instrument' in df.index.names:
                 series = df[label_key]
                 df[label_key] = series.groupby(level='instrument').transform(
@@ -93,6 +97,9 @@ class IntradayLabelProcessor:
             else:
                 df[label_key] = df[label_key].shift(-self.horizon) / (df[label_key].shift(-1) + self.eps) - 1
             df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
+        else:
+            import sys
+            print(f"[IntradayLabelProcessor] SKIP: label_key={label_key} NOT in columns={list(df.columns[:3])}...", file=sys.stderr)
         return df
     
     def is_for_infer(self):
@@ -124,7 +131,7 @@ class IntradayHandler(HighFreqGeneralHandler):
         )
         DataHandlerLP.__init__(
             self, data_loader=data_loader,
-            learn_processors=[{
+            shared_processors=[{
                 'class': 'IntradayLabelProcessor',
                 'module_path': 'qlib_pipeline.train',
                 'kwargs': {'horizon': self.horizon}
