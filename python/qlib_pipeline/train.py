@@ -55,6 +55,43 @@ END_TIME = '2026-06-16 15:00:00'
 N_FEAT = 10  # 默认值, 会被实际特征数覆盖
 
 
+class IntradayLabelProcessor:
+    """Label 处理器: 将 $close 原始值转换为未来收益率
+    
+    Qlib 的 Ref($close, -N) 负偏移表达式在 DatasetH 中不稳定,
+    改为在 Python 侧直接计算 label。
+    """
+    
+    def __init__(self, horizon=3, eps=1e-6):
+        self.horizon = horizon
+        self.eps = eps
+    
+    def __call__(self, df: 'pd.DataFrame') -> 'pd.DataFrame':
+        """
+        df: MultiIndex (instrument, datetime) 或 (datetime, instrument)
+        将 LABEL0 列从 $close 原始值转换为:
+            Close(t+horizon) / Close(t+1) - 1
+        """
+        import pandas as pd
+        label_col = 'LABEL0'
+        if label_col in df.columns:
+            # 按 instrument 分组做 shift (处理跨股票边界)
+            if 'instrument' in df.index.names:
+                df[label_col] = df.groupby(level='instrument')[label_col].transform(
+                    lambda x: x.shift(-self.horizon) / (x.shift(-1) + self.eps) - 1
+                )
+            else:
+                # 如果没有 instrument level, 尝试直接 shift
+                df[label_col] = df[label_col].shift(-self.horizon) / (df[label_col].shift(-1) + self.eps) - 1
+            # 去除无效 label (NaN 和 Inf)
+            df[label_col] = df[label_col].replace([float('inf'), float('-inf')], float('nan'))
+        return df
+    
+    def is_for_infer(self):
+        """learn processor: 训练时也需要用"""
+        return True
+
+
 class IntradayHandler(HighFreqGeneralHandler):
     """丰富的分钟级特征 + 标签处理器 (~120+ features)"""
 
@@ -75,7 +112,11 @@ class IntradayHandler(HighFreqGeneralHandler):
                     'label': (label_fields, label_names)},
             swap_level=False, freq=freq,
         )
-        DataHandlerLP.__init__(self, data_loader=data_loader, **kwargs)
+        DataHandlerLP.__init__(
+            self, data_loader=data_loader,
+            learn_processors=[IntradayLabelProcessor(horizon=self.horizon)],
+            **kwargs
+        )
 
     def get_feature_config(self):
         """最优特征集: 归一化OHLC(带epsilon防除零) + 收益 + 量比 + RSI + MACD (23个, IC=0.119)"""
@@ -120,10 +161,14 @@ class IntradayHandler(HighFreqGeneralHandler):
         return fields, names
 
     def get_label_config(self):
-        """未来 horizon 根K线收益率, 分母加 epsilon 防止停牌脏数据除零"""
-        EPS = '1e-6'
-        label_expr = f"Ref($close, -{self.horizon}) / (Ref($close, -1) + {EPS}) - 1"
-        return [label_expr], ["LABEL0"]
+        """
+        未来 horizon 根K线收益率
+        
+        注意: 不直接使用 Ref($close, -N) 前向引用表达式,
+        因为 Qlib 的 DatasetH 在某些版本下对负偏移 Ref 的求值不稳定。
+        改为返回 $close 原始值, 在 Python 侧计算 label。
+        """
+        return ["$close"], ["LABEL0"]
 
 
 MODEL_CONFIGS = {

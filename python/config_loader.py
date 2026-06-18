@@ -3,7 +3,16 @@
 import os
 import yaml
 
+# 项目根目录 - python/ 的父目录
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
+
+
+def _resolve_path(path: str) -> str:
+    """解析相对路径为绝对路径（相对于项目根目录）"""
+    if not path or os.path.isabs(path):
+        return path
+    return os.path.join(PROJECT_ROOT, path)
 
 _config = None
 
@@ -32,10 +41,10 @@ def get(key, default=None):
 
 # 常用配置（延迟加载）
 def get_base_dir():
-    return get("base.dir")
+    return get("base.dir") or PROJECT_ROOT
 
 def get_db_path():
-    return get("database.path")
+    return _resolve_path(get("database.path"))
 
 def get_available_cash():
     return get("account.available_cash", 150000)
