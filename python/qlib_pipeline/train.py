@@ -289,11 +289,11 @@ MODEL_CONFIGS = {
         'class': 'LGBModel',
         'module_path': 'qlib.contrib.model.gbdt',
         'kwargs': {
-            'loss': 'mse', 'num_leaves': 127, 'max_depth': 9,
-            'learning_rate': 0.001, 'n_estimators': 5000, 'early_stopping_rounds': 200,
-            'subsample': 0.6, 'colsample_bytree': 0.5,
-            'reg_alpha': 0.1, 'reg_lambda': 0.5, 'min_child_samples': 50,
-            'verbosity': -1, 'seed': 42, 'n_jobs': 4,
+            'loss': 'mse', 'num_leaves': 127, 'max_depth': -1,
+            'learning_rate': 0.03, 'n_estimators': 5000, 'early_stopping_rounds': 200,
+            'subsample': 0.6, 'colsample_bytree': 0.6,
+            'reg_alpha': 0.0, 'reg_lambda': 5.0, 'min_child_samples': 50,
+            'min_split_gain': 0.001, 'verbosity': -1, 'seed': 42, 'n_jobs': 4,
         }
     },
     'GRU': {
