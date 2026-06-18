@@ -144,6 +144,11 @@ class IntradayHandler(HighFreqGeneralHandler):
             
             df[label_key] = new_labels
             df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
+            
+            # 清理所有特征列中的 inf (XGBoost 不接受 inf 值)
+            feat_cols = [c for c in df.columns if c != label_key]
+            df[feat_cols] = df[feat_cols].replace([float('inf'), float('-inf')], float('nan'))
+            
             if not self.quiet:
                 print(f"[IntradayHandler] {attr} label fixed, after mean={df[label_key].mean():.6f}, nan={df[label_key].isna().sum()}", file=sys.stderr)
 
