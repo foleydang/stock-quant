@@ -69,9 +69,10 @@ N_FEAT = 0  # 运行时根据实际特征数动态设置
 class IntradayHandler(HighFreqGeneralHandler):
     """丰富的分钟级特征 + 标签处理器 (~120+ features)"""
 
-    def __init__(self, horizon=3, quiet=False, **kwargs):
+    def __init__(self, horizon=3, quiet=False, top_features=None, **kwargs):
         self.horizon = horizon
         self.quiet = quiet
+        self._top_features = set(top_features) if top_features else None
         self.day_length = kwargs.pop('day_length', DAY_LENGTH)
         self.columns = kwargs.pop('columns', ['$open', '$high', '$low', '$close'])
         freq = kwargs.pop('freq', FREQ)
@@ -271,6 +272,13 @@ class IntradayHandler(HighFreqGeneralHandler):
         for p in [5, 10, 20]:
             add(f"($close - Min($low, {p})) / (Max($high, {p}) - Min($low, {p}) + {EPS})", f"hl_pos_{p}")
 
+        # ── 特征筛选 (如果指定了 top_features) ──
+        if self._top_features is not None:
+            filtered = [(f, n) for f, n in zip(fields, names) if n in self._top_features]
+            if filtered:
+                fields, names = zip(*filtered)
+                fields, names = list(fields), list(names)
+
         return fields, names
 
     def get_label_config(self):
@@ -294,6 +302,17 @@ MODEL_CONFIGS = {
             'subsample': 0.6, 'colsample_bytree': 0.6,
             'reg_alpha': 0.0, 'reg_lambda': 5.0, 'min_child_samples': 50,
             'min_split_gain': 0.001, 'verbosity': -1, 'seed': 42, 'n_jobs': 4,
+        }
+    },
+    'XGBoost': {
+        'class': 'XGBModel',
+        'module_path': 'qlib.contrib.model.xgboost',
+        'kwargs': {
+            'objective': 'reg:squarederror', 'max_depth': 8,
+            'learning_rate': 0.03, 'n_estimators': 5000, 'early_stopping_rounds': 200,
+            'subsample': 0.7, 'colsample_bytree': 0.6,
+            'reg_alpha': 0.0, 'reg_lambda': 5.0, 'min_child_weight': 5,
+            'verbosity': 0, 'seed': 42, 'n_jobs': 4,
         }
     },
     'GRU': {
@@ -373,6 +392,8 @@ def main():
     parser.add_argument('--max-stocks', type=int, default=0, help='限制股票数量 (0=全部)')
     parser.add_argument('--no-backtest', action='store_true', help='跳过回测')
     parser.add_argument('--quiet', action='store_true', help='减少输出')
+    parser.add_argument('--feature-limit', type=int, default=0, help='只使用 Top-K 特征 (0=全部, 需先跑 ensemble.py 生成重要性文件)')
+    parser.add_argument('--feature-importance', default='', help='特征重要性 CSV 路径')
     args = parser.parse_args()
 
     if not os.path.exists(args.bin_dir):
@@ -390,6 +411,27 @@ def main():
               custom_ops=[Cut, DayLast, FFillNan, IsNull], expression_cache=None)
 
     dataset_config = get_dataset_config(args.horizon, args.quick, args.max_stocks, args.quiet)
+    
+    # ── 特征筛选: 加载重要性文件, 取 Top-K ──
+    top_features = None
+    if args.feature_limit > 0:
+        fi_path = args.feature_importance or os.path.join(ROOT, 'experiments', 'feature_importance_ensemble.csv')
+        if not os.path.exists(fi_path):
+            fi_path = os.path.join(ROOT, 'experiments', 'feature_importance_h5.csv')
+        if os.path.exists(fi_path):
+            import csv
+            with open(fi_path) as f:
+                rows = list(csv.DictReader(f))
+            # 用 combined 列或 importance 列
+            col = 'combined' if 'combined' in rows[0] else 'importance'
+            rows.sort(key=lambda r: -float(r[col]))
+            top_features = [r['feature'] for r in rows[:args.feature_limit]]
+            print(f"📋 特征筛选: Top-{args.feature_limit} (来自 {fi_path})")
+        else:
+            print(f"⚠️ 特征重要性文件不存在: {fi_path}, 请先运行 ensemble.py")
+    
+    if top_features:
+        dataset_config['kwargs']['handler']['kwargs']['top_features'] = top_features
     model_config = MODEL_CONFIGS[args.model]
 
     t0 = time.time()
@@ -426,6 +468,25 @@ def main():
         print(f"\n🏋️ 训练模型...")
         model.fit(dataset)
         print(f"  训练耗时: {time.time()-t0:.0f}s")
+
+        # ── 特征重要性 (LGBM/XGBoost/CatBoost) ──
+        feature_names = dataset.handler.get_feature_config()[1]
+        if hasattr(model, 'model') and hasattr(model.model, 'feature_importances_'):
+            importances = model.model.feature_importances_
+            ranked = sorted(zip(feature_names, importances), key=lambda x: -x[1])
+            print(f"\n📊 特征重要性 Top 20:")
+            for i, (name, imp) in enumerate(ranked[:20]):
+                bar = '█' * int(imp / ranked[0][1] * 20)
+                print(f"  {i+1:>2}. {name:<25s} {imp:.6f} {bar}")
+            print(f"  ... (共 {len(ranked)} 个特征)")
+            # 保存到文件
+            out_dir = os.path.join(ROOT, 'experiments')
+            os.makedirs(out_dir, exist_ok=True)
+            with open(os.path.join(out_dir, 'feature_importance_h5.csv'), 'w') as f:
+                f.write("feature,importance\n")
+                for name, imp in ranked:
+                    f.write(f"{name},{imp}\n")
+            print(f"  特征重要性已保存: experiments/feature_importance_h5.csv")
 
         recorder = R.get_recorder()
         sr = SignalRecord(model, dataset, recorder)
