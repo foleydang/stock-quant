@@ -86,7 +86,8 @@ class IntradayLabelProcessor:
         
         if label_key in df.columns:
             if 'instrument' in df.index.names:
-                df[label_key] = df.groupby(level='instrument')[label_key].transform(
+                series = df[label_key]
+                df[label_key] = series.groupby(level='instrument').transform(
                     lambda x: x.shift(-self.horizon) / (x.shift(-1) + self.eps) - 1
                 )
             else:
