@@ -73,20 +73,25 @@ class IntradayLabelProcessor:
     
     def __call__(self, df: 'pd.DataFrame') -> 'pd.DataFrame':
         """
-        df: MultiIndex (instrument, datetime)
-        将 LABEL0 列从 $close 原始值转换为:
+        df: MultiIndex (instrument, datetime), columns 是 MultiIndex (group, col_name)
+        将 ('label', 'LABEL0') 列从 $close 原始值转换为:
             Close(t+horizon) / Close(t+1) - 1
         """
         import pandas as pd
-        label_col = 'LABEL0'
-        if label_col in df.columns:
+        # Qlib 的 DataFrame columns 是 MultiIndex, 如 ('label', 'LABEL0')
+        if isinstance(df.columns, pd.MultiIndex):
+            label_key = ('label', 'LABEL0')
+        else:
+            label_key = 'LABEL0'
+        
+        if label_key in df.columns:
             if 'instrument' in df.index.names:
-                df[label_col] = df.groupby(level='instrument')[label_col].transform(
+                df[label_key] = df.groupby(level='instrument')[label_key].transform(
                     lambda x: x.shift(-self.horizon) / (x.shift(-1) + self.eps) - 1
                 )
             else:
-                df[label_col] = df[label_col].shift(-self.horizon) / (df[label_col].shift(-1) + self.eps) - 1
-            df[label_col] = df[label_col].replace([float('inf'), float('-inf')], float('nan'))
+                df[label_key] = df[label_key].shift(-self.horizon) / (df[label_key].shift(-1) + self.eps) - 1
+            df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
         return df
     
     def is_for_infer(self):
