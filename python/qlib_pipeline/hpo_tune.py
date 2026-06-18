@@ -4,11 +4,20 @@
 随机搜索 20 组参数, 记录 IC/RankIC/训练时间
 """
 
-import os, sys, time, json, warnings, argparse, itertools
+import os, sys, time, json, warnings, argparse, io, contextlib
 import numpy as np
 
-warnings.filterwarnings('ignore', category=FutureWarning)
-warnings.filterwarnings('ignore', category=DeprecationWarning)
+np.seterr(all='ignore')
+warnings.filterwarnings('ignore')
+
+_stderr_backup = sys.stderr
+sys.stderr = io.StringIO()
+try:
+    import gym
+except Exception:
+    pass
+finally:
+    sys.stderr = _stderr_backup
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)

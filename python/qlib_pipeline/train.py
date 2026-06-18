@@ -13,13 +13,24 @@ Qlib 分钟级择时训练 — HighFreqGeneralHandler + 自定义标签
   python qlib_pipeline/train.py --horizon 3         # 预测3根K线后
 """
 
-import os, sys, argparse, time, json, copy, warnings
+import os, sys, argparse, time, json, copy, warnings, io, contextlib
+import numpy as np
 
-# 抑制 Qlib 依赖的 FutureWarning/DeprecationWarning (pandas fillna 废弃)
-warnings.filterwarnings('ignore', category=FutureWarning)
-warnings.filterwarnings('ignore', category=DeprecationWarning)
+# 抑制 numpy 除零/自由度警告
+np.seterr(all='ignore')
+warnings.filterwarnings('ignore')
 
-# 抑制 Gym 废弃通知 (gym 直接 print 到 stderr, 不走 warnings 系统)
+# 抑制 Gym 刷屏警告 (gym.__init__ 直接 print 到 stderr)
+_stderr_backup = sys.stderr
+sys.stderr = io.StringIO()
+try:
+    import gym
+except Exception:
+    pass
+finally:
+    sys.stderr = _stderr_backup
+
+# 抑制 Gym 废弃通知 (旧版 gym 兼容)
 try:
     import gym_notices.notices
     gym_notices.notices.notices = {}
