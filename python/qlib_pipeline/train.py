@@ -144,6 +144,8 @@ class IntradayHandler(HighFreqGeneralHandler):
             
             df[label_key] = new_labels
             df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
+            # XGBoost 不接受 NaN 标签, 填 0 (LightGBM 自动忽略 NaN)
+            df[label_key] = df[label_key].fillna(0.0)
             
             # 清理所有特征列中的 inf (XGBoost 不接受 inf 值)
             feat_cols = [c for c in df.columns if c != label_key]
