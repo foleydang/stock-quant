@@ -131,13 +131,43 @@ class IntradayHandler(HighFreqGeneralHandler):
         )
         DataHandlerLP.__init__(
             self, data_loader=data_loader,
-            shared_processors=[{
-                'class': 'IntradayLabelProcessor',
-                'module_path': 'qlib_pipeline.train',
-                'kwargs': {'horizon': self.horizon}
-            }],
             **kwargs
         )
+        
+        # 直接修改 _learn 和 _infer 的 label 列, 绕过 Qlib 的 processor 系统
+        self._fix_label_column()
+
+    def _fix_label_column(self):
+        """
+        将 _learn 和 _infer 中的 label 列从原始 $close 转换为收益率
+        绕过 Qlib 的 processor 系统, 直接修改 DataFrame
+        """
+        import pandas as pd
+        import sys
+        label_key = ('label', 'LABEL0')
+        
+        for attr in ['_learn', '_infer']:
+            df = getattr(self, attr, None)
+            if df is None:
+                continue
+            if not isinstance(df.columns, pd.MultiIndex):
+                print(f"[IntradayHandler] {attr} columns is NOT MultiIndex, skipping", file=sys.stderr)
+                continue
+            if label_key not in df.columns:
+                print(f"[IntradayHandler] {attr} label_key={label_key} not in columns, skipping", file=sys.stderr)
+                continue
+            
+            print(f"[IntradayHandler] Fixing {attr} label, shape={df.shape}, before mean={df[label_key].mean():.4f}", file=sys.stderr)
+            series = df[label_key]
+            if 'instrument' in df.index.names:
+                df[label_key] = series.groupby(level='instrument').transform(
+                    lambda x: x.shift(-self.horizon) / (x.shift(-1) + 1e-6) - 1
+                )
+            else:
+                df[label_key] = series.shift(-self.horizon) / (series.shift(-1) + 1e-6) - 1
+            df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
+            print(f"[IntradayHandler] {attr} label fixed, after mean={df[label_key].mean():.6f}", file=sys.stderr)
+
 
     def get_feature_config(self):
         """最优特征集: 归一化OHLC(带epsilon防除零) + 收益 + 量比 + RSI + MACD (23个, IC=0.119)"""
