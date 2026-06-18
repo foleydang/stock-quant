@@ -140,16 +140,26 @@ class IntradayHandler(HighFreqGeneralHandler):
     def _fix_label_column(self):
         """
         将 _learn 和 _infer 中的 label 列从原始 $close 转换为收益率
-        绕过 Qlib 的 processor 系统, 直接修改 DataFrame
+        直接操作, 绕过 Qlib 的 processor 系统
         """
         import pandas as pd
+        import numpy as np
         import sys
         label_key = ('label', 'LABEL0')
+        
+        # _learn 和 _infer 在 PTYPE_A 下可能是同一个对象, 只处理一次
+        processed_ids = set()
         
         for attr in ['_learn', '_infer']:
             df = getattr(self, attr, None)
             if df is None:
                 continue
+            obj_id = id(df)
+            if obj_id in processed_ids:
+                print(f"[IntradayHandler] {attr} is same object as previous, skipping", file=sys.stderr)
+                continue
+            processed_ids.add(obj_id)
+            
             if not isinstance(df.columns, pd.MultiIndex):
                 print(f"[IntradayHandler] {attr} columns is NOT MultiIndex, skipping", file=sys.stderr)
                 continue
@@ -158,16 +168,18 @@ class IntradayHandler(HighFreqGeneralHandler):
                 continue
             
             print(f"[IntradayHandler] Fixing {attr} label, shape={df.shape}, before mean={df[label_key].mean():.4f}, min={df[label_key].min():.4f}, max={df[label_key].max():.4f}", file=sys.stderr)
-            series = df[label_key]
-            print(f"[IntradayHandler] {attr} index.names={df.index.names}, n_instruments={len(df.index.get_level_values('instrument').unique())}", file=sys.stderr)
-            if 'instrument' in df.index.names:
-                df[label_key] = series.groupby(level='instrument').transform(
-                    lambda x: x.shift(-self.horizon) / (x.shift(-1) + 1e-6) - 1
-                )
-            else:
-                df[label_key] = series.shift(-self.horizon) / (series.shift(-1) + 1e-6) - 1
+            
+            # 使用 pandas 原生 groupby().shift() 而不是 transform
+            close_series = df[label_key]
+            inst_level = 'instrument' if 'instrument' in df.index.names else df.index.names[0]
+            
+            shifted_fwd = close_series.groupby(level=inst_level).shift(-self.horizon)
+            shifted_fwd1 = close_series.groupby(level=inst_level).shift(-1)
+            
+            df[label_key] = shifted_fwd / (shifted_fwd1 + 1e-6) - 1.0
             df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
-            print(f"[IntradayHandler] {attr} label fixed, after mean={df[label_key].mean():.6f}", file=sys.stderr)
+            
+            print(f"[IntradayHandler] {attr} label fixed, after mean={df[label_key].mean():.6f}, nan={df[label_key].isna().sum()}", file=sys.stderr)
 
 
     def get_feature_config(self):
