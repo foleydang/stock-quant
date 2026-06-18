@@ -60,36 +60,40 @@ class IntradayLabelProcessor:
     
     Qlib 的 Ref($close, -N) 负偏移表达式在 DatasetH 中不稳定,
     改为在 Python 侧直接计算 label。
+    
+    继承 qlib 的 Processor 基类以兼容 DataHandlerLP 的 learn_processors。
     """
     
     def __init__(self, horizon=3, eps=1e-6):
         self.horizon = horizon
         self.eps = eps
     
+    def fit(self, df: 'pd.DataFrame' = None):
+        pass  # 不需要 fit
+    
     def __call__(self, df: 'pd.DataFrame') -> 'pd.DataFrame':
         """
-        df: MultiIndex (instrument, datetime) 或 (datetime, instrument)
+        df: MultiIndex (instrument, datetime)
         将 LABEL0 列从 $close 原始值转换为:
             Close(t+horizon) / Close(t+1) - 1
         """
         import pandas as pd
         label_col = 'LABEL0'
         if label_col in df.columns:
-            # 按 instrument 分组做 shift (处理跨股票边界)
             if 'instrument' in df.index.names:
                 df[label_col] = df.groupby(level='instrument')[label_col].transform(
                     lambda x: x.shift(-self.horizon) / (x.shift(-1) + self.eps) - 1
                 )
             else:
-                # 如果没有 instrument level, 尝试直接 shift
                 df[label_col] = df[label_col].shift(-self.horizon) / (df[label_col].shift(-1) + self.eps) - 1
-            # 去除无效 label (NaN 和 Inf)
             df[label_col] = df[label_col].replace([float('inf'), float('-inf')], float('nan'))
         return df
     
     def is_for_infer(self):
-        """learn processor: 训练时也需要用"""
         return True
+    
+    def readonly(self):
+        return False
 
 
 class IntradayHandler(HighFreqGeneralHandler):
@@ -114,7 +118,11 @@ class IntradayHandler(HighFreqGeneralHandler):
         )
         DataHandlerLP.__init__(
             self, data_loader=data_loader,
-            learn_processors=[IntradayLabelProcessor(horizon=self.horizon)],
+            learn_processors=[{
+                'class': 'IntradayLabelProcessor',
+                'module_path': 'qlib_pipeline.train',
+                'kwargs': {'horizon': self.horizon}
+            }],
             **kwargs
         )
 
