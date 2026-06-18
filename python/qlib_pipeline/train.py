@@ -52,68 +52,15 @@ TRAIN_END = '2026-04-30 15:00:00'
 VAL_END = '2026-05-31 15:00:00'
 END_TIME = '2026-06-16 15:00:00'
 
-N_FEAT = 10  # 默认值, 会被实际特征数覆盖
-
-
-class IntradayLabelProcessor:
-    """Label 处理器: 将 $close 原始值转换为未来收益率
-    
-    Qlib 的 Ref($close, -N) 负偏移表达式在 DatasetH 中不稳定,
-    改为在 Python 侧直接计算 label。
-    
-    继承 qlib 的 Processor 基类以兼容 DataHandlerLP 的 learn_processors。
-    """
-    
-    def __init__(self, horizon=3, eps=1e-6):
-        self.horizon = horizon
-        self.eps = eps
-        import sys
-        print(f"[IntradayLabelProcessor] INIT horizon={horizon}", file=sys.stderr)
-    
-    def fit(self, df: 'pd.DataFrame' = None):
-        pass  # 不需要 fit
-    
-    def __call__(self, df: 'pd.DataFrame') -> 'pd.DataFrame':
-        """
-        df: MultiIndex (instrument, datetime), columns 是 MultiIndex (group, col_name)
-        将 ('label', 'LABEL0') 列从 $close 原始值转换为:
-            Close(t+horizon) / Close(t+1) - 1
-        """
-        import pandas as pd
-        # Qlib 的 DataFrame columns 是 MultiIndex, 如 ('label', 'LABEL0')
-        if isinstance(df.columns, pd.MultiIndex):
-            label_key = ('label', 'LABEL0')
-        else:
-            label_key = 'LABEL0'
-        
-        import sys
-        if label_key in df.columns:
-            print(f"[IntradayLabelProcessor] APPLYING label transform, shape={df.shape}", file=sys.stderr)
-            if 'instrument' in df.index.names:
-                series = df[label_key]
-                df[label_key] = series.groupby(level='instrument').transform(
-                    lambda x: x.shift(-self.horizon) / (x.shift(-1) + self.eps) - 1
-                )
-            else:
-                df[label_key] = df[label_key].shift(-self.horizon) / (df[label_key].shift(-1) + self.eps) - 1
-            df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
-        else:
-            import sys
-            print(f"[IntradayLabelProcessor] SKIP: label_key={label_key} NOT in columns={list(df.columns[:3])}...", file=sys.stderr)
-        return df
-    
-    def is_for_infer(self):
-        return True
-    
-    def readonly(self):
-        return False
+N_FEAT = 0  # 运行时根据实际特征数动态设置
 
 
 class IntradayHandler(HighFreqGeneralHandler):
     """丰富的分钟级特征 + 标签处理器 (~120+ features)"""
 
-    def __init__(self, horizon=3, **kwargs):
+    def __init__(self, horizon=3, quiet=False, **kwargs):
         self.horizon = horizon
+        self.quiet = quiet
         self.day_length = kwargs.pop('day_length', DAY_LENGTH)
         self.columns = kwargs.pop('columns', ['$open', '$high', '$low', '$close'])
         freq = kwargs.pop('freq', FREQ)
@@ -160,7 +107,8 @@ class IntradayHandler(HighFreqGeneralHandler):
             if label_key not in df.columns:
                 continue
             
-            print(f"[IntradayHandler] Fixing {attr} label, shape={df.shape}, before mean={df[label_key].mean():.4f}", file=sys.stderr)
+            if not self.quiet:
+                print(f"[IntradayHandler] Fixing {attr} label, shape={df.shape}, before mean={df[label_key].mean():.4f}", file=sys.stderr)
             
             # 按 instrument 分组, 逐组用 numpy 向量化计算
             close_series = df[label_key]
@@ -183,48 +131,93 @@ class IntradayHandler(HighFreqGeneralHandler):
             
             df[label_key] = new_labels
             df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
-            print(f"[IntradayHandler] {attr} label fixed, after mean={df[label_key].mean():.6f}, nan={df[label_key].isna().sum()}", file=sys.stderr)
+            if not self.quiet:
+                print(f"[IntradayHandler] {attr} label fixed, after mean={df[label_key].mean():.6f}, nan={df[label_key].isna().sum()}", file=sys.stderr)
 
 
     def get_feature_config(self):
-        """最优特征集: 归一化OHLC(带epsilon防除零) + 收益 + 量比 + RSI + MACD (23个, IC=0.119)"""
+        """
+        扩展特征集 (~80+ 特征):
+        - 归一化 OHLC (当日 + 前日)
+        - 多周期收益率 (1/2/3/5/8/10/15/20/30 根K线)
+        - 量比 + 量加速度
+        - RSI (6/14/24)
+        - MACD + 信号线 + 柱
+        - 波动率 (滚动std)
+        - 日内位置 (在当日高低价区间的位置)
+        - 布林带 (%B)
+        - 价格加速度
+        """
         EPS = '1e-6'
+        DL = self.day_length
         fields, names = [], []
 
         def add(expr, name):
             fields.append(expr)
             names.append(name)
 
-        # ── 归一化 OHLC (带 epsilon 防止停牌脏数据除零) ──
-        # 与 HighFreqGeneralHandler 相同逻辑, 但分母加 EPS
+        # ── 归一化 OHLC (当日/昨日) ──
         for col in self.columns:
-            # 当日归一化: $open / (昨日收盘 + EPS), Cut 去掉前2天
-            add(f"Cut({col} / (DayLast(Ref(FFillNan($close), {self.day_length * 2})) + {EPS}), {self.day_length * 2}, None)", col)
+            add(f"Cut({col} / (DayLast(Ref(FFillNan($close), {DL * 2})) + {EPS}), {DL * 2}, None)", col)
         for col in self.columns:
-            # 前日归一化: Ref($open, 8) / (昨日收盘 + EPS)
-            add(f"Cut(Ref({col}, {self.day_length}) / (DayLast(Ref(FFillNan($close), {self.day_length})) + {EPS}), {self.day_length * 2}, None)", f"{col}_1")
+            add(f"Cut(Ref({col}, {DL}) / (DayLast(Ref(FFillNan($close), {DL})) + {EPS}), {DL * 2}, None)", f"{col}_1")
 
         # ── 归一化成交量 ──
-        add(f"Cut($volume / (Ref(DayLast(Mean($volume, {self.day_length * 30})), {self.day_length}) + {EPS}), {self.day_length * 2}, None)", "$volume")
-        add(f"Cut(Ref($volume, {self.day_length}) / (Ref(DayLast(Mean($volume, {self.day_length * 30})), {self.day_length}) + {EPS}), {self.day_length * 2}, None)", "$volume_1")
+        add(f"Cut($volume / (Ref(DayLast(Mean($volume, {DL * 30})), {DL}) + {EPS}), {DL * 2}, None)", "$volume")
+        add(f"Cut(Ref($volume, {DL}) / (Ref(DayLast(Mean($volume, {DL * 30})), {DL}) + {EPS}), {DL * 2}, None)", "$volume_1")
 
-        # ── 收益率 (短周期动量) ──
-        for p in [1, 2, 3, 5, 10]:
+        # ── 多周期收益率 (动量) ──
+        for p in [1, 2, 3, 5, 8, 10, 15, 20, 30]:
             add(f"$close / Ref($close, {p}) - 1", f"ret_{p}")
 
+        # ── 收益率加速度 (ret_1 - ret_N) ──
+        for p in [2, 3, 5]:
+            add(f"($close / Ref($close, 1) - 1) - (Ref($close, 1) / Ref($close, {p + 1}) - 1)", f"ret_acc_{p}")
+
         # ── 量比 ──
-        for p in [5, 10, 20]:
+        for p in [3, 5, 8, 10, 20, 30]:
             add(f"$volume / (Mean($volume, {p}) + {EPS}) - 1", f"vol_ratio_{p}")
 
+        # ── 量加速度 ──
+        for p in [3, 5, 10]:
+            add(f"($volume / Ref($volume, 1) - 1) - (Ref($volume, {p}) / Ref($volume, {p + 1}) - 1)", f"vol_acc_{p}")
+
         # ── RSI ──
-        for p in [6, 14]:
+        for p in [6, 14, 24]:
             up = f"If(Gt($close - Ref($close, 1), 0), $close - Ref($close, 1), 0)"
             down = f"If(Gt(Ref($close, 1) - $close, 0), Ref($close, 1) - $close, 0)"
             add(f"100 - 100 / (1 + Mean({up}, {p}) / (Mean({down}, {p}) + {EPS}))", f"rsi_{p}")
 
-        # ── MACD ──
-        add("EMA($close, 12) - EMA($close, 26)", "macd")
-        add("(EMA($close, 12) - EMA($close, 26)) - EMA(EMA($close, 12) - EMA($close, 26), 9)", "macd_hist")
+        # ── MACD (多周期) ──
+        for fast, slow, sig in [(12, 26, 9), (6, 13, 5), (24, 52, 18)]:
+            add(f"EMA($close, {fast}) - EMA($close, {slow})", f"macd_{fast}_{slow}")
+            add(f"(EMA($close, {fast}) - EMA($close, {slow})) - EMA(EMA($close, {fast}) - EMA($close, {slow}), {sig})", f"macd_hist_{fast}_{slow}")
+
+        # ── 波动率 (滚动标准差) ──
+        for p in [5, 10, 20, 40]:
+            add(f"Std($close / Ref($close, 1) - 1, {p})", f"vol_{p}")
+
+        # ── 日内位置特征 ──
+        # 当前价格在日内区间的位置
+        add(f"($close - DayLast(Ref(FFillNan($low), {DL * 2}))) / (DayLast(Ref(FFillNan(FFillNan($high) - FFillNan($low)), {DL * 2})) + {EPS})", "day_pos")
+        # 日内涨跌幅
+        add(f"$close / DayLast(Ref(FFillNan($close), {DL * 2})) - 1", "day_ret")
+        # 日内振幅
+        add(f"(DayLast(Ref(FFillNan($high) - FFillNan($low), {DL * 2}))) / (DayLast(Ref(FFillNan($close), {DL * 2})) + {EPS})", "day_range")
+
+        # ── 布林带 %B ──
+        for p in [20, 40]:
+            ma = f"Mean($close, {p})"
+            std = f"Std($close, {p})"
+            add(f"($close - ({ma} - 2 * {std})) / (4 * ({std} + {EPS}))", f"bb_pct_{p}")
+
+        # ── 高低价差 ──
+        add(f"($high - $low) / ($close + {EPS})", "hl_ratio")
+        add(f"($close - $open) / ($open + {EPS})", "co_ratio")
+
+        # ── 价格与均线偏离 ──
+        for p in [5, 10, 20, 40]:
+            add(f"$close / (Mean($close, {p}) + {EPS}) - 1", f"ma_dev_{p}")
 
         return fields, names
 
@@ -278,13 +271,14 @@ MODEL_CONFIGS = {
 }
 
 
-def get_dataset_config(horizon: int, quick: bool = False, max_stocks: int = 0):
+def get_dataset_config(horizon: int, quick: bool = False, max_stocks: int = 0, quiet: bool = False):
     handler_kwargs = {
         'start_time': START_TIME, 'end_time': END_TIME,
         'fit_start_time': START_TIME, 'fit_end_time': TRAIN_END,
         'instruments': 'all', 'day_length': DAY_LENGTH, 'freq': FREQ,
         'columns': ['$open', '$high', '$low', '$close'],
         'horizon': horizon,
+        'quiet': quiet,
     }
     if quick:
         handler_kwargs['instruments'] = 'csi300'
@@ -326,6 +320,7 @@ def main():
     parser.add_argument('--quick', action='store_true', help='快速验证')
     parser.add_argument('--max-stocks', type=int, default=0, help='限制股票数量 (0=全部)')
     parser.add_argument('--no-backtest', action='store_true', help='跳过回测')
+    parser.add_argument('--quiet', action='store_true', help='减少输出')
     args = parser.parse_args()
 
     if not os.path.exists(args.bin_dir):
@@ -342,18 +337,22 @@ def main():
     qlib.init(provider_uri=args.bin_dir, region=REG_CN, freq=FREQ,
               custom_ops=[Cut, DayLast, FFillNan, IsNull], expression_cache=None)
 
-    dataset_config = get_dataset_config(args.horizon, args.quick, args.max_stocks)
+    dataset_config = get_dataset_config(args.horizon, args.quick, args.max_stocks, args.quiet)
     model_config = MODEL_CONFIGS[args.model]
 
-    print(f"\n📦 模型: {model_config['class']} | 📊 特征: {N_FEAT} | 🎯 标签: 未来{args.horizon}根K线收益率")
-
-    exp_name = f"{EXPERIMENT_NAME}_{args.model}_h{args.horizon}"
-    if args.quick: exp_name += '_quick'
-
     t0 = time.time()
-    with R.start(experiment_name=exp_name):
-        model = init_instance_by_config(model_config)
+    with R.start(experiment_name=f"{EXPERIMENT_NAME}_{args.model}_h{args.horizon}" + ('_quick' if args.quick else '')):
+        # 先创建 dataset, 获取实际特征数
         dataset = init_instance_by_config(dataset_config)
+        n_feat = len(dataset.handler.get_feature_config()[0])
+        
+        # 更新深度学习模型的 d_feat
+        if 'd_feat' in model_config.get('kwargs', {}):
+            model_config['kwargs']['d_feat'] = n_feat
+        
+        print(f"\n📦 模型: {model_config['class']} | 📊 特征: {n_feat} | 🎯 标签: 未来{args.horizon}根K线收益率")
+        
+        model = init_instance_by_config(model_config)
 
         # ── 数据验证 ──
         import numpy as np
@@ -363,7 +362,7 @@ def main():
         lab_std = float(np.nanstd(lab))
         nan_count = int(np.isnan(lab).sum())
         inf_count = int(np.isinf(lab).sum())
-        print(f"\n🔍 数据验证: {df_check.shape[0]:,} 样本 | label mean={lab_mean:.6f} std={lab_std:.6f} | NaN={nan_count} Inf={inf_count}")
+        print(f"🔍 数据验证: {df_check.shape[0]:,} 样本 | label mean={lab_mean:.6f} std={lab_std:.6f} | NaN={nan_count} Inf={inf_count}")
         if abs(lab_mean) > 1e6 or lab_std > 1e6:
             print(f"❌ 标签异常 (mean={lab_mean:.2e}, std={lab_std:.2e})！数据可能已损坏")
             print(f"   建议: 先用 --quick 模式测试 (csi300 50只股票)")
