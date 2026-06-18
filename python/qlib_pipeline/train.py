@@ -140,14 +140,12 @@ class IntradayHandler(HighFreqGeneralHandler):
     def _fix_label_column(self):
         """
         将 _learn 和 _infer 中的 label 列从原始 $close 转换为收益率
-        直接操作, 绕过 Qlib 的 processor 系统
+        用 numpy 逐股票计算, 确保不跨股票边界
         """
-        import pandas as pd
         import numpy as np
         import sys
         label_key = ('label', 'LABEL0')
         
-        # _learn 和 _infer 在 PTYPE_A 下可能是同一个对象, 只处理一次
         processed_ids = set()
         
         for attr in ['_learn', '_infer']:
@@ -156,29 +154,35 @@ class IntradayHandler(HighFreqGeneralHandler):
                 continue
             obj_id = id(df)
             if obj_id in processed_ids:
-                print(f"[IntradayHandler] {attr} is same object as previous, skipping", file=sys.stderr)
                 continue
             processed_ids.add(obj_id)
             
-            if not isinstance(df.columns, pd.MultiIndex):
-                print(f"[IntradayHandler] {attr} columns is NOT MultiIndex, skipping", file=sys.stderr)
-                continue
             if label_key not in df.columns:
-                print(f"[IntradayHandler] {attr} label_key={label_key} not in columns, skipping", file=sys.stderr)
                 continue
             
-            print(f"[IntradayHandler] Fixing {attr} label, shape={df.shape}, before mean={df[label_key].mean():.4f}, min={df[label_key].min():.4f}, max={df[label_key].max():.4f}", file=sys.stderr)
+            print(f"[IntradayHandler] Fixing {attr} label, shape={df.shape}, before mean={df[label_key].mean():.4f}", file=sys.stderr)
             
-            # 使用 pandas 原生 groupby().shift() 而不是 transform
+            # 按 instrument 分组, 逐组用 numpy 向量化计算
             close_series = df[label_key]
             inst_level = 'instrument' if 'instrument' in df.index.names else df.index.names[0]
             
-            shifted_fwd = close_series.groupby(level=inst_level).shift(-self.horizon)
-            shifted_fwd1 = close_series.groupby(level=inst_level).shift(-1)
+            new_labels = close_series.copy()
+            for inst, idx in close_series.groupby(level=inst_level).groups.items():
+                grp = close_series.loc[idx].sort_index(level=1)
+                vals = grp.values.astype(np.float64)
+                n = len(vals)
+                result = np.full(n, np.nan)
+                if n > self.horizon:
+                    n_valid = n - self.horizon
+                    # 向量化: close(t+horizon) / close(t+1) - 1
+                    future_close = vals[self.horizon:self.horizon + n_valid]
+                    next_close = vals[1:1 + n_valid]
+                    mask = (next_close > 0) & (future_close > 0)
+                    result[:n_valid][mask] = future_close[mask] / next_close[mask] - 1.0
+                new_labels.loc[grp.index] = result
             
-            df[label_key] = shifted_fwd / (shifted_fwd1 + 1e-6) - 1.0
+            df[label_key] = new_labels
             df[label_key] = df[label_key].replace([float('inf'), float('-inf')], float('nan'))
-            
             print(f"[IntradayHandler] {attr} label fixed, after mean={df[label_key].mean():.6f}, nan={df[label_key].isna().sum()}", file=sys.stderr)
 
 
@@ -244,7 +248,7 @@ MODEL_CONFIGS = {
             'learning_rate': 0.001, 'n_estimators': 5000, 'early_stopping_rounds': 200,
             'subsample': 0.6, 'colsample_bytree': 0.5,
             'reg_alpha': 0.1, 'reg_lambda': 0.5, 'min_child_samples': 50,
-            'verbosity': 1, 'seed': 42, 'n_jobs': 4,
+            'verbosity': -1, 'seed': 42, 'n_jobs': 4,
         }
     },
     'GRU': {
