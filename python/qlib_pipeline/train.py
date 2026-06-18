@@ -122,11 +122,12 @@ class IntradayHandler(HighFreqGeneralHandler):
                 result = np.full(n, np.nan)
                 if n > self.horizon:
                     n_valid = n - self.horizon
-                    # 向量化: close(t+horizon) / close(t+1) - 1
+                    # close(t+horizon) / close(t) - 1
+                    # h=1: close(t+1)/close(t)-1, h=3: close(t+3)/close(t)-1
                     future_close = vals[self.horizon:self.horizon + n_valid]
-                    next_close = vals[1:1 + n_valid]
-                    mask = (next_close > 0) & (future_close > 0)
-                    result[:n_valid][mask] = future_close[mask] / next_close[mask] - 1.0
+                    cur_close = vals[:n_valid]
+                    mask = (cur_close > 0) & (future_close > 0)
+                    result[:n_valid][mask] = future_close[mask] / cur_close[mask] - 1.0
                 new_labels.loc[grp.index] = result
             
             df[label_key] = new_labels
@@ -218,6 +219,46 @@ class IntradayHandler(HighFreqGeneralHandler):
         # ── 价格与均线偏离 ──
         for p in [5, 10, 20, 40]:
             add(f"$close / (Mean($close, {p}) + {EPS}) - 1", f"ma_dev_{p}")
+
+        # ── KDJ ──
+        for p in [9, 14]:
+            highest = f"Max($high, {p})"
+            lowest = f"Min($low, {p})"
+            rsv = f"100 * ($close - {lowest}) / ({highest} - {lowest} + {EPS})"
+            k = f"Mean({rsv}, 3)"
+            d = f"Mean({k}, 3)"
+            add(k, f"kdj_k_{p}")
+            add(d, f"kdj_d_{p}")
+            add(f"3 * {k} - 2 * {d}", f"kdj_j_{p}")
+
+        # ── 隔夜跳空 ──
+        for col in ['$open']:
+            add(f"({col} / Ref($close, 1) - 1)", "overnight_gap")
+
+        # ── 日内累计收益 ──
+        add(f"$close / DayLast(Ref(FFillNan($open), {DL * 2})) - 1", "intraday_ret")
+
+        # ── 相对强弱 ──
+        for p in [5, 10, 20]:
+            add(f"($close / Ref($close, 1) - 1) - (Mean($close, {p}) / Ref(Mean($close, {p}), 1) - 1)", f"rel_strength_{p}")
+
+        # ── 价格百分位 ──
+        for p in [20, 40]:
+            highest = f"Max($high, {p})"
+            lowest = f"Min($low, {p})"
+            add(f"($close - {lowest}) / ({highest} - {lowest} + {EPS})", f"price_pct_{p}")
+
+        # ── 均线斜率 (均线变化率) ──
+        for p in [5, 10, 20]:
+            add(f"Mean($close, {p}) / Ref(Mean($close, {p}), 1) - 1", f"ma_slope_{p}")
+
+        # ── 量价背离 ──
+        for p in [5, 10, 20]:
+            add(f"($close / Ref($close, {p}) - 1) * ($volume / (Mean($volume, {p}) + {EPS}) - 1)", f"pv_div_{p}")
+
+        # ── 高低价位置 ──
+        for p in [5, 10, 20]:
+            add(f"($close - Min($low, {p})) / (Max($high, {p}) - Min($low, {p}) + {EPS})", f"hl_pos_{p}")
 
         return fields, names
 
