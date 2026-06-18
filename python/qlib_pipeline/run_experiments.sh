@@ -1,10 +1,8 @@
 #!/bin/bash
-# 并行实验运行脚本
+# 并行实验运行脚本 (macOS + Linux 兼容)
 # 用法: bash run_experiments.sh [--quick]
-#   --quick: 快速模式 (csi300, 50只股票)
+#   --quick: 快速模式 (csi300)
 #   --parallel N: 并行跑 N 个任务 (默认串行)
-#
-# 输出: experiments/results.csv
 
 set -e
 
@@ -24,21 +22,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# 实验配置
 MODELS=("LightGBM")
 HORIZONS=(1 3 5)
-# 如果 GPU 可用, 可以加: GRU LSTM
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RESULT_FILE="$RESULTS_DIR/results_${TIMESTAMP}.csv"
 echo "model,horizon,n_feat,ic,rank_ic,icir,rank_icir,train_s,sharpe,ret" > "$RESULT_FILE"
 
 echo "============================================"
-echo " 🧪 并行实验运行"
+echo " 并行实验"
 echo "  模型: ${MODELS[*]}"
 echo "  预测周期: ${HORIZONS[*]}"
 echo "  快速模式: ${QUICK:-否}"
-echo "  并行数: $PARALLEL"
 echo "  结果: $RESULT_FILE"
 echo "============================================"
 
@@ -51,6 +46,32 @@ fi
 
 cd "$PROJECT_DIR"
 
+# 用 Python 解析日志 (macOS grep 不支持 -P)
+parse_log() {
+    python -c "
+import re, sys
+with open('$1') as f:
+    text = f.read()
+m = re.findall(r\"'IC':\s*np\.float64\(([^)]+)\)\", text)
+ic = m[-1] if m else '?'
+m = re.findall(r\"'Rank IC':\s*np\.float64\(([^)]+)\)\", text)
+rank_ic = m[-1] if m else '?'
+m = re.findall(r\"'ICIR':\s*np\.float64\(([^)]+)\)\", text)
+icir = m[-1] if m else '?'
+m = re.findall(r\"'Rank ICIR':\s*np\.float64\(([^)]+)\)\", text)
+rank_icir = m[-1] if m else '?'
+m = re.findall(r'训练耗时:\s*(\d+)', text)
+train_s = m[-1] if m else '?'
+m = re.findall(r'信号夏普:\s*([-\d.]+)', text)
+sharpe = m[-1] if m else '?'
+m = re.findall(r'累计复合:\s*([-\d.]+)', text)
+ret = m[-1] if m else '?'
+m = re.findall(r'特征:\s*(\d+)', text)
+n_feat = m[-1] if m else '?'
+print(f'{n_feat},{ic},{rank_ic},{icir},{rank_icir},{train_s},{sharpe},{ret}')
+"
+}
+
 run_exp() {
     local model=$1
     local horizon=$2
@@ -60,30 +81,24 @@ run_exp() {
     echo "▶ [$model h=$horizon] 开始... ($(date +%H:%M:%S))"
     
     python qlib_pipeline/train.py --model "$model" --horizon "$horizon" $QUICK --quiet \
-        > "$log_file" 2>&1
+        > "$log_file" 2>&1 || true
     
-    # 解析结果
-    local ic=$(grep "'IC':" "$log_file" | tail -1 | grep -oP "np\.float64\([^)]+\)" | head -1 | grep -oP '[-0-9.]+' | head -1)
-    local rank_ic=$(grep "'Rank IC':" "$log_file" | tail -1 | grep -oP "np\.float64\([^)]+\)" | head -1 | grep -oP '[-0-9.]+' | head -1)
-    local icir=$(grep "'ICIR':" "$log_file" | tail -1 | grep -oP "np\.float64\([^)]+\)" | head -1 | grep -oP '[-0-9.]+' | head -1)
-    local rank_icir=$(grep "'Rank ICIR':" "$log_file" | tail -1 | grep -oP "np\.float64\([^)]+\)" | head -1 | grep -oP '[-0-9.]+' | head -1)
-    local train_s=$(grep "训练耗时:" "$log_file" | tail -1 | grep -oP '[0-9]+')
-    local sharpe=$(grep "信号夏普:" "$log_file" | tail -1 | grep -oP '[-0-9.]+')
-    local ret=$(grep "累计复合:" "$log_file" | tail -1 | grep -oP '[-0-9.]+')
-    local n_feat=$(grep "| 📊 特征:" "$log_file" | tail -1 | grep -oP '[0-9]+')
+    local parsed=$(parse_log "$log_file")
+    local n_feat=$(echo "$parsed" | cut -d, -f1)
+    local ic=$(echo "$parsed" | cut -d, -f2)
+    local rank_ic=$(echo "$parsed" | cut -d, -f3)
+    local sharpe=$(echo "$parsed" | cut -d, -f8)
+    local train_s=$(echo "$parsed" | cut -d, -f7)
     
-    echo "$model,$horizon,${n_feat:-?},${ic:-?},${rank_ic:-?},${icir:-?},${rank_icir:-?},${train_s:-?},${sharpe:-?},${ret:-?}" >> "$RESULT_FILE"
-    
-    echo "  ✅ [$model h=$horizon] IC=${ic:-?} RankIC=${rank_ic:-?} 夏普=${sharpe:-?} (${train_s:-?}s)"
+    echo "$model,$horizon,$parsed" >> "$RESULT_FILE"
+    echo "  ✅ [$model h=$horizon] IC=$ic RankIC=$rank_ic 夏普=$sharpe (${train_s}s)"
 }
 
-# 运行实验
 if [ "$PARALLEL" -gt 1 ]; then
     echo "⚠️ 并行模式需要每个进程独立内存, 注意 OOM"
     for model in "${MODELS[@]}"; do
         for h in "${HORIZONS[@]}"; do
             run_exp "$model" "$h" &
-            # 限制并行数
             while [ $(jobs -r | wc -l) -ge "$PARALLEL" ]; do
                 sleep 5
             done
@@ -100,8 +115,8 @@ fi
 
 echo ""
 echo "============================================"
-echo " 📊 实验结果汇总"
+echo " 实验结果汇总"
 echo "============================================"
 column -t -s, "$RESULT_FILE"
 echo ""
-echo "结果已保存: $RESULT_FILE"
+echo "结果: $RESULT_FILE"
