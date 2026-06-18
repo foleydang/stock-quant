@@ -157,8 +157,9 @@ class IntradayHandler(HighFreqGeneralHandler):
                 print(f"[IntradayHandler] {attr} label_key={label_key} not in columns, skipping", file=sys.stderr)
                 continue
             
-            print(f"[IntradayHandler] Fixing {attr} label, shape={df.shape}, before mean={df[label_key].mean():.4f}", file=sys.stderr)
+            print(f"[IntradayHandler] Fixing {attr} label, shape={df.shape}, before mean={df[label_key].mean():.4f}, min={df[label_key].min():.4f}, max={df[label_key].max():.4f}", file=sys.stderr)
             series = df[label_key]
+            print(f"[IntradayHandler] {attr} index.names={df.index.names}, n_instruments={len(df.index.get_level_values('instrument').unique())}", file=sys.stderr)
             if 'instrument' in df.index.names:
                 df[label_key] = series.groupby(level='instrument').transform(
                     lambda x: x.shift(-self.horizon) / (x.shift(-1) + 1e-6) - 1
