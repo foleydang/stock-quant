@@ -309,16 +309,211 @@ def compute_features_batch(close, high, low, volume, min_idx=120):
 
 
 def compute_features(close, high, low, volume):
-    """单个股最新一期特征 (推理用)"""
-    feats = compute_features_batch(close, high, low, volume)
-    if feats is None:
+    """单个股最新一期特征 (推理用，轻量)"""
+    n = len(close)
+    if n < 120:
         return None
+
+    eps = 1e-8
     result = {}
-    for k, v in feats.items():
-        val = v[-1]
-        if not np.isnan(val) and not np.isinf(val):
-            result[k] = float(val)
+
+    # 收益率
+    for p in [1, 2, 3, 5, 10, 20, 60, 120]:
+        if n > p:
+            result[f'ret_{p}d'] = float(close[-1] / close[-p-1] - 1)
+
+    # 波动率
+    rets_all = np.diff(close) / (close[:-1] + eps)
+    for p in [5, 10, 20, 60]:
+        if n >= p:
+            result[f'vol_{p}d'] = float(np.std(rets_all[-p:]) * np.sqrt(252))
+
+    # 偏度/峰度
+    for p in [20, 60]:
+        if n >= p:
+            r = rets_all[-p:]
+            if len(r) > 3:
+                result[f'skew_{p}d'] = float(sp_stats.skew(r))
+                result[f'kurt_{p}d'] = float(sp_stats.kurtosis(r))
+
+    # 均线偏离
+    for p in [5, 10, 20, 30, 60, 120]:
+        if n >= p:
+            ma = np.mean(close[-p:])
+            result[f'ma_dev_{p}d'] = float((close[-1] - ma) / (ma + eps))
+
+    # 均线交叉
+    for s, l in [(5, 10), (5, 20), (5, 60), (10, 20), (10, 60), (20, 60)]:
+        if n >= l:
+            ma_s = np.mean(close[-s:])
+            ma_l = np.mean(close[-l:])
+            result[f'ma{s}_ma{l}'] = float((ma_s - ma_l) / (ma_l + eps))
+
+    # 成交量
+    for p in [5, 10, 20, 60]:
+        if n >= p:
+            avg_vol = np.mean(volume[-p:])
+            result[f'vol_ratio_{p}d'] = float(volume[-1] / (avg_vol + eps))
+            result[f'vol_std_{p}d'] = float(np.std(volume[-p:]) / (avg_vol + eps))
+
+    if n >= 5:
+        pc = close[-1] - close[-6]
+        vc = volume[-1] / (np.mean(volume[-5:]) + eps) - 1
+        result['vol_price_5d'] = float(pc / (close[-1] + eps) * vc)
+
+    for p in [10, 20, 60]:
+        if n >= p:
+            r = rets_all[-p+1:]
+            v = np.diff(volume[-p:]) / (volume[-p:-1] + eps)
+            if len(r) > 1:
+                c = np.corrcoef(r, v)[0, 1]
+                result[f'corr_rv_{p}d'] = float(0 if np.isnan(c) else c)
+
+    # RSI
+    for p in [6, 14, 28]:
+        if n >= p:
+            d = np.diff(close[-p-1:])
+            gain = np.sum(np.maximum(d, 0))
+            loss = np.sum(np.maximum(-d, 0))
+            avg_g = gain / p
+            avg_l = loss / p
+            result[f'rsi_{p}'] = float(100 - 100 / (1 + avg_g / (avg_l + eps)) if avg_l > 0 else 100)
+
+    # MACD
+    if n >= 35:
+        ema12 = _ema_last(close, 12)
+        ema26 = _ema_last(close, 26)
+        dif = ema12 - ema26
+        dea = _series_ema_last(close, dif, 12, 26, 9)
+        macd = (dif - dea) * 2
+        price = close[-1]
+        result['macd_dif'] = float(dif / (price + eps))
+        result['macd_dea'] = float(dea / (price + eps))
+        result['macd_bar'] = float(macd / (price + eps))
+        if n >= 40:
+            dif_5 = _ema_last(close[:-5], 12) - _ema_last(close[:-5], 26)
+            result['macd_dif_chg'] = float((dif - dif_5) / (price + eps))
+
+    # KDJ
+    for p in [9, 14]:
+        if n >= p:
+            ll = np.min(low[-p:])
+            hh = np.max(high[-p:])
+            result[f'kdj_rsv_{p}'] = float((close[-1] - ll) / (hh - ll + eps) * 100)
+
+    # Bollinger
+    for p in [20, 60]:
+        if n >= p:
+            ma = np.mean(close[-p:])
+            std = np.std(close[-p:])
+            result[f'bb_pct_{p}d'] = float((close[-1] - ma) / (2 * std + eps))
+            result[f'bb_width_{p}d'] = float((2 * std) / (ma + eps))
+
+    # ATR
+    for p in [14, 28]:
+        if n >= p:
+            tr = np.maximum(
+                high[-p:] - low[-p:],
+                np.abs(high[-p:] - close[-p-1:-1]),
+                np.abs(low[-p:] - close[-p-1:-1])
+            )
+            result[f'atr_{p}d'] = float(np.mean(tr) / (close[-1] + eps))
+
+    # 价格位置
+    for p in [20, 60, 120]:
+        if n >= p:
+            hh = np.max(high[-p:])
+            ll = np.min(low[-p:])
+            result[f'price_pos_{p}d'] = float((close[-1] - ll) / (hh - ll + eps))
+
+    # 回撤
+    for p in [20, 60, 120]:
+        if n >= p:
+            c = close[-p:]
+            rolling_max = np.maximum.accumulate(c)
+            dd = (rolling_max - c) / (rolling_max + eps)
+            result[f'max_dd_{p}d'] = float(np.max(dd))
+            result[f'mean_dd_{p}d'] = float(np.mean(dd))
+
+    # 夏普
+    for p in [20, 60]:
+        if n >= p:
+            r = rets_all[-p:]
+            mean_r = np.mean(r)
+            std_r = np.std(r)
+            result[f'sharpe_{p}d'] = float(mean_r / (std_r + eps) * np.sqrt(252))
+
+    # 涨跌比
+    for p in [20, 60]:
+        if n >= p:
+            result[f'up_ratio_{p}d'] = float(np.sum(np.diff(close[-p-1:]) > 0) / p)
+
+    # 振幅
+    for p in [5, 20]:
+        if n >= p:
+            a = (high[-p:] - low[-p:]) / (close[-p:] + eps)
+            result[f'amp_{p}d'] = float(np.mean(a))
+            result[f'amp_max_{p}d'] = float(np.max(a))
+
+    # 跳空
+    result['gap'] = float((close[-1] - close[-2]) / (close[-2] + eps))
+    if n >= 5:
+        gaps = (close[-5:] - close[-6:-1]) / (close[-6:-1] + eps)
+        result['gap_mean_5d'] = float(np.mean(gaps))
+
+    # OBV
+    if n >= 20:
+        obv = np.zeros(n)
+        for i in range(1, n):
+            if close[i] > close[i-1]:
+                obv[i] = obv[i-1] + volume[i]
+            elif close[i] < close[i-1]:
+                obv[i] = obv[i-1] - volume[i]
+            else:
+                obv[i] = obv[i-1]
+        result['obv_ma5'] = float(np.mean(obv[-5:]) / (np.mean(volume[-5:]) * 1000 + eps))
+        result['obv_ma20'] = float(np.mean(obv[-20:]) / (np.mean(volume[-20:]) * 1000 + eps))
+
+    # 威廉
+    for p in [14, 28]:
+        if n >= p:
+            hh = np.max(high[-p:])
+            ll = np.min(low[-p:])
+            result[f'wr_{p}'] = float((hh - close[-1]) / (hh - ll + eps) * 100)
+
+    # CCI
+    for p in [14, 20]:
+        if n >= p:
+            tp = (high[-p:] + low[-p:] + close[-p:]) / 3
+            ma_tp = np.mean(tp)
+            md = np.mean(np.abs(tp - ma_tp))
+            result[f'cci_{p}'] = float((tp[-1] - ma_tp) / (0.015 * md + eps))
+
+    # ROC
+    for p in [3, 5, 10, 20, 60]:
+        if n > p:
+            result[f'roc_{p}d'] = float((close[-1] - close[-p-1]) / (close[-p-1] + eps) * 100)
+
     return result if len(result) > 20 else None
+
+
+def _ema_last(data, span):
+    """计算 EMA 最后一个值"""
+    alpha = 2 / (span + 1)
+    ema = data[0]
+    for x in data[1:]:
+        ema = alpha * x + (1 - alpha) * ema
+    return ema
+
+
+def _series_ema_last(close, dif, ema_span, macd_span, smoothing):
+    """计算 DEA (dif 的 EMA) 最后一个值"""
+    alpha = 2 / (smoothing + 1)
+    # 用 dif 的 EMA 近似
+    ema = dif
+    for i in range(1, smoothing):
+        ema = alpha * dif + (1 - alpha) * ema
+    return ema
 
 
 # 所有特征名 (排序)
