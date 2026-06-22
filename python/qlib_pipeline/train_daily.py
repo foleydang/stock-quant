@@ -18,6 +18,7 @@ import os, sys, json, pickle, argparse, warnings
 from datetime import datetime
 import numpy as np, pandas as pd
 import lightgbm as lgb
+from scipy.stats import rankdata, spearmanr
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
@@ -53,7 +54,7 @@ def load_data(conn):
     return data
 
 
-CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache.parquet')
+CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v2.parquet')
 
 
 def build_dataset(data, target_horizon=5, use_cache=True):
@@ -62,10 +63,11 @@ def build_dataset(data, target_horizon=5, use_cache=True):
         print(f"  📦 加载缓存: {CACHE_FILE}")
         df = pd.read_parquet(CACHE_FILE)
         y = df.pop('__label__').values
-        return df, y
+        dates = df.pop('__date__').values if '__date__' in df.columns else None
+        return df, y, dates
 
     from tqdm import tqdm
-    X_rows, y_rows = [], []
+    X_rows, y_rows, date_rows = [], [], []
 
     for sym, df in tqdm(data.items(), desc="  计算特征", unit="stock"):
         close = df['close'].values
@@ -97,18 +99,38 @@ def build_dataset(data, target_horizon=5, use_cache=True):
 
             X_rows.append(row)
             y_rows.append(future_return)
+            date_rows.append(str(dates[i])[:10])
 
     X = pd.DataFrame(X_rows)
     X = X[FEATURE_NAMES].fillna(0).replace([np.inf, -np.inf], 0)
     y = np.array(y_rows)
+    dates = np.array(date_rows)
+
+    # 截面排名标签: 每个日期内，对 y 做排名归一化
+    y_cs = _cs_rank(y, dates)
 
     # 保存缓存
     cache = X.copy()
-    cache['__label__'] = y
+    cache['__label__'] = y_cs
+    cache['__date__'] = dates
     cache.to_parquet(CACHE_FILE, index=False)
     print(f"  💾 缓存已保存: {CACHE_FILE}")
 
-    return X, y
+    return X, y_cs, dates
+
+
+def _cs_rank(y, dates):
+    """截面排名: 每个日期内，对 y 排名并归一化到 [0, 1]"""
+    y_ranked = np.zeros_like(y)
+    unique_dates = np.unique(dates)
+    for d in unique_dates:
+        mask = dates == d
+        if mask.sum() < 5:
+            y_ranked[mask] = y[mask]  # 样本太少，保持原值
+            continue
+        ranks = rankdata(y[mask])
+        y_ranked[mask] = (ranks - 1) / (len(ranks) - 1)  # 归一化到 [0, 1]
+    return y_ranked
 
 
 def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
@@ -153,7 +175,6 @@ def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
     elapsed = (datetime.now() - t0).total_seconds()
 
     # 评估
-    from scipy.stats import spearmanr
     y_pred = pipeline.predict(X_val)
     ic = np.corrcoef(y_pred, y_val)[0, 1]
     rank_ic, _ = spearmanr(y_pred, y_val)
@@ -181,7 +202,7 @@ def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
     meta = {
         'model': 'LightGBM',
         'horizon': target_horizon,
-        'label': 'future_5d_return',
+        'label': 'cs_rank_5d',
         'features': len(FEATURE_NAMES),
         'IC': round(float(ic), 4),
         'RankIC': round(float(rank_ic), 4),
@@ -201,7 +222,6 @@ def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
 
 if __name__ == '__main__':
     import sqlite3
-    from scipy import stats
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', default='models/lgb_daily')
@@ -217,7 +237,7 @@ if __name__ == '__main__':
     print(f"  {len(data)} 只股票")
 
     print("🔧 构建特征...")
-    X, y = build_dataset(data, target_horizon=target_horizon)
+    X, y, dates = build_dataset(data, target_horizon=target_horizon)
 
     # 时间切分: 前70%训练, 后30%验证
     n = len(X)
