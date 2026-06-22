@@ -53,8 +53,18 @@ def load_data(conn):
     return data
 
 
-def build_dataset(data, target_horizon=5):
-    """构建特征-标签数据集 (向量化批量计算)"""
+CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache.parquet')
+
+
+def build_dataset(data, target_horizon=5, use_cache=True):
+    """构建特征-标签数据集 (向量化批量计算，支持缓存)"""
+    if use_cache and os.path.exists(CACHE_FILE):
+        print(f"  📦 加载缓存: {CACHE_FILE}")
+        import pandas as pd
+        df = pd.read_parquet(CACHE_FILE)
+        y = df.pop('__label__').values
+        return df, y
+
     from tqdm import tqdm
     X_rows, y_rows = [], []
 
@@ -91,8 +101,15 @@ def build_dataset(data, target_horizon=5):
 
     X = pd.DataFrame(X_rows)
     X = X[FEATURE_NAMES].fillna(0).replace([np.inf, -np.inf], 0)
+    y = np.array(y_rows)
 
-    return X, np.array(y_rows)
+    # 保存缓存
+    cache = X.copy()
+    cache['__label__'] = y
+    cache.to_parquet(CACHE_FILE, index=False)
+    print(f"  💾 缓存已保存: {CACHE_FILE}")
+
+    return X, y
 
 
 def train_model(X_train, y_train, X_val, y_val, output_dir):
