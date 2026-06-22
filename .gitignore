@@ -21,33 +21,22 @@ env/
 *.swo
 .DS_Store
 
-# 模型文件 (太大，不上传 git)
-python/models/lgb_*/
-python/models/xgb_*/
-python/models/lstm_*/
-python/models/weekly_*/
-python/models/*.pkl
-python/models/*.txt
-python/models/*.json
-python/models/*.csv
-!python/models/lgb_hs300/OPTIMIZE_PLAN.md
-
-# 数据文件
+# 大文件 (OSS 同步)
+*.db
+*.sqlite
 data/
 python/data/*.json
 python/data/*.csv
 python/data/backup/
-*.db
-*.sqlite
-
-# 日志
-logs/
-python/logs/
 
 # 前端
 node_modules/
 frontend/node_modules/
 frontend/dist/
+
+# 日志
+logs/
+python/logs/
 
 # 临时
 *.tmp
