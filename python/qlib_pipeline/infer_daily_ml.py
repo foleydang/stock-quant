@@ -165,7 +165,7 @@ def main():
     conn.row_factory = sqlite3.Row
 
     # 加载辅助数据
-    aux = load_auxiliary(conn, {})
+    aux = load_auxiliary(conn)
 
     print(f"📡 预测中...", flush=True)
     scores = predict_all(conn, pipeline, aux)
