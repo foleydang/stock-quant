@@ -99,9 +99,9 @@ def train_model(X_train, y_train, X_val, y_val, output_dir):
     """训练 LightGBM 排序模型"""
     os.makedirs(output_dir, exist_ok=True)
 
-    model = lgb.LGBMRanker(
-        objective='lambdarank',
-        metric='ndcg',
+    model = lgb.LGBMRegressor(
+        objective='regression',
+        metric='rmse',
         num_leaves=128,
         learning_rate=0.03,
         n_estimators=1000,
@@ -121,25 +121,14 @@ def train_model(X_train, y_train, X_val, y_val, output_dir):
         ('model', model),
     ])
 
-    n_train = len(X_train)
-    n_val = len(X_val)
-
-    print(f"  训练集: {n_train:,} 样本, {X_train.shape[1]} 特征")
-    print(f"  验证集: {n_val:,} 样本")
-
-    # 创建 group (每个日期一个 group，用于 lambdarank)
-    # 简化：用样本数作为 group size
-    train_group = [n_train]
-    val_group = [n_val]
+    print(f"  训练集: {len(X_train):,} 样本, {X_train.shape[1]} 特征")
+    print(f"  验证集: {len(X_val):,} 样本")
 
     t0 = datetime.now()
     pipeline.fit(
         X_train, y_train,
-        model__group=train_group,
         model__eval_set=[(X_val, y_val)],
-        model__eval_group=[val_group],
-        model__eval_metric='ndcg',
-        model__eval_at=[5, 10],
+        model__eval_metric='rmse',
         model__callbacks=[
             lgb.early_stopping(100),
             lgb.log_evaluation(100),
@@ -174,15 +163,15 @@ def train_model(X_train, y_train, X_val, y_val, output_dir):
         json.dump({'features': FEATURE_NAMES, 'horizon': target_horizon}, f)
 
     meta = {
-        'model': 'LightGBMRanker',
+        'model': 'LightGBM',
         'horizon': target_horizon,
         'label': 'future_5d_return',
         'features': len(FEATURE_NAMES),
         'IC': round(float(ic), 4),
         'RankIC': round(float(rank_ic), 4),
         'train_time_s': round(elapsed),
-        'train_samples': n_train,
-        'val_samples': n_val,
+        'train_samples': len(X_train),
+        'val_samples': len(X_val),
         'timestamp': datetime.now().isoformat(),
     }
     with open(os.path.join(output_dir, 'meta.json'), 'w') as f:
