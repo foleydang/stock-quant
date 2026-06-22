@@ -33,11 +33,15 @@ from qlib_pipeline.features_daily import compute_features_batch, compute_feature
 OHLCV_FEATURES = [f for f in FEATURE_NAMES if not f.startswith(('fund_', 'macro_', 'north_', 'sent_', 'sector_'))]
 
 DB_PATH = get_db_path()
+CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v3.parquet')
 
+
+# ──────────────────────────────────────────────
+# 数据加载
+# ──────────────────────────────────────────────
 
 def load_data(conn):
-    """加载所有股票日线数据 (单次查询)"""
-    # 确保有索引
+    """加载所有股票日线 (单次查询)"""
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_kd_symbol ON kline_daily(symbol)")
     except Exception:
@@ -57,11 +61,10 @@ def load_data(conn):
     for sym, df in df_all.groupby('symbol'):
         if len(df) >= 120:
             data[sym] = df.reset_index(drop=True)
+    return data
 
-    return data, None  # aux loaded separately
 
-
-def load_auxiliary(conn, data):
+def load_auxiliary(conn):
     """加载基本面、行业、宏观、情绪数据"""
     aux = {}
 
@@ -86,8 +89,7 @@ def load_auxiliary(conn, data):
     # 宏观
     try:
         macro = pd.read_sql(
-            "SELECT trade_date, hs300_close, hs300_volume, shibor_1w, cn_10y, "
-            "shibor_1m, cn_2y, cn_5y, cn_30y FROM macro_daily ORDER BY trade_date", conn)
+            "SELECT trade_date, hs300_close, shibor_1w, cn_10y FROM macro_daily ORDER BY trade_date", conn)
         macro['trade_date'] = pd.to_datetime(macro['trade_date'])
         macro = macro.set_index('trade_date')
         aux['macro'] = macro
@@ -98,7 +100,7 @@ def load_auxiliary(conn, data):
     # 北向资金
     try:
         north = pd.read_sql(
-            "SELECT trade_date, north_net, total_net FROM north_flow ORDER BY trade_date", conn)
+            "SELECT trade_date, north_net FROM north_flow ORDER BY trade_date", conn)
         north['trade_date'] = pd.to_datetime(north['trade_date'])
         north = north.set_index('trade_date')
         aux['north'] = north
@@ -121,8 +123,74 @@ def load_auxiliary(conn, data):
     return aux
 
 
-CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v3.parquet')
+# ──────────────────────────────────────────────
+# 辅助特征 (内联在 build_dataset 中调用)
+# ──────────────────────────────────────────────
 
+def _add_aux_features(row, sym, date, aux):
+    """添加辅助特征到 row dict (供推理使用)"""
+    ds = pd.Timestamp(str(date)[:10])
+
+    # 基本面
+    fund = aux.get('fund')
+    if fund is not None and sym in fund.index:
+        try:
+            fs = fund.loc[sym]
+            fb = fs[fs.index <= ds]
+            if len(fb) > 0:
+                latest = fb.iloc[-1]
+                row['fund_roe'] = float(latest.get('roe', 0) or 0)
+                row['fund_np_yoy'] = float(latest.get('net_profit_yoy', 0) or 0)
+                row['fund_debt'] = float(latest.get('debt_ratio', 0) or 0)
+                return
+        except Exception:
+            pass
+    row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+
+    # 行业
+    industry = aux.get('sector', {}).get(sym, '未知')
+    row['sector_code'] = float(hash(industry) % 100) / 100
+
+    # 宏观
+    macro = aux.get('macro')
+    if macro is not None and ds in macro.index:
+        m = macro.loc[ds]
+        if macro.index.get_loc(ds) > 0:
+            prev = macro.iloc[macro.index.get_loc(ds) - 1]['hs300_close']
+            row['macro_hs300_chg'] = float((m['hs300_close'] - prev) / prev) if prev > 0 else 0
+        else:
+            row['macro_hs300_chg'] = 0
+        row['macro_shibor_1w'] = float(m.get('shibor_1w', 0) or 0)
+        row['macro_cn_10y'] = float(m.get('cn_10y', 0) or 0)
+    else:
+        row['macro_hs300_chg'] = row['macro_shibor_1w'] = row['macro_cn_10y'] = 0
+
+    # 北向
+    north = aux.get('north')
+    if north is not None and ds in north.index:
+        row['north_net'] = float(north.loc[ds, 'north_net'] or 0)
+    else:
+        row['north_net'] = 0
+
+    # 情绪
+    sent = aux.get('sent')
+    if sent is not None and sym in sent.index:
+        try:
+            ss = sent.loc[sym]
+            if ds in ss.index:
+                s = ss.loc[ds]
+                row['sent_limit_up'] = float(s.get('is_limit_up', 0) or 0)
+                row['sent_limit_down'] = float(s.get('is_limit_down', 0) or 0)
+                row['sent_vol_ratio'] = float(s.get('vol_ratio_20', 0) or 0)
+                return
+        except Exception:
+            pass
+    row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+
+
+# ──────────────────────────────────────────────
+# 特征构建
+# ──────────────────────────────────────────────
 
 def build_dataset(data, aux, target_horizon=5, use_cache=True):
     """构建特征-标签数据集 (向量化批量计算，支持缓存)"""
@@ -141,15 +209,12 @@ def build_dataset(data, aux, target_horizon=5, use_cache=True):
         high = df['high'].values
         low = df['low'].values
         vol = df['volume'].values
+        dates_arr = df['date'].values
 
-        # 批量计算该股票全部特征
         feats_batch = compute_features_batch(close, high, low, vol)
         if feats_batch is None:
             continue
 
-        stock_dates = df['date'].values
-
-        # 提取训练样本
         for i in range(120, len(df) - target_horizon):
             future_return = close[i + target_horizon] / close[i] - 1
             if np.isnan(future_return) or np.isinf(future_return):
@@ -166,74 +231,22 @@ def build_dataset(data, aux, target_horizon=5, use_cache=True):
             if not valid:
                 continue
 
-            # 添加辅助特征 (内联，避免函数调用问题)
-            ds = pd.Timestamp(str(stock_dates[i])[:10])
-            # 基本面
-            fund = aux.get('fund')
-            if fund is not None and sym in fund.index:
-                try:
-                    fs = fund.loc[sym]
-                    fb = fs[fs.index <= ds]
-                    if len(fb) > 0:
-                        l = fb.iloc[-1]
-                        row['fund_roe'] = float(l.get('roe', 0) or 0)
-                        row['fund_np_yoy'] = float(l.get('net_profit_yoy', 0) or 0)
-                        row['fund_debt'] = float(l.get('debt_ratio', 0) or 0)
-                    else:
-                        row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
-                except Exception:
-                    row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
-            else:
-                row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
-            # 行业
-            industry = aux.get('sector', {}).get(sym, '未知')
-            row['sector_code'] = float(hash(industry) % 100) / 100
-            # 宏观
-            macro = aux.get('macro')
-            if macro is not None and ds in macro.index:
-                m = macro.loc[ds]
-                if macro.index.get_loc(ds) > 0:
-                    prev = macro.iloc[macro.index.get_loc(ds) - 1]['hs300_close']
-                    row['macro_hs300_chg'] = float((m['hs300_close'] - prev) / prev) if prev > 0 else 0
-                else:
-                    row['macro_hs300_chg'] = 0
-                row['macro_shibor_1w'] = float(m.get('shibor_1w', 0) or 0)
-                row['macro_cn_10y'] = float(m.get('cn_10y', 0) or 0)
-            else:
-                row['macro_hs300_chg'] = row['macro_shibor_1w'] = row['macro_cn_10y'] = 0
-            # 北向
-            north = aux.get('north')
-            if north is not None and ds in north.index:
-                row['north_net'] = float(north.loc[ds, 'north_net'] or 0)
-            else:
-                row['north_net'] = 0
-            # 情绪
-            sent = aux.get('sent')
-            if sent is not None and sym in sent.index:
-                try:
-                    ss = sent.loc[sym]
-                    if ds in ss.index:
-                        s = ss.loc[ds]
-                        row['sent_limit_up'] = float(s.get('is_limit_up', 0) or 0)
-                        row['sent_limit_down'] = float(s.get('is_limit_down', 0) or 0)
-                        row['sent_vol_ratio'] = float(s.get('vol_ratio_20', 0) or 0)
-                    else:
-                        row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
-                except Exception:
-                    row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
-            else:
-                row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+            _add_aux_features(row, sym, dates_arr[i], aux)
 
             X_rows.append(row)
             y_rows.append(future_return)
-            date_rows.append(str(stock_dates[i])[:10])
+            date_rows.append(str(dates_arr[i])[:10])
 
     X = pd.DataFrame(X_rows)
+    # 确保所有列都存在
+    for col in FEATURE_NAMES:
+        if col not in X.columns:
+            X[col] = 0.0
     X = X[FEATURE_NAMES].fillna(0).replace([np.inf, -np.inf], 0)
     y = np.array(y_rows)
     dates = np.array(date_rows)
 
-    # 截面排名标签: 每个日期内，对 y 做排名归一化
+    # 截面排名标签
     y_cs = _cs_rank(y, dates)
 
     # 保存缓存
@@ -253,12 +266,16 @@ def _cs_rank(y, dates):
     for d in unique_dates:
         mask = dates == d
         if mask.sum() < 5:
-            y_ranked[mask] = y[mask]  # 样本太少，保持原值
+            y_ranked[mask] = y[mask]
             continue
         ranks = rankdata(y[mask])
-        y_ranked[mask] = (ranks - 1) / (len(ranks) - 1)  # 归一化到 [0, 1]
+        y_ranked[mask] = (ranks - 1) / (len(ranks) - 1)
     return y_ranked
 
+
+# ──────────────────────────────────────────────
+# 模型训练
+# ──────────────────────────────────────────────
 
 def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
     """训练 LightGBM 排序模型"""
@@ -301,14 +318,12 @@ def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
     )
     elapsed = (datetime.now() - t0).total_seconds()
 
-    # 评估
     y_pred = pipeline.predict(X_val)
     ic = np.corrcoef(y_pred, y_val)[0, 1]
     rank_ic, _ = spearmanr(y_pred, y_val)
 
     print(f"\n  IC={ic:.4f}, RankIC={rank_ic:.4f}, 耗时={elapsed:.0f}s")
 
-    # 特征重要性
     importance = model.feature_importances_
     top_idx = np.argsort(importance)[-15:][::-1]
     print(f"  Top-15 特征:")
@@ -347,10 +362,9 @@ def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
     return meta
 
 
-def _add_aux_features(row, sym, date, aux):
-    """添加辅助特征到 feature dict"""
-    date_str = pd.Timestamp(str(date)[:10])
-
+# ──────────────────────────────────────────────
+# 主流程
+# ──────────────────────────────────────────────
 
 if __name__ == '__main__':
     import sqlite3
@@ -365,9 +379,9 @@ if __name__ == '__main__':
     conn = sqlite3.connect(DB_PATH)
 
     print("📡 加载数据...")
-    data, _ = load_data(conn)
+    data = load_data(conn)
     print(f"  {len(data)} 只股票")
-    aux = load_auxiliary(conn, data)
+    aux = load_auxiliary(conn)
 
     print("🔧 构建特征...")
     X, y, dates = build_dataset(data, aux, target_horizon=target_horizon)
@@ -386,63 +400,3 @@ if __name__ == '__main__':
     train_model(X_train, y_train, X_val, y_val, args.output, target_horizon)
 
     conn.close()
-
-    # 基本面
-    fund = aux.get('fund')
-    if fund is not None and sym in fund.index:
-        try:
-            fund_stock = fund.loc[sym]
-            fund_before = fund_stock[fund_stock.index <= date_str]
-            if len(fund_before) > 0:
-                latest = fund_before.iloc[-1]
-                row['fund_roe'] = float(latest.get('roe', 0)) if pd.notna(latest.get('roe')) else 0
-                row['fund_np_yoy'] = float(latest.get('net_profit_yoy', 0)) if pd.notna(latest.get('net_profit_yoy')) else 0
-                row['fund_debt'] = float(latest.get('debt_ratio', 0)) if pd.notna(latest.get('debt_ratio')) else 0
-            else:
-                row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
-        except Exception:
-            row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
-    else:
-        row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
-
-    # 行业
-    industry = aux.get('sector', {}).get(sym, '\u672a\u77e5')
-    row['sector_code'] = float(hash(industry) % 100) / 100
-
-    # 宏观
-    macro = aux.get('macro')
-    if macro is not None and date_str in macro.index:
-        m = macro.loc[date_str]
-        if macro.index.get_loc(date_str) > 0:
-            prev = macro.iloc[macro.index.get_loc(date_str) - 1]['hs300_close']
-            row['macro_hs300_chg'] = float((m['hs300_close'] - prev) / prev) if prev > 0 else 0
-        else:
-            row['macro_hs300_chg'] = 0
-        row['macro_shibor_1w'] = float(m.get('shibor_1w', 0)) if pd.notna(m.get('shibor_1w')) else 0
-        row['macro_cn_10y'] = float(m.get('cn_10y', 0)) if pd.notna(m.get('cn_10y')) else 0
-    else:
-        row['macro_hs300_chg'] = row['macro_shibor_1w'] = row['macro_cn_10y'] = 0
-
-    # 北向
-    north = aux.get('north')
-    if north is not None and date_str in north.index:
-        row['north_net'] = float(north.loc[date_str, 'north_net']) if pd.notna(north.loc[date_str, 'north_net']) else 0
-    else:
-        row['north_net'] = 0
-
-    # 情绪
-    sent = aux.get('sent')
-    if sent is not None and sym in sent.index:
-        try:
-            sent_stock = sent.loc[sym]
-            if date_str in sent_stock.index:
-                s = sent_stock.loc[date_str]
-                row['sent_limit_up'] = float(s.get('is_limit_up', 0)) if pd.notna(s.get('is_limit_up')) else 0
-                row['sent_limit_down'] = float(s.get('is_limit_down', 0)) if pd.notna(s.get('is_limit_down')) else 0
-                row['sent_vol_ratio'] = float(s.get('vol_ratio_20', 0)) if pd.notna(s.get('vol_ratio_20')) else 0
-            else:
-                row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
-        except Exception:
-            row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
-    else:
-        row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
