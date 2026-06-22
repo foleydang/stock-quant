@@ -55,9 +55,10 @@ def load_data(conn):
 
 def build_dataset(data, target_horizon=5):
     """构建特征-标签数据集"""
+    from tqdm import tqdm
     X_rows, y_rows, meta_rows = [], [], []
 
-    for sym, df in data.items():
+    for sym, df in tqdm(data.items(), desc="  计算特征", unit="stock"):
         close = df['close'].values
         high = df['high'].values
         low = df['low'].values
