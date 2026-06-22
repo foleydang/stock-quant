@@ -1,50 +1,60 @@
-# Python cache
+# Python
 __pycache__/
 *.pyc
+*.pyo
 *.pyd
+.Python
+*.egg-info/
+dist/
+build/
 
 # 虚拟环境
 venv/
+.venv/
 python/venv/
+env/
 
 # IDE
 .idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
 
+# 模型文件 (太大，不上传 git)
+python/models/lgb_*/
+python/models/xgb_*/
+python/models/lstm_*/
+python/models/weekly_*/
+python/models/*.pkl
+python/models/*.txt
+python/models/*.json
+python/models/*.csv
+!python/models/lgb_hs300/OPTIMIZE_PLAN.md
+
+# 数据文件
+data/
+python/data/*.json
+python/data/*.csv
+python/data/backup/
+*.db
+*.sqlite
 
 # 日志
-logs/*.log
-python/logs/*.log
-python/logs/*.json
+logs/
+python/logs/
 
-# 模型时间戳备份 (model.pkl / model_daily.pkl 不忽略)
-python/models/lgb_hs300/model_[0-9]*_[0-9]*.pkl
-python/models/lgb_hs300/model_daily_[0-9]*_[0-9]*.pkl
+# 前端
+node_modules/
+frontend/node_modules/
+frontend/dist/
 
 # 临时
 *.tmp
 *.bak
-*.swp
-.DS_Store
-# 前端依赖 (不要提交 node_modules!)
-node_modules/
-frontend/node_modules/
+*.tar.gz
+*.zip
 
-# Pytest 缓存
-.pytest_cache/
-frontend/dist/
-
-# 密钥文件（不要提交到 git）
+# 环境
 .env
-
-# 数据库（通过 OSS 同步，不提交 git）
-python/data/*.db
-python/data/backup/
-python/data/*.pkl
-
-# 日志
-logs/
-*.log
-python/data/stock_data.db
-python/data/*.db
-stock_data.db
-mlruns/
+.env.local
