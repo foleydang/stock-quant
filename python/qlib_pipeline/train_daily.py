@@ -166,8 +166,63 @@ def build_dataset(data, aux, target_horizon=5, use_cache=True):
             if not valid:
                 continue
 
-            # 添加辅助特征
-            _add_aux_features(row, sym, stock_dates[i], aux)
+            # 添加辅助特征 (内联，避免函数调用问题)
+            ds = pd.Timestamp(str(stock_dates[i])[:10])
+            # 基本面
+            fund = aux.get('fund')
+            if fund is not None and sym in fund.index:
+                try:
+                    fs = fund.loc[sym]
+                    fb = fs[fs.index <= ds]
+                    if len(fb) > 0:
+                        l = fb.iloc[-1]
+                        row['fund_roe'] = float(l.get('roe', 0) or 0)
+                        row['fund_np_yoy'] = float(l.get('net_profit_yoy', 0) or 0)
+                        row['fund_debt'] = float(l.get('debt_ratio', 0) or 0)
+                    else:
+                        row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+                except Exception:
+                    row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+            else:
+                row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+            # 行业
+            industry = aux.get('sector', {}).get(sym, '未知')
+            row['sector_code'] = float(hash(industry) % 100) / 100
+            # 宏观
+            macro = aux.get('macro')
+            if macro is not None and ds in macro.index:
+                m = macro.loc[ds]
+                if macro.index.get_loc(ds) > 0:
+                    prev = macro.iloc[macro.index.get_loc(ds) - 1]['hs300_close']
+                    row['macro_hs300_chg'] = float((m['hs300_close'] - prev) / prev) if prev > 0 else 0
+                else:
+                    row['macro_hs300_chg'] = 0
+                row['macro_shibor_1w'] = float(m.get('shibor_1w', 0) or 0)
+                row['macro_cn_10y'] = float(m.get('cn_10y', 0) or 0)
+            else:
+                row['macro_hs300_chg'] = row['macro_shibor_1w'] = row['macro_cn_10y'] = 0
+            # 北向
+            north = aux.get('north')
+            if north is not None and ds in north.index:
+                row['north_net'] = float(north.loc[ds, 'north_net'] or 0)
+            else:
+                row['north_net'] = 0
+            # 情绪
+            sent = aux.get('sent')
+            if sent is not None and sym in sent.index:
+                try:
+                    ss = sent.loc[sym]
+                    if ds in ss.index:
+                        s = ss.loc[ds]
+                        row['sent_limit_up'] = float(s.get('is_limit_up', 0) or 0)
+                        row['sent_limit_down'] = float(s.get('is_limit_down', 0) or 0)
+                        row['sent_vol_ratio'] = float(s.get('vol_ratio_20', 0) or 0)
+                    else:
+                        row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+                except Exception:
+                    row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+            else:
+                row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
 
             X_rows.append(row)
             y_rows.append(future_return)
