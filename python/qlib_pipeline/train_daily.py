@@ -36,28 +36,29 @@ DB_PATH = get_db_path()
 
 
 def load_data(conn):
-    """加载所有股票日线数据 + 辅助数据"""
-    symbols = [r[0] for r in conn.execute(
-        "SELECT DISTINCT symbol FROM kline_daily ORDER BY symbol"
-    ).fetchall()]
+    """加载所有股票日线数据 (单次查询)"""
+    # 确保有索引
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_kd_symbol ON kline_daily(symbol)")
+    except Exception:
+        pass
+
+    print("  读取日线数据...")
+    df_all = pd.read_sql(
+        "SELECT symbol, date, open, high, low, close, volume FROM kline_daily ORDER BY symbol, date",
+        conn
+    )
+    df_all['date'] = pd.to_datetime(df_all['date'].apply(
+        lambda d: f"{str(d)[:4]}-{str(d)[4:6]}-{str(d)[6:8]}"
+        if len(str(d)) == 8 else str(d)[:10]
+    ))
 
     data = {}
-    for sym in symbols:
-        df = pd.read_sql(
-            "SELECT date, open, high, low, close, volume FROM kline_daily "
-            "WHERE symbol=? ORDER BY date", conn, params=(sym,)
-        )
-        if len(df) < 120:
-            continue
-        df['date'] = pd.to_datetime(df['date'].apply(
-            lambda d: f"{str(d)[:4]}-{str(d)[4:6]}-{str(d)[6:8]}"
-            if len(str(d)) == 8 else str(d)[:10]
-        ))
-        data[sym] = df
+    for sym, df in df_all.groupby('symbol'):
+        if len(df) >= 120:
+            data[sym] = df.reset_index(drop=True)
 
-    # 加载辅助数据
-    aux = load_auxiliary(conn, data)
-    return data, aux
+    return data, None  # aux loaded separately
 
 
 def load_auxiliary(conn, data):
@@ -307,8 +308,9 @@ if __name__ == '__main__':
     conn = sqlite3.connect(DB_PATH)
 
     print("📡 加载数据...")
-    data, aux = load_data(conn)
+    data, _ = load_data(conn)
     print(f"  {len(data)} 只股票")
+    aux = load_auxiliary(conn, data)
 
     print("🔧 构建特征...")
     X, y, dates = build_dataset(data, aux, target_horizon=target_horizon)
