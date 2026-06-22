@@ -543,4 +543,10 @@ FEATURE_NAMES = sorted([
     'wr_14', 'wr_28',
     'cci_14', 'cci_20',
     'roc_3d', 'roc_5d', 'roc_10d', 'roc_20d', 'roc_60d',
+    # 辅助特征
+    'fund_roe', 'fund_np_yoy', 'fund_debt',
+    'macro_hs300_chg', 'macro_shibor_1w', 'macro_cn_10y',
+    'north_net',
+    'sent_limit_up', 'sent_limit_down', 'sent_vol_ratio',
+    'sector_code',
 ])
