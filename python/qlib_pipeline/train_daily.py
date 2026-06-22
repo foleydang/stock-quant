@@ -128,7 +128,7 @@ def load_auxiliary(conn):
 # ──────────────────────────────────────────────
 
 def _add_aux_features(row, sym, date, aux):
-    """添加辅助特征到 row dict (供推理使用)"""
+    """添加辅助特征到 row dict (供训练和推理使用)"""
     ds = pd.Timestamp(str(date)[:10])
 
     # 基本面
@@ -142,10 +142,12 @@ def _add_aux_features(row, sym, date, aux):
                 row['fund_roe'] = float(latest.get('roe', 0) or 0)
                 row['fund_np_yoy'] = float(latest.get('net_profit_yoy', 0) or 0)
                 row['fund_debt'] = float(latest.get('debt_ratio', 0) or 0)
-                return
+            else:
+                row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
         except Exception:
-            pass
-    row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+            row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+    else:
+        row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
 
     # 行业
     industry = aux.get('sector', {}).get(sym, '未知')
@@ -182,10 +184,12 @@ def _add_aux_features(row, sym, date, aux):
                 row['sent_limit_up'] = float(s.get('is_limit_up', 0) or 0)
                 row['sent_limit_down'] = float(s.get('is_limit_down', 0) or 0)
                 row['sent_vol_ratio'] = float(s.get('vol_ratio_20', 0) or 0)
-                return
+            else:
+                row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
         except Exception:
-            pass
-    row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+            row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+    else:
+        row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
 
 
 # ──────────────────────────────────────────────
