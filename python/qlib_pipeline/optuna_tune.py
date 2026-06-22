@@ -89,7 +89,7 @@ def objective(trial, X, y, splits):
             X_train_s, y_train,
             eval_set=[(X_val_s, y_val)],
             eval_metric='rmse',
-            callbacks=[lgb.early_stopping(100), lgb.log_evaluation(0)],
+            callbacks=[lgb.early_stopping(100)],
         )
 
         y_pred = model.predict(X_val_s)
