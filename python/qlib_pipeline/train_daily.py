@@ -289,6 +289,11 @@ def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
     return meta
 
 
+def _add_aux_features(row, sym, date, aux):
+    """添加辅助特征到 feature dict"""
+    date_str = pd.Timestamp(str(date)[:10])
+
+
 if __name__ == '__main__':
     import sqlite3
 
@@ -322,10 +327,6 @@ if __name__ == '__main__':
     train_model(X_train, y_train, X_val, y_val, args.output, target_horizon)
 
     conn.close()
-
-def _add_aux_features(row, sym, date, aux):
-    """添加辅助特征到 feature dict"""
-    date_str = pd.Timestamp(str(date)[:10])
 
     # 基本面
     fund = aux.get('fund')
