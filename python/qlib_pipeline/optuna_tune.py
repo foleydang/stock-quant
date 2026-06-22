@@ -30,7 +30,8 @@ def load_dataset():
     """加载特征缓存，返回 numpy 数组"""
     df = pd.read_parquet(CACHE_FILE)
     y = df.pop('__label__').values.astype(np.float32)
-    df.pop('__date__', None)  # 移除日期列
+    if '__date__' in df.columns:
+        df.drop(columns=['__date__'], inplace=True)
     X = df.values.astype(np.float32)
     return X, y
 
