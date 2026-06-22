@@ -33,7 +33,7 @@ from qlib_pipeline.features_daily import compute_features_batch, compute_feature
 OHLCV_FEATURES = [f for f in FEATURE_NAMES if not f.startswith(('fund_', 'macro_', 'north_', 'sent_', 'sector_'))]
 
 DB_PATH = get_db_path()
-CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v3.parquet')
+CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v4.parquet')
 
 
 # ──────────────────────────────────────────────
@@ -89,7 +89,8 @@ def load_auxiliary(conn):
     # 宏观
     try:
         macro = pd.read_sql(
-            "SELECT trade_date, hs300_close, shibor_1w, cn_10y FROM macro_daily ORDER BY trade_date", conn)
+            "SELECT trade_date, hs300_close, shibor_1w, shibor_1m, cn_10y, "
+            "cn_us_spread, usdcny, us_10y FROM macro_daily ORDER BY trade_date", conn)
         macro['trade_date'] = pd.to_datetime(macro['trade_date'])
         macro = macro.set_index('trade_date')
         aux['macro'] = macro
@@ -100,7 +101,7 @@ def load_auxiliary(conn):
     # 北向资金
     try:
         north = pd.read_sql(
-            "SELECT trade_date, north_net FROM north_flow ORDER BY trade_date", conn)
+            "SELECT trade_date, north_net, total_net FROM north_flow ORDER BY trade_date", conn)
         north['trade_date'] = pd.to_datetime(north['trade_date'])
         north = north.set_index('trade_date')
         aux['north'] = north
@@ -111,8 +112,8 @@ def load_auxiliary(conn):
     # 情绪
     try:
         sent = pd.read_sql(
-            "SELECT symbol, trade_date, is_limit_up, is_limit_down, vol_ratio_20 "
-            "FROM sentiment_daily", conn)
+            "SELECT symbol, trade_date, is_limit_up, is_limit_down, vol_ratio_20, "
+            "lhb_net_buy, margin_balance_chg, abnormal_ret FROM sentiment_daily", conn)
         sent['trade_date'] = pd.to_datetime(sent['trade_date'])
         sent = sent.set_index(['symbol', 'trade_date']).sort_index()
         aux['sent'] = sent
@@ -142,12 +143,13 @@ def _add_aux_features(row, sym, date, aux):
                 row['fund_roe'] = float(latest.get('roe', 0) or 0)
                 row['fund_np_yoy'] = float(latest.get('net_profit_yoy', 0) or 0)
                 row['fund_debt'] = float(latest.get('debt_ratio', 0) or 0)
+                row['fund_rev_yoy'] = float(latest.get('revenue_yoy', 0) or 0)
             else:
-                row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+                row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = row['fund_rev_yoy'] = 0
         except Exception:
-            row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+            row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = row['fund_rev_yoy'] = 0
     else:
-        row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+        row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = row['fund_rev_yoy'] = 0
 
     # 行业
     industry = aux.get('sector', {}).get(sym, '未知')
@@ -163,16 +165,23 @@ def _add_aux_features(row, sym, date, aux):
         else:
             row['macro_hs300_chg'] = 0
         row['macro_shibor_1w'] = float(m.get('shibor_1w', 0) or 0)
+        row['macro_shibor_1m'] = float(m.get('shibor_1m', 0) or 0)
         row['macro_cn_10y'] = float(m.get('cn_10y', 0) or 0)
+        row['macro_us_10y'] = float(m.get('us_10y', 0) or 0)
+        row['macro_cn_us_spread'] = float(m.get('cn_us_spread', 0) or 0)
+        row['macro_usdcny'] = float(m.get('usdcny', 0) or 0)
     else:
-        row['macro_hs300_chg'] = row['macro_shibor_1w'] = row['macro_cn_10y'] = 0
+        row['macro_hs300_chg'] = row['macro_shibor_1w'] = row['macro_shibor_1m'] = 0
+        row['macro_cn_10y'] = row['macro_us_10y'] = row['macro_cn_us_spread'] = 0
+        row['macro_usdcny'] = 0
 
     # 北向
     north = aux.get('north')
     if north is not None and ds in north.index:
         row['north_net'] = float(north.loc[ds, 'north_net'] or 0)
+        row['north_total_net'] = float(north.loc[ds, 'total_net'] or 0)
     else:
-        row['north_net'] = 0
+        row['north_net'] = row['north_total_net'] = 0
 
     # 情绪
     sent = aux.get('sent')
@@ -184,12 +193,18 @@ def _add_aux_features(row, sym, date, aux):
                 row['sent_limit_up'] = float(s.get('is_limit_up', 0) or 0)
                 row['sent_limit_down'] = float(s.get('is_limit_down', 0) or 0)
                 row['sent_vol_ratio'] = float(s.get('vol_ratio_20', 0) or 0)
+                row['sent_lhb_net'] = float(s.get('lhb_net_buy', 0) or 0)
+                row['sent_margin_chg'] = float(s.get('margin_balance_chg', 0) or 0)
+                row['sent_abnormal_ret'] = float(s.get('abnormal_ret', 0) or 0)
             else:
                 row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+                row['sent_lhb_net'] = row['sent_margin_chg'] = row['sent_abnormal_ret'] = 0
         except Exception:
             row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+            row['sent_lhb_net'] = row['sent_margin_chg'] = row['sent_abnormal_ret'] = 0
     else:
         row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+        row['sent_lhb_net'] = row['sent_margin_chg'] = row['sent_abnormal_ret'] = 0
 
 
 # ──────────────────────────────────────────────
