@@ -544,9 +544,11 @@ FEATURE_NAMES = sorted([
     'cci_14', 'cci_20',
     'roc_3d', 'roc_5d', 'roc_10d', 'roc_20d', 'roc_60d',
     # 辅助特征
-    'fund_roe', 'fund_np_yoy', 'fund_debt',
-    'macro_hs300_chg', 'macro_shibor_1w', 'macro_cn_10y',
-    'north_net',
+    'fund_roe', 'fund_np_yoy', 'fund_debt', 'fund_rev_yoy',
+    'macro_hs300_chg', 'macro_shibor_1w', 'macro_shibor_1m', 'macro_cn_10y',
+    'macro_us_10y', 'macro_cn_us_spread', 'macro_usdcny',
+    'north_net', 'north_total_net',
     'sent_limit_up', 'sent_limit_down', 'sent_vol_ratio',
+    'sent_lhb_net', 'sent_margin_chg', 'sent_abnormal_ret',
     'sector_code',
 ])
