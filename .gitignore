@@ -46,4 +46,5 @@ python/logs/
 
 # 环境
 .env
-.env.local
+.env.localmlruns/
+python/.pytest_cache/
