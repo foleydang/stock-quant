@@ -60,7 +60,6 @@ def build_dataset(data, target_horizon=5, use_cache=True):
     """构建特征-标签数据集 (向量化批量计算，支持缓存)"""
     if use_cache and os.path.exists(CACHE_FILE):
         print(f"  📦 加载缓存: {CACHE_FILE}")
-        import pandas as pd
         df = pd.read_parquet(CACHE_FILE)
         y = df.pop('__label__').values
         return df, y
