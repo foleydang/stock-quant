@@ -22,7 +22,9 @@ sys.path.insert(0, ROOT)
 from config_loader import get_db_path
 
 DB_PATH = get_db_path()
-CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v3.parquet')
+CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v4.parquet')
+if not os.path.exists(CACHE_FILE):
+    CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v3.parquet')
 OUTPUT_DIR = os.path.join(ROOT, 'models', 'lgb_daily')
 
 
