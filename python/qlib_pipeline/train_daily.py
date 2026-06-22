@@ -33,7 +33,7 @@ DB_PATH = get_db_path()
 
 
 def load_data(conn):
-    """加载所有股票日线数据"""
+    """加载所有股票日线数据 + 辅助数据"""
     symbols = [r[0] for r in conn.execute(
         "SELECT DISTINCT symbol FROM kline_daily ORDER BY symbol"
     ).fetchall()]
@@ -51,13 +51,76 @@ def load_data(conn):
             if len(str(d)) == 8 else str(d)[:10]
         ))
         data[sym] = df
-    return data
+
+    # 加载辅助数据
+    aux = load_auxiliary(conn, data)
+    return data, aux
 
 
-CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v2.parquet')
+def load_auxiliary(conn, data):
+    """加载基本面、行业、宏观、情绪数据"""
+    aux = {}
+
+    # 基本面
+    try:
+        fund = pd.read_sql("SELECT * FROM fundamental_daily", conn)
+        fund['trade_date'] = pd.to_datetime(fund['trade_date'])
+        fund = fund.set_index(['symbol', 'trade_date']).sort_index()
+        aux['fund'] = fund
+        print(f"  基本面: {len(fund)} 条")
+    except Exception:
+        aux['fund'] = None
+
+    # 行业
+    try:
+        sector = pd.read_sql("SELECT symbol, industry FROM stock_sector", conn)
+        aux['sector'] = sector.set_index('symbol')['industry'].to_dict()
+        print(f"  行业: {len(aux['sector'])} 只")
+    except Exception:
+        aux['sector'] = {}
+
+    # 宏观
+    try:
+        macro = pd.read_sql(
+            "SELECT trade_date, hs300_close, hs300_volume, shibor_1w, cn_10y, "
+            "shibor_1m, cn_2y, cn_5y, cn_30y FROM macro_daily ORDER BY trade_date", conn)
+        macro['trade_date'] = pd.to_datetime(macro['trade_date'])
+        macro = macro.set_index('trade_date')
+        aux['macro'] = macro
+        print(f"  宏观: {len(macro)} 天")
+    except Exception:
+        aux['macro'] = None
+
+    # 北向资金
+    try:
+        north = pd.read_sql(
+            "SELECT trade_date, north_net, total_net FROM north_flow ORDER BY trade_date", conn)
+        north['trade_date'] = pd.to_datetime(north['trade_date'])
+        north = north.set_index('trade_date')
+        aux['north'] = north
+        print(f"  北向: {len(north)} 天")
+    except Exception:
+        aux['north'] = None
+
+    # 情绪
+    try:
+        sent = pd.read_sql(
+            "SELECT symbol, trade_date, is_limit_up, is_limit_down, vol_ratio_20 "
+            "FROM sentiment_daily", conn)
+        sent['trade_date'] = pd.to_datetime(sent['trade_date'])
+        sent = sent.set_index(['symbol', 'trade_date']).sort_index()
+        aux['sent'] = sent
+        print(f"  情绪: {len(sent)} 条")
+    except Exception:
+        aux['sent'] = None
+
+    return aux
 
 
-def build_dataset(data, target_horizon=5, use_cache=True):
+CACHE_FILE = os.path.join(os.path.dirname(DB_PATH), 'features_cache_v3.parquet')
+
+
+def build_dataset(data, aux, target_horizon=5, use_cache=True):
     """构建特征-标签数据集 (向量化批量计算，支持缓存)"""
     if use_cache and os.path.exists(CACHE_FILE):
         print(f"  📦 加载缓存: {CACHE_FILE}")
@@ -96,6 +159,9 @@ def build_dataset(data, target_horizon=5, use_cache=True):
                 row[k] = v
             if not valid:
                 continue
+
+            # 添加辅助特征
+            _add_aux_features(row, sym, dates[i], aux)
 
             X_rows.append(row)
             y_rows.append(future_return)
@@ -233,11 +299,11 @@ if __name__ == '__main__':
     conn = sqlite3.connect(DB_PATH)
 
     print("📡 加载数据...")
-    data = load_data(conn)
+    data, aux = load_data(conn)
     print(f"  {len(data)} 只股票")
 
     print("🔧 构建特征...")
-    X, y, dates = build_dataset(data, target_horizon=target_horizon)
+    X, y, dates = build_dataset(data, aux, target_horizon=target_horizon)
 
     # 时间切分: 前70%训练, 后30%验证
     n = len(X)
@@ -253,3 +319,67 @@ if __name__ == '__main__':
     train_model(X_train, y_train, X_val, y_val, args.output, target_horizon)
 
     conn.close()
+
+def _add_aux_features(row, sym, date, aux):
+    """添加辅助特征到 feature dict"""
+    date_str = pd.Timestamp(str(date)[:10])
+
+    # 基本面
+    fund = aux.get('fund')
+    if fund is not None and sym in fund.index:
+        try:
+            fund_stock = fund.loc[sym]
+            fund_before = fund_stock[fund_stock.index <= date_str]
+            if len(fund_before) > 0:
+                latest = fund_before.iloc[-1]
+                row['fund_roe'] = float(latest.get('roe', 0)) if pd.notna(latest.get('roe')) else 0
+                row['fund_np_yoy'] = float(latest.get('net_profit_yoy', 0)) if pd.notna(latest.get('net_profit_yoy')) else 0
+                row['fund_debt'] = float(latest.get('debt_ratio', 0)) if pd.notna(latest.get('debt_ratio')) else 0
+            else:
+                row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+        except Exception:
+            row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+    else:
+        row['fund_roe'] = row['fund_np_yoy'] = row['fund_debt'] = 0
+
+    # 行业
+    industry = aux.get('sector', {}).get(sym, '\u672a\u77e5')
+    row['sector_code'] = float(hash(industry) % 100) / 100
+
+    # 宏观
+    macro = aux.get('macro')
+    if macro is not None and date_str in macro.index:
+        m = macro.loc[date_str]
+        if macro.index.get_loc(date_str) > 0:
+            prev = macro.iloc[macro.index.get_loc(date_str) - 1]['hs300_close']
+            row['macro_hs300_chg'] = float((m['hs300_close'] - prev) / prev) if prev > 0 else 0
+        else:
+            row['macro_hs300_chg'] = 0
+        row['macro_shibor_1w'] = float(m.get('shibor_1w', 0)) if pd.notna(m.get('shibor_1w')) else 0
+        row['macro_cn_10y'] = float(m.get('cn_10y', 0)) if pd.notna(m.get('cn_10y')) else 0
+    else:
+        row['macro_hs300_chg'] = row['macro_shibor_1w'] = row['macro_cn_10y'] = 0
+
+    # 北向
+    north = aux.get('north')
+    if north is not None and date_str in north.index:
+        row['north_net'] = float(north.loc[date_str, 'north_net']) if pd.notna(north.loc[date_str, 'north_net']) else 0
+    else:
+        row['north_net'] = 0
+
+    # 情绪
+    sent = aux.get('sent')
+    if sent is not None and sym in sent.index:
+        try:
+            sent_stock = sent.loc[sym]
+            if date_str in sent_stock.index:
+                s = sent_stock.loc[date_str]
+                row['sent_limit_up'] = float(s.get('is_limit_up', 0)) if pd.notna(s.get('is_limit_up')) else 0
+                row['sent_limit_down'] = float(s.get('is_limit_down', 0)) if pd.notna(s.get('is_limit_down')) else 0
+                row['sent_vol_ratio'] = float(s.get('vol_ratio_20', 0)) if pd.notna(s.get('vol_ratio_20')) else 0
+            else:
+                row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+        except Exception:
+            row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0
+    else:
+        row['sent_limit_up'] = row['sent_limit_down'] = row['sent_vol_ratio'] = 0

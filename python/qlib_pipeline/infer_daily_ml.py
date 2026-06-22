@@ -20,6 +20,9 @@ sys.path.insert(0, PROJECT_ROOT)
 from config_loader import get_db_path
 from qlib_pipeline.features_daily import compute_features, FEATURE_NAMES
 
+# 复制辅助特征加载逻辑（轻量版）
+from qlib_pipeline.train_daily import load_auxiliary, _add_aux_features
+
 DB_PATH = get_db_path()
 MODEL_DIR = os.path.join(PROJECT_ROOT, 'models', 'lgb_daily')
 SIGNAL_FILE = os.path.join(PROJECT_ROOT, 'data', 'daily_ml_signals.json')
@@ -40,7 +43,7 @@ def load_model(model_dir=MODEL_DIR):
     return pipeline, meta
 
 
-def predict_all(conn, pipeline):
+def predict_all(conn, pipeline, aux):
     """对所有股票预测未来收益"""
     symbols = [r[0] for r in conn.execute(
         "SELECT DISTINCT symbol FROM kline_daily ORDER BY symbol"
@@ -61,6 +64,9 @@ def predict_all(conn, pipeline):
         )
         if feats is None:
             continue
+
+        # 添加辅助特征
+        _add_aux_features(feats, sym, df['date'].iloc[-1], aux)
 
         X = pd.DataFrame([feats])
         for col in FEATURE_NAMES:
@@ -158,8 +164,11 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
+    # 加载辅助数据
+    aux = load_auxiliary(conn, {})
+
     print(f"📡 预测中...", flush=True)
-    scores = predict_all(conn, pipeline)
+    scores = predict_all(conn, pipeline, aux)
     name_map = get_names(conn)
     positions = get_positions(conn)
     signals = generate_signals(scores, positions, name_map, args.top_k)
