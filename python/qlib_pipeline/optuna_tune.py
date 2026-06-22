@@ -74,6 +74,7 @@ def objective(trial, X, y, splits):
         'random_state': 42,
         'n_jobs': -1,
         'verbose': -1,
+        'verbosity': -1,
     }
 
     # ── 时序交叉验证 ──
@@ -91,7 +92,7 @@ def objective(trial, X, y, splits):
             X_train_s, y_train,
             eval_set=[(X_val_s, y_val)],
             eval_metric='rmse',
-            callbacks=[lgb.early_stopping(100)],
+            callbacks=[lgb.early_stopping(100, verbose=False)],
         )
 
         y_pred = model.predict(X_val_s)
@@ -191,6 +192,7 @@ def main():
         'random_state': 42,
         'n_jobs': -1,
         'verbose': -1,
+        'verbosity': -1,
     })
 
     # 最终用 70/30 单次切分训练
