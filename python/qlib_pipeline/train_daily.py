@@ -29,6 +29,9 @@ sys.path.insert(0, ROOT)
 from config_loader import get_db_path
 from qlib_pipeline.features_daily import compute_features_batch, compute_features, FEATURE_NAMES
 
+# OHLCV 特征 (不含辅助特征)
+OHLCV_FEATURES = [f for f in FEATURE_NAMES if not f.startswith(('fund_', 'macro_', 'north_', 'sent_', 'sector_'))]
+
 DB_PATH = get_db_path()
 
 
@@ -151,7 +154,7 @@ def build_dataset(data, aux, target_horizon=5, use_cache=True):
 
             row = {}
             valid = True
-            for k in FEATURE_NAMES:
+            for k in OHLCV_FEATURES:
                 v = feats_batch[k][i]
                 if np.isnan(v) or np.isinf(v):
                     valid = False
