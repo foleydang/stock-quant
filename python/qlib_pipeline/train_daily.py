@@ -26,7 +26,7 @@ warnings.filterwarnings('ignore')
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from config_loader import get_db_path
-from qlib_pipeline.features_daily import compute_features, FEATURE_NAMES
+from qlib_pipeline.features_daily import compute_features_batch, compute_features, FEATURE_NAMES
 
 DB_PATH = get_db_path()
 
@@ -54,41 +54,45 @@ def load_data(conn):
 
 
 def build_dataset(data, target_horizon=5):
-    """构建特征-标签数据集"""
+    """构建特征-标签数据集 (向量化批量计算)"""
     from tqdm import tqdm
-    X_rows, y_rows, meta_rows = [], [], []
+    X_rows, y_rows = [], []
 
     for sym, df in tqdm(data.items(), desc="  计算特征", unit="stock"):
         close = df['close'].values
         high = df['high'].values
         low = df['low'].values
         vol = df['volume'].values
-        dates = df['date'].values
 
+        # 批量计算该股票全部特征
+        feats_batch = compute_features_batch(close, high, low, vol)
+        if feats_batch is None:
+            continue
+
+        # 提取训练样本
         for i in range(120, len(df) - target_horizon):
-            feats = compute_features(close[:i+1], high[:i+1], low[:i+1], vol[:i+1])
-            if feats is None:
-                continue
-
             future_return = close[i + target_horizon] / close[i] - 1
             if np.isnan(future_return) or np.isinf(future_return):
                 continue
 
-            X_rows.append(feats)
+            row = {}
+            valid = True
+            for k in FEATURE_NAMES:
+                v = feats_batch[k][i]
+                if np.isnan(v) or np.isinf(v):
+                    valid = False
+                    break
+                row[k] = v
+            if not valid:
+                continue
+
+            X_rows.append(row)
             y_rows.append(future_return)
-            meta_rows.append({
-                'symbol': sym,
-                'date': str(dates[i])[:10],
-                'future_return': future_return,
-            })
 
     X = pd.DataFrame(X_rows)
-    for col in FEATURE_NAMES:
-        if col not in X.columns:
-            X[col] = 0.0
     X = X[FEATURE_NAMES].fillna(0).replace([np.inf, -np.inf], 0)
 
-    return X, np.array(y_rows), pd.DataFrame(meta_rows)
+    return X, np.array(y_rows)
 
 
 def train_model(X_train, y_train, X_val, y_val, output_dir):
@@ -208,7 +212,7 @@ if __name__ == '__main__':
     print(f"  {len(data)} 只股票")
 
     print("🔧 构建特征...")
-    X, y, meta = build_dataset(data, target_horizon=target_horizon)
+    X, y = build_dataset(data, target_horizon=target_horizon)
 
     # 时间切分: 前70%训练, 后30%验证
     n = len(X)
