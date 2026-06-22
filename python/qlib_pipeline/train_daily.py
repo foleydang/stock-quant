@@ -147,6 +147,8 @@ def build_dataset(data, aux, target_horizon=5, use_cache=True):
         if feats_batch is None:
             continue
 
+        stock_dates = df['date'].values
+
         # 提取训练样本
         for i in range(120, len(df) - target_horizon):
             future_return = close[i + target_horizon] / close[i] - 1
@@ -165,11 +167,11 @@ def build_dataset(data, aux, target_horizon=5, use_cache=True):
                 continue
 
             # 添加辅助特征
-            _add_aux_features(row, sym, dates[i], aux)
+            _add_aux_features(row, sym, stock_dates[i], aux)
 
             X_rows.append(row)
             y_rows.append(future_return)
-            date_rows.append(str(dates[i])[:10])
+            date_rows.append(str(stock_dates[i])[:10])
 
     X = pd.DataFrame(X_rows)
     X = X[FEATURE_NAMES].fillna(0).replace([np.inf, -np.inf], 0)
