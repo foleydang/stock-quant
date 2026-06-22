@@ -237,6 +237,22 @@ class TradingMonitor:
             sys.stderr.write(f"预测失败 {symbol}: {e}\n")
             return None
 
+    def _load_ml_signals(self) -> Optional[Dict]:
+        """加载 ML 日线策略信号"""
+        signal_file = os.path.join(BASE_DIR, 'data', 'daily_ml_signals.json')
+        if not os.path.exists(signal_file):
+            return None
+        try:
+            with open(signal_file) as f:
+                data = json.load(f)
+            # 检查是否是今天的信号
+            today = datetime.now().strftime('%Y-%m-%d')
+            if data.get('date') == today:
+                return data
+        except Exception:
+            pass
+        return None
+
     def analyze_positions(self) -> List[Dict]:
         """分析持仓，给出操作建议"""
         positions = self.get_positions()
@@ -410,6 +426,34 @@ class TradingMonitor:
                 price = float(df['close'].iloc[0])
                 print(f"  👀 {stock['name']}: ¥{price:.2f}")
         conn.close()
+
+        # ── ML 日线信号 ──
+        ml_signals = self._load_ml_signals()
+        if ml_signals:
+            print(f"\n【ML 日线量化信号】")
+            print(f"  模型: {ml_signals.get('model', {}).get('model', '?')}"
+                  f" | RankIC={ml_signals.get('model', {}).get('RankIC', '?')}")
+
+            for s in ml_signals.get('signals', []):
+                icon = {'BUY': '🟢', 'SELL': '🔴', 'ADD': '🔵'}.get(s['action'], '⚪')
+                extra = ''
+                if s['action'] == 'BUY':
+                    extra = f" | {s.get('shares', '?')}股 ¥{s.get('amount', 0):,.0f}"
+                elif s['action'] == 'ADD':
+                    extra = f" | +{s.get('add_shares', '?')}股 ¥{s.get('add_amount', 0):,.0f}"
+                elif s['action'] == 'SELL':
+                    extra = f" | 持仓{s.get('hold_days', '?')}天 | {s.get('pnl', '?')}"
+                print(f"  {icon} {s['action']:4s} | {s['symbol']:12s} {s.get('name', '')[:8]:8s}"
+                      f" | @{s['price']:.2f} | 排名:{s['rank']} | {s['reason']}{extra}")
+
+            if not ml_signals.get('signals'):
+                print(f"  ⚪ 无交易信号")
+
+            top5 = ml_signals.get('top5', [])
+            if top5:
+                print(f"\n  ML Top-5 推荐:")
+                for t in top5:
+                    print(f"    {t['rank']:3d}. {t['symbol']:12s} 分数:{t['score']:.4f}")
 
         # 发送邮件
         if send_email and self.email_notifier:
