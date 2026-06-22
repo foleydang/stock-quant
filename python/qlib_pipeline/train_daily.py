@@ -111,7 +111,7 @@ def build_dataset(data, target_horizon=5, use_cache=True):
     return X, y
 
 
-def train_model(X_train, y_train, X_val, y_val, output_dir):
+def train_model(X_train, y_train, X_val, y_val, output_dir, target_horizon=5):
     """训练 LightGBM 排序模型"""
     os.makedirs(output_dir, exist_ok=True)
 
@@ -229,7 +229,7 @@ if __name__ == '__main__':
     print(f"  总样本: {n:,}")
     print(f"  训练: {len(X_train):,} | 验证: {len(X_val):,} | 特征: {X.shape[1]}")
 
-    print("🤖 训练 LightGBMRanker...")
-    train_model(X_train, y_train, X_val, y_val, args.output)
+    print("🤖 训练 LightGBM...")
+    train_model(X_train, y_train, X_val, y_val, args.output, target_horizon)
 
     conn.close()
