@@ -141,7 +141,7 @@ class IntradayStrategy:
 
         # 确保日期格式
         if 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
         df = df.sort_values('date')
 
         # 确保数值列

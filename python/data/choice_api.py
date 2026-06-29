@@ -74,7 +74,7 @@ def fetch_kline_30m(symbol: str, days: int = 60):
             'close': 'close',
             'volume': 'volume'
         })
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['date'], format='mixed')
         df = df.sort_values('date').reset_index(drop=True)
         
         return df

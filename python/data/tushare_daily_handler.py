@@ -38,7 +38,7 @@ def fetch_daily_data(symbol: str, days: int = 60):
                 'trade_date': 'date',
                 'vol': 'volume'
             })
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
             df = df[['date', 'open', 'high', 'low', 'close', 'volume']]
             df = df.sort_values('date').reset_index(drop=True)
             

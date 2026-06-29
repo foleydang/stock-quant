@@ -53,7 +53,7 @@ class MacroFeatures:
         if len(macro) == 0:
             return f
 
-        df_dates = pd.to_datetime(df['date'])
+        df_dates = pd.to_datetime(df['date'], format='mixed')
 
         # ====== 1. 利率环境 ======
         # SHIBOR

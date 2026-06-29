@@ -59,7 +59,7 @@ for idx, (symbol, cnt) in enumerate(stocks):
         print("数据不足")
         continue
 
-    df['date'] = pd.to_datetime(df['date'])
+    df['date'] = pd.to_datetime(df['date'], format='mixed')
 
     # 回测参数
     cash = 100000

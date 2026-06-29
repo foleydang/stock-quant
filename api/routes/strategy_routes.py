@@ -54,7 +54,7 @@ def run_strategy(symbol):
                 data.append({'date': r[0], 'open': float(r[1]), 'high': float(r[2]), 'low': float(r[3]), 'close': float(r[4]), 'volume': int(r[5])})
             data.reverse()  # 恢复时间正序
             df = pd.DataFrame(data)
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
             source = 'db_fallback'
         else:
             source = 'api'

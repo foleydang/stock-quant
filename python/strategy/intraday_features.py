@@ -158,7 +158,7 @@ class MicroPriceFeatures:
 
         # ---- 6. 日内位置 ----
         if 'date' in df.columns:
-            dates = pd.to_datetime(df['date'])
+            dates = pd.to_datetime(df['date'], format='mixed')
             day_grp = dates.dt.date
             day_open = df.groupby(day_grp)['open'].transform('first').values
             day_high = df.groupby(day_grp)['high'].cummax().values
@@ -311,7 +311,7 @@ class MicroVolumeFeatures:
         vwap = cum_vp / (cum_vol + 1e-10)
         f['mv_vwap_dev'] = close / vwap - 1
         if 'date' in df.columns:
-            dates = pd.to_datetime(df['date'])
+            dates = pd.to_datetime(df['date'], format='mixed')
             day_grp = dates.dt.date
             tp_series = (pd.Series(high) + pd.Series(low) + pd.Series(close)) / 3
             cum_vp_day = (tp_series * vol).groupby(day_grp).cumsum()
@@ -370,7 +370,7 @@ class IntradayPatternFeatures:
                 f[col] = 0
             return f
 
-        dates = pd.to_datetime(df['date'])
+        dates = pd.to_datetime(df['date'], format='mixed')
         total_min = dates.dt.hour * 60 + dates.dt.minute
 
         f['ip_morning'] = ((total_min >= 570) & (total_min < 690)).astype(int)
@@ -938,7 +938,7 @@ if __name__ == '__main__':
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql("SELECT * FROM kline_30m WHERE symbol='600519.SH' ORDER BY date LIMIT 500", conn)
     conn.close()
-    df['date'] = pd.to_datetime(df['date'])
+    df['date'] = pd.to_datetime(df['date'], format='mixed')
     pipeline = IntradayFeaturePipeline()
     feats = pipeline.compute_stock(df, '600519.SH')
     print(f"特征数: {len(feats.columns)}")

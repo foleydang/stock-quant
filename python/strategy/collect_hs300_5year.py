@@ -215,7 +215,7 @@ class HS300DataCollector:
 
             if df is not None and not df.empty:
                 df = df.rename(columns={'day': 'date'})
-                df['date'] = pd.to_datetime(df['date'])
+                df['date'] = pd.to_datetime(df['date'], format='mixed')
                 df = df[['date', 'open', 'high', 'low', 'close', 'volume']]
                 df = df.sort_values('date').reset_index(drop=True)
                 return df

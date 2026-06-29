@@ -98,7 +98,7 @@ def add_market_features_to_30m(conn, symbol_30m: str, df_30m: pd.DataFrame) -> p
     if df_daily.empty:
         return df_30m
 
-    df_daily['date'] = pd.to_datetime(df_daily['date'])
+    df_daily['date'] = pd.to_datetime(df_daily['date'], format='mixed')
     df_daily['daily_return'] = df_daily['close'].pct_change()
     df_daily['daily_date'] = df_daily['date'].dt.date
 
@@ -106,7 +106,7 @@ def add_market_features_to_30m(conn, symbol_30m: str, df_30m: pd.DataFrame) -> p
     daily_return_map = dict(zip(df_daily['daily_date'], df_daily['daily_return']))
 
     # 添加市场背景特征
-    df_30m_dates = pd.to_datetime(df_30m['date']).dt.date
+    df_30m_dates = pd.to_datetime(df_30m['date'], format='mixed').dt.date
     df_30m['market_daily_return'] = df_30m_dates.map(daily_return_map).fillna(0)
     df_30m['market_daily_return_lag1'] = df_30m['market_daily_return'].shift(8)
     df_30m['market_daily_return_lag2'] = df_30m['market_daily_return'].shift(16)

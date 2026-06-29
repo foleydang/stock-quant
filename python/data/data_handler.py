@@ -88,7 +88,7 @@ class DataHandler:
             conn.close()
             if df.empty:
                 return None
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
             return df
         except Exception as e:
             return None
@@ -253,7 +253,7 @@ class DataHandler:
             df = self.tushare_pro.daily(ts_code=symbol, start_date=start, end_date=end)
             if df is not None and not df.empty:
                 df = df.rename(columns={'trade_date': 'date', 'vol': 'volume'})
-                df['date'] = pd.to_datetime(df['date'])
+                df['date'] = pd.to_datetime(df['date'], format='mixed')
                 df = df[['date', 'open', 'high', 'low', 'close', 'volume']]
                 df = df.sort_values('date').reset_index(drop=True)
                 self.last_fetch_status[symbol] = {
@@ -285,7 +285,7 @@ class DataHandler:
                 if isinstance(data, list) and len(data) > 0:
                     df = pd.DataFrame(data)
                     df = df.rename(columns={"day": "date"})
-                    df["date"] = pd.to_datetime(df["date"])
+                    df["date"] = pd.to_datetime(df["date"], format="mixed")
                     for col in ["open", "high", "low", "close", "volume"]:
                         df[col] = df[col].astype(float)
                     df = df[["date", "open", "high", "low", "close", "volume"]]
@@ -410,7 +410,7 @@ class DataHandler:
         if df is None or df.empty:
             return False
         
-        last_date = pd.to_datetime(df['date'].iloc[-1])
+        last_date = pd.to_datetime(df['date'], format='mixed').iloc[-1]
         now = datetime.now()
         
         if last_date.date() == now.date():

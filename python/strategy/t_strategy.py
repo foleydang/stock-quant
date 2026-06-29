@@ -112,7 +112,7 @@ class TStrategy:
 
     def _get_today_data(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
         """获取今日数据"""
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['date'], format='mixed')
         today = datetime.now().date()
         today_df = df[df['date'].dt.date == today]
         if len(today_df) == 0:

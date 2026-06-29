@@ -517,7 +517,7 @@ class SentimentFeatures:
                 f[col] = 0
             return f
 
-        df_dates = pd.to_datetime(df['date'])
+        df_dates = pd.to_datetime(df['date'], format='mixed')
         trade_dates_ymd = df_dates.dt.strftime('%Y-%m-%d')
 
         try:
@@ -590,7 +590,7 @@ class MarketFeatures:
         if 'date' not in df.columns:
             return f
 
-        df_dates = pd.to_datetime(df['date'])
+        df_dates = pd.to_datetime(df['date'], format='mixed')
         trade_dates_ymd = df_dates.dt.strftime('%Y-%m-%d')
         trade_dates_raw8 = df_dates.dt.strftime('%Y%m%d')
 

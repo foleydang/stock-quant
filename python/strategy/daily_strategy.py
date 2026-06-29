@@ -441,7 +441,7 @@ def backtest_optimized(factors_dict, start_date='2024-01-01', end_date=None):
         return
 
     df_pv = pd.DataFrame(portfolio_values)
-    df_pv['date'] = pd.to_datetime(df_pv['date'])
+    df_pv['date'] = pd.to_datetime(df_pv['date'], format='mixed')
     df_pv.set_index('date', inplace=True)
 
     initial = INITIAL_CAPITAL
