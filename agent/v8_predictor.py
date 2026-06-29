@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Tuple
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'strategy'))
 
-from train_lgb_enhanced import EnhancedFeatureEngineer
+from features_compat import EnhancedFeatureEngineer
 
 # ====== 自适应信号阈值 (基于大盘状态) ======
 # 固定阈值的问题: 牛市0.5%太保守, 熊市0.5%太乐观
@@ -341,7 +341,7 @@ class V8Predictor:
 
         candidates = [r for r in all_rankings
                       if r['symbol'] not in existing
-                      and r['predicted_return'] > BUY_THRESHOLD]
+                      and r['predicted_return'] > BASE_BUY_THRESHOLD]
 
         return candidates[:n]
 

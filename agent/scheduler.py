@@ -15,11 +15,39 @@ import os
 import sys
 import json
 import logging
-from datetime import datetime
+import time
+from datetime import datetime, date
 from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+
+# ========== 交易日历（带缓存） ==========
+_trading_calendar = None
+_trading_calendar_date = None
+
+def is_trading_day() -> bool:
+    """判断今天是否为A股交易日（含节假日判断）"""
+    global _trading_calendar, _trading_calendar_date
+    today_str = date.today().strftime('%Y-%m-%d')
+    
+    # 缓存：同一天不重复拉取
+    if _trading_calendar is not None and _trading_calendar_date == today_str:
+        return today_str in _trading_calendar
+    
+    try:
+        import akshare as ak
+        df = ak.tool_trade_date_hist_sina()
+        _trading_calendar = set(df['trade_date'].astype(str).values)
+        _trading_calendar_date = today_str
+        result = today_str in _trading_calendar
+        if not result:
+            logger.info(f"{today_str} 非交易日，跳过定时推送")
+        return result
+    except Exception as e:
+        logger.warning(f"交易日历获取失败，回退到周一至周五判断: {e}")
+        # 回退：周一至周五
+        return date.today().weekday() < 5
 
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PYTHON_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'python')
@@ -390,6 +418,8 @@ def _generate_action_hint(alert: dict, ta: dict, position_info: dict = None) -> 
 
 def morning_alert():
     """盘前提醒 9:25 - 持仓分析 + 关键位 + AI新闻摘要"""
+    if not is_trading_day():
+        return
     logger.info("盘前提醒触发")
 
     # 获取自选股行情
@@ -725,6 +755,8 @@ def _risk_alert_check():
 
 def intraday_alert_monitor():
     """盘中异动轮询 - 分时段频率 + 技术信号限频推送"""
+    if not is_trading_day():
+        return
     # ===== 频率控制：高波动时段每5分钟，其他时段每10分钟 =====
     now = datetime.now()
     m = now.minute
@@ -842,6 +874,8 @@ def intraday_alert_monitor():
 
 def intraday_check():
     """盘中开盘全量检查 - 异动 + 新闻 + LLM操作建议"""
+    if not is_trading_day():
+        return
     logger.info("盘中开盘监控触发")
 
     try:
@@ -913,6 +947,8 @@ def intraday_check():
 
 def daily_summary_push():
     """盘后总结推送 15:05"""
+    if not is_trading_day():
+        return
     logger.info("盘后总结推送触发")
 
     summary_data = get_daily_summary()
@@ -929,6 +965,8 @@ def daily_summary_push():
 
 def evening_review():
     """晚间复盘推送 18:00 - 今日总结 + 明日计划"""
+    if not is_trading_day():
+        return
     logger.info("晚间复盘推送触发")
 
     try:
@@ -1033,12 +1071,79 @@ def _push_card(card: dict):
         logger.error(f"推送飞书卡片失败: {e}")
 
 
+def save_30min_kline_data(symbols: list = None):
+    """保存30分钟K线数据到数据库（东方财富API）
+    
+    在盘中监控时调用，确保 kline_30m 表有当日最新数据，
+    后续 qlib 模型可直接使用。
+    """
+    import sqlite3
+    import requests
+    
+    if symbols is None:
+        # 默认：所有持仓股 + 自选股
+        conn = sqlite3.connect(DB_PATH)
+        symbols = [r[0] for r in conn.execute("SELECT DISTINCT symbol FROM positions").fetchall()]
+        for w in WATCHLIST:
+            s = w.get('symbol', '')
+            if s and s not in symbols:
+                symbols.append(s)
+        conn.close()
+    
+    if not symbols:
+        return
+    
+    conn = sqlite3.connect(DB_PATH)
+    new_total = 0
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://quote.eastmoney.com/',
+    }
+    
+    for sym in symbols:
+        if sym.endswith('.HK'):
+            continue
+        code = sym.split('.')[0]
+        secid = f"0.{code}" if sym.endswith('.SZ') else f"1.{code}"
+        
+        try:
+            r = requests.get(
+                'http://push2his.eastmoney.com/api/qt/stock/kline/get',
+                params={'secid': secid, 'fields1': 'f1,f2,f3', 'fields2': 'f51,f52,f53,f54,f55,f56,f57',
+                        'klt': '30', 'fqt': '1', 'end': '20260625', 'lmt': 8},
+                headers=headers, timeout=10
+            )
+            data = r.json()
+            klines = data.get('data', {}).get('klines', [])
+        except Exception:
+            continue
+        
+        for line in klines:
+            parts = line.split(',')
+            if len(parts) < 6:
+                continue
+            dt, o, c, h, l, v = parts[0], float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4]), float(parts[5])
+            if not conn.execute("SELECT 1 FROM kline_30m WHERE symbol=? AND date=?", (sym, dt)).fetchone():
+                conn.execute(
+                    "INSERT OR IGNORE INTO kline_30m (symbol,date,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?)",
+                    (sym, dt, o, h, l, c, v))
+                new_total += 1
+    
+    if new_total > 0:
+        conn.commit()
+        logger.info(f"💾 30min K线数据已保存: +{new_total}条 ({len(symbols)}只股票)")
+    conn.close()
+
+
 def v8_intraday_push():
     """v8 模型盘中推送 — 每30分钟预测排名 + 持仓加减仓建议"""
+    if not is_trading_day():
+        return
     logger.info("v8 模型预测推送触发")
 
     try:
         from v8_predictor import get_predictor, format_feishu_message, TOP_N_CANDIDATES
+        import sqlite3
         predictor = get_predictor()
 
         if not predictor.is_loaded():
@@ -1123,6 +1228,74 @@ def v8_intraday_push():
         logger.error(f"v8预测推送失败: {e}")
 
 
+def qlib_intraday_push():
+    """qlib 30min模型预测推送 — 盘前9:25（用昨天收盘数据预测今天）"""
+    if not is_trading_day():
+        return
+    logger.info("qlib 盘前预测推送触发（用昨日数据）")
+
+    try:
+        from qlib_light_predictor import predict_top_stocks, format_feishu_card
+        result = predict_top_stocks(10, use_yesterday=True)
+        if not result or not result.get('signals'):
+            logger.info("qlib 无有效预测")
+            return
+
+        text = format_feishu_card(result)
+        from card_templates import make_text_card
+        card = make_text_card(text)
+        _push_card(card)
+        logger.info(f"qlib盘前预测推送完成: {len(result['signals'])}只")
+
+    except Exception as e:
+        logger.error(f"qlib预测推送失败: {e}")
+
+
+def save_and_rebuild_qlib_data():
+    """收盘后保存全部372只股票的30min数据，并重建qlib bin"""
+    if not is_trading_day():
+        return
+    logger.info("📊 收盘后30min数据保存 + qlib重建...")
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['/root/miniconda3/bin/python3', '/root/github/stock-quant/scripts/update_qlib_data.py'],
+            capture_output=True, text=True, timeout=600
+        )
+        if result.returncode == 0:
+            # 提取关键信息
+            for line in result.stdout.strip().split('\n'):
+                if '✅' in line:
+                    logger.info(line.strip())
+        else:
+            logger.error(f"30min数据更新失败: {result.stderr[-200:]}")
+    except Exception as e:
+        logger.error(f"30min数据更新异常: {e}")
+
+
+def lgbm_signal_push():
+    """LGBM 模型信号推送 — 盘前推送 + 盘中更新"""
+    if not is_trading_day():
+        return
+    logger.info("LGBM 模型信号推送触发")
+
+    try:
+        signals_data = get_signals_data()
+        signals = signals_data.get('signals', [])
+        if not signals:
+            logger.info("LGBM: 无有效信号")
+            return
+
+        buy_count = sum(1 for s in signals if '买入' in s.get('signal', '') or s.get('signal') == 'buy')
+        sell_count = sum(1 for s in signals if '卖出' in s.get('signal', '') or s.get('signal') == 'sell')
+
+        card = make_signal_card(signals)
+        _push_card(card)
+        logger.info(f"LGBM信号推送完成: {len(signals)}只 (买入{buy_count}/卖出{sell_count})")
+    except Exception as e:
+        logger.error(f"LGBM信号推送失败: {e}")
+
+
 def setup_scheduler():
     """配置定时任务"""
     # 盘前提醒 9:25 —— 集合竞价阶段，提供今日关注点
@@ -1200,8 +1373,43 @@ def setup_scheduler():
         misfire_grace_time=120
     )
 
-    logger.info("定时任务已配置: 盘前9:25, 开盘9:30/13:00, 盘后15:05, "
-               "晚间18:00, 异动轮询(分时段频率), v8预测(10:00/14:30/15:00)")
+    # qlib 30min模型预测推送 — 盘前9:25（用昨天数据预测今天）
+    scheduler.add_job(
+        qlib_intraday_push,
+        CronTrigger(hour=9, minute=25, day_of_week='mon-fri'),
+        id='qlib_intraday_0925',
+        name='qlib盘前预测(9:25)',
+        misfire_grace_time=300
+    )
+
+    # LGBM 模型信号推送 — 盘前9:25 + 盘中14:00
+    scheduler.add_job(
+        lgbm_signal_push,
+        CronTrigger(hour=9, minute=25, day_of_week='mon-fri'),
+        id='lgbm_signal_0925',
+        name='LGBM信号推送(盘前)',
+        misfire_grace_time=120
+    )
+    scheduler.add_job(
+        lgbm_signal_push,
+        CronTrigger(hour=14, minute=0, day_of_week='mon-fri'),
+        id='lgbm_signal_1400',
+        name='LGBM信号推送(盘中)',
+        misfire_grace_time=120
+    )
+
+    # 收盘后保存全部30min数据 + 重建qlib bin（15:10）
+    scheduler.add_job(
+        save_and_rebuild_qlib_data,
+        CronTrigger(hour=15, minute=10, day_of_week='mon-fri'),
+        id='save_qlib_data_1510',
+        name='30min数据保存+qlib重建(15:10)',
+        misfire_grace_time=600
+    )
+
+    logger.info("定时任务已配置: 盘前9:25(含qlib+LGBM预测), 开盘9:30/13:00, 盘后15:05, "
+               "晚间18:00, 异动轮询(分时段频率), v8预测(10:00/14:30/15:00), "
+               "LGBM信号(9:25/14:00), 30min数据保存(15:10)")
 
 
 def start_scheduler():

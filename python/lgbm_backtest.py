@@ -101,7 +101,8 @@ class LGBMBacktesterOptimized:
             self.daily_model_data = self._load_model(daily_path)
             self.daily_models = self.daily_model_data.get('models', []) if self.daily_model_data else []
             logger.info(f"📊 日线模型: {len(self.daily_models)} 个子模型 (双层架构)")
-            logger.info(f"   日线F1: {self.daily_model_data.get('cv_f1', '?')}")
+            cv_f1 = self.daily_model_data.get('cv_f1', '?') if self.daily_model_data else '?'
+            logger.info(f"   日线F1: {cv_f1}")
         else:
             logger.info(f"⚠️ 日线模型未找到 ({daily_path})，使用单层30分钟模型")
 
@@ -170,17 +171,74 @@ class LGBMBacktesterOptimized:
 
         logger.info(f"日线特征预计算完成，共 {len(self.daily_features_cache)} 只股票")
 
+    # Feature name mapping: old model names → new engineer names
+    _FEATURE_NAME_MAP = {
+        'return_': 'price_ret_',
+        'volatility_': 'price_vol_',
+        'parkinson_vol': 'price_parkinson_vol',
+        'ma5_ratio': 'price_ma5_ratio',
+        'ma120_ratio': 'price_ma120_ratio',
+        'ma20_ma60': 'price_ma20_60_dist',
+        'ma60_ma120': 'price_ma60_120_dist',
+        'rsi_14': 'price_rsi_14',
+        'rsi_24': 'price_rsi_24',
+        'rsi_50': 'price_rsi_50',
+        'macd': 'price_macd',
+        'macd_signal': 'price_macd_signal',
+        'macd_hist': 'price_macd_hist',
+        'macd_hist_slope': 'price_macd_hist_chg',
+        'kdj_k': 'price_kdj_k',
+        'kdj_d': 'price_kdj_d',
+        'kdj_j': 'price_kdj_j',
+        'kdj_cross': 'price_kdj_kd_dist',
+        'bb_upper_20': 'price_bb20_pos',
+        'bb_width_20': 'price_bb20_width',
+        'bb_width_30': 'price_bb30_width',
+        'atr_10': 'price_atr_10',
+        'high_10_ratio': 'price_high_dist_10',
+        'price_position_20': 'price_pos_20',
+        'high_20_ratio': 'price_high_dist_20',
+        'high_60_ratio': 'price_high_dist_60',
+        'adx': 'price_adx',
+        'trend_strength': 'price_adx_trend',
+    }
+
+    @classmethod
+    def _map_feature_name(cls, old_name: str) -> str:
+        """Map old model feature name to new engineer feature name"""
+        if old_name in cls._FEATURE_NAME_MAP:
+            return cls._FEATURE_NAME_MAP[old_name]
+        # Try prefix matching
+        for old_prefix, new_prefix in cls._FEATURE_NAME_MAP.items():
+            if old_name.startswith(old_prefix) and old_prefix.endswith('_'):
+                return new_prefix + old_name[len(old_prefix):]
+        return old_name
+
     def _load_model(self, model_path: str) -> Optional[Dict]:
-        """加载模型"""
+        """加载模型 — 兼容 dict/object 两种格式"""
         if not os.path.exists(model_path):
             logger.warning(f"模型文件不存在: {model_path}")
             return None
         try:
             with open(model_path, 'rb') as f:
-                return pickle.load(f)
+                data = pickle.load(f)
         except Exception as e:
             logger.error(f"加载模型失败: {e}")
             return None
+
+        # 如果直接是 Pipeline/LGBMRegressor，包装成 dict
+        if not isinstance(data, dict):
+            return {
+                'models': [data],
+                'feature_names': [],
+                'model_type': type(data).__name__,
+            }
+
+        # 如果 dict 有 'model'（单数），包装成 'models'（复数）
+        if 'model' in data and 'models' not in data:
+            data['models'] = [data['model']]
+
+        return data
 
     def _get_model_prediction(self, symbol: str, local_idx: int) -> Tuple[float, str]:
         """获取30分钟模型预测"""
@@ -313,8 +371,24 @@ class LGBMBacktesterOptimized:
             
             all_features = all_features.fillna(0)
             
-            # 按模型特征名过滤
+            # 按模型特征名过滤 — 先重命名字段对齐
             if model_feature_names is not None:
+                # 将 engineer 特征名映射为模型特征名
+                rename_map = {}
+                for col in all_features.columns:
+                    # 去掉 price_ 前缀试试能否匹配模型特征名
+                    if col.startswith('price_'):
+                        bare = col[6:]  # 去掉 'price_'
+                        if bare in model_feature_names:
+                            rename_map[col] = bare
+                # 也尝试完整映射
+                for old_name in model_feature_names:
+                    mapped = self._map_feature_name(old_name)
+                    if mapped != old_name and mapped in all_features.columns:
+                        rename_map[mapped] = old_name
+
+                all_features = all_features.rename(columns=rename_map)
+
                 missing = [c for c in model_feature_names if c not in all_features.columns]
                 for c in missing:
                     all_features[c] = 0
