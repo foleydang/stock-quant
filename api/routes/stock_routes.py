@@ -94,7 +94,7 @@ def get_stock_data_by_period(symbol, period):
                 return jsonify({'status': 'error', 'message': '无数据'}), 404
             
             df = pd.DataFrame(rows, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
             df['open'] = df['open'].astype(float)
             df['high'] = df['high'].astype(float)
             df['low'] = df['low'].astype(float)
@@ -146,14 +146,14 @@ def get_stock_data_by_period(symbol, period):
                 })
         
         prices = [d['close'] for d in data]
-        latest_price = prices[0]
+        latest_price = prices[-1]
         
         return jsonify({
             'status': 'success',
             'symbol': symbol,
             'name': name,
             'latestPrice': latest_price,
-            'totalReturn': round((latest_price - prices[-1]) / prices[-1] * 100, 2),
+            'totalReturn': round((latest_price - prices[0]) / prices[0] * 100, 2),
             'maxPrice': max(prices),
             'minPrice': min(prices),
             'avgPrice': round(sum(prices) / len(prices), 2),

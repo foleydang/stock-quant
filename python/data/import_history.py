@@ -24,7 +24,7 @@ def import_history(symbol, days=365):
     
     if df is not None and not df.empty:
         df = df.rename(columns={'trade_date': 'date', 'vol': 'volume'})
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['date'], format='mixed')
         df = df[['date', 'open', 'high', 'low', 'close', 'volume']]
         df = df.sort_values('date').reset_index(drop=True)
         

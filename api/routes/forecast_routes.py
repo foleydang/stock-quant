@@ -208,7 +208,7 @@ def forecast_7days(symbol):
 
             # 生成未来7天的时间标签（每条30分钟K线）
             from datetime import datetime, timedelta as td
-            base_dt = pd.to_datetime(last_date)
+            base_dt = pd.to_datetime(last_date, format='mixed')
             # 简化：每个step代表一个交易日
             pred_date = (base_dt + td(days=step_i + 1)).strftime('%Y-%m-%d')
 
@@ -292,7 +292,7 @@ def forecast_history(symbol):
             drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
             features = features[[c for c in features.columns if c not in drop_cols]]
 
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['date'], format='mixed')
         horizon = model_data.get('horizon', 3)
         threshold = model_data.get('threshold', 0.015)
 
@@ -430,7 +430,7 @@ def forecast_stats():
                     drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
                     features_calc = features_calc[[c for c in features_calc.columns if c not in drop_cols]]
 
-                df['date'] = pd.to_datetime(df['date'])
+                df['date'] = pd.to_datetime(df['date'], format='mixed')
                 seven_days_ago = df['date'].max() - timedelta(days=7)
 
                 # 最近1个月评估（步长=5减少计算量）
@@ -562,7 +562,7 @@ def forecast_accuracy(symbol):
         threshold = model_data.get('threshold', 0.015)
         min_history = 150
 
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['date'], format='mixed')
         cutoff_date = df['date'].max() - timedelta(days=30 * months)
         cutoff_idx = df[df['date'] >= cutoff_date].index[0] if len(df[df['date'] >= cutoff_date]) > 0 else min_history
         start_idx = max(cutoff_idx, min_history)
