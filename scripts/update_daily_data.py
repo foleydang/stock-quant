@@ -188,4 +188,22 @@ except Exception as e:
 
 # 关闭
 conn.close()
+
+# 6. 更新30分钟K线数据 + 重建qlib bin（每日收盘后执行）
+print(f"\n更新30分钟K线数据...")
+try:
+    import subprocess
+    result = subprocess.run(
+        [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'update_qlib_data.py')],
+        capture_output=True, text=True, timeout=600
+    )
+    if result.returncode == 0:
+        for line in result.stdout.strip().split('\n'):
+            if '✅' in line:
+                print(line)
+    else:
+        print(f"✗ 30min数据更新失败: {result.stderr[-200:]}")
+except Exception as e:
+    print(f"✗ 30min数据更新异常: {e}")
+
 print(f"[{datetime.now()}] 每日数据更新完成")

@@ -573,7 +573,7 @@ def get_technical_analysis(symbol: str) -> Dict:
     # 量比
     vol_ratio = calc_volume_ratio(kline)
 
-    # 用实时行情覆盖当前价（盘中K线可能缺少今天的数据）
+    # 用实时行情覆盖当前价和量比（盘中K线不含当天数据，量比会停滞）
     rt_current = None
     rt_change_pct = None
     rt_data = None
@@ -583,6 +583,31 @@ def get_technical_analysis(symbol: str) -> Dict:
         if 'error' not in rt_data:
             rt_current = rt_data['current_price']
             rt_change_pct = rt_data['change_pct']
+            # 用实时成交量更新量比（盘中K线不含当天数据，量比会停滞）
+            rt_vol = rt_data.get('volume')
+            if rt_vol and rt_vol > 0 and len(kline) >= 6:
+                prev_avg_vol = sum(k['volume'] for k in kline[-5:]) / 5
+                if prev_avg_vol > 0:
+                    # 量比 = 当日累计成交量 / (5日平均日成交量 × 已交易时间比例)
+                    # 交易时间: 9:30-11:30(120min), 13:00-15:00(120min) = 240min
+                    from datetime import datetime
+                    now = datetime.now()
+                    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+                    lunch_start = now.replace(hour=11, minute=30, second=0, microsecond=0)
+                    lunch_end = now.replace(hour=13, minute=0, second=0, microsecond=0)
+                    market_close = now.replace(hour=15, minute=0, second=0, microsecond=0)
+                    if now < market_open:
+                        minutes_elapsed = 0
+                    elif now < lunch_start:
+                        minutes_elapsed = (now - market_open).total_seconds() / 60
+                    elif now < lunch_end:
+                        minutes_elapsed = 120
+                    elif now < market_close:
+                        minutes_elapsed = 120 + (now - lunch_end).total_seconds() / 60
+                    else:
+                        minutes_elapsed = 240
+                    time_ratio = max(minutes_elapsed / 240, 0.01)  # 避免除零
+                    vol_ratio = rt_vol / (prev_avg_vol * time_ratio)
     except Exception as e:
         logger.warning(f"实时行情获取失败 {symbol}: {e}")
 
@@ -889,9 +914,10 @@ def get_smart_alerts(symbols: Optional[List[str]] = None) -> List[Dict]:
             is_etf = symbol.startswith('15') or symbol.startswith('51') or symbol.startswith('50') or 'ETF' in analysis.get('name', '')
 
             # 合并所有接近的支撑位
+            # 如果股价明显上涨（>0.5%），说明是从支撑位反弹，不触发"接近支撑位"警报
             near_supports = [s for s in analysis.get('supports', [])
                              if abs(analysis['current'] - s) / analysis['current'] < 0.015 and analysis['current'] > s]
-            if near_supports:
+            if near_supports and change_pct <= 0.5:
                 supports_str = '、'.join([f'¥{s:.2f}' for s in near_supports])
                 alerts.append({
                     'symbol': symbol, 'name': analysis['name'],
@@ -902,9 +928,10 @@ def get_smart_alerts(symbols: Optional[List[str]] = None) -> List[Dict]:
                 })
 
             # 合并所有接近的压力位
+            # 如果股价明显下跌（<-0.5%），说明是从压力位回落，不触发"接近压力位"警报
             near_resistances = [r for r in analysis.get('resistances', [])
                                 if abs(analysis['current'] - r) / analysis['current'] < 0.015 and analysis['current'] < r]
-            if near_resistances:
+            if near_resistances and change_pct >= -0.5:
                 resistances_str = '、'.join([f'¥{r:.2f}' for r in near_resistances])
                 alerts.append({
                     'symbol': symbol, 'name': analysis['name'],
