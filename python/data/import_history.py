@@ -41,7 +41,7 @@ def import_history(symbol, days=365):
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (symbol, row['date'].strftime('%Y-%m-%d %H:%M:%S'),
                   float(row['open']), float(row['high']), float(row['low']),
-                  float(row['close']), float(row['volume'])))
+                  float(row['close']), float(row['volume']) * 100))
         
         conn.commit()
         conn.close()
