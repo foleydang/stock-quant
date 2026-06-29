@@ -60,7 +60,7 @@ def _load_model():
         return None, None, None
 
     try:
-        from strategy.train_lgb_enhanced import EnhancedFeatureEngineer
+        from strategy.features import EnhancedFeatureEngineer
         _feature_engineer = EnhancedFeatureEngineer
     except ImportError as e:
         print(f'⚠ FeatureEngineer导入失败: {e}')
@@ -70,38 +70,33 @@ def _load_model():
 
 
 def _predict_proba(feat_row, model_data):
-    """预测上涨概率（支持v4混合/v3集成/v2单模型）"""
+    """预测上涨概率（支持v4混合/v3集成/v2单模型/回归模型）"""
+    def _model_to_proba(model, feat):
+        """单个模型预测 -> 概率"""
+        try:
+            if hasattr(model, 'predict_proba'):
+                return model.predict_proba([feat])[0][1]
+            else:
+                # 回归模型: sigmoid 转换预测值到概率
+                raw = model.predict([feat])[0]
+                return 1.0 / (1.0 + np.exp(-raw * 5))  # 缩放提高区分度
+        except Exception:
+            return 0.5
+
     if 'models' in model_data and 'model_types' in model_data:
         # v4 混合ensemble
         probs = []
         model_types = model_data.get('model_types', ['lgbm'] * len(model_data['models']))
         for model, mtype in zip(model_data['models'], model_types):
-            try:
-                if mtype == 'lgbm':
-                    probs.append(model.predict_proba([feat_row])[0][1])
-                elif mtype == 'xgb':
-                    probs.append(model.predict_proba(feat_row.reshape(1, -1))[0][1])
-                elif mtype == 'catboost':
-                    p = model.predict_proba(feat_row.reshape(1, -1))
-                    probs.append(float(p[0][1]))
-                else:
-                    probs.append(0.5)
-            except Exception:
-                probs.append(0.5)
+            probs.append(_model_to_proba(model, feat_row))
         return np.mean(probs)
     elif 'models' in model_data:
         # v3 集成: 平均概率
-        probs = []
-        for model in model_data['models']:
-            try:
-                probs.append(model.predict_proba([feat_row])[0][1])
-            except Exception:
-                probs.append(0.5)
+        probs = [_model_to_proba(m, feat_row) for m in model_data['models']]
         return np.mean(probs)
     else:
         # v2/v1 单模型
-        model = model_data['model']
-        return model.predict_proba([feat_row])[0][1]
+        return _model_to_proba(model_data['model'], feat_row)
 
 
 def _predict_direction(feat_row, model_data):
