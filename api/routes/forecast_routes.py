@@ -28,8 +28,22 @@ ZERO_IMP_FEATURES = [
 ]
 
 
+def _detect_regime(close_prices):
+    """检测当前市场状态: bull/bear/sideways"""
+    if len(close_prices) < 60:
+        return 'sideways'
+    ma60 = np.mean(close_prices[-60:])
+    ret_60 = (close_prices[-1] - close_prices[-60]) / (close_prices[-60] + 1e-9)
+    current = close_prices[-1]
+    if current > ma60 and ret_60 > 0.05:
+        return 'bull'
+    elif current < ma60 and ret_60 < -0.05:
+        return 'bear'
+    return 'sideways'
+
+
 def _load_model():
-    """加载模型（支持v3集成和v2单模型）"""
+    """加载模型（支持v9 regime/v3集成/v2单模型）"""
     global _model_data, _feature_engineer, _filtered_feature_names
     if _model_data is not None:
         return _model_data, _feature_engineer, _filtered_feature_names
@@ -46,7 +60,13 @@ def _load_model():
         return None, None, None
 
     # 判断模型版本
-    if 'models' in _model_data:
+    if 'regime_models' in _model_data:
+        # v9 市场状态分治 + 多模型集成
+        regimes = list(_model_data['regime_models'].keys())
+        n_models = sum(len(m) for m in _model_data['regime_models'].values())
+        print(f'✓ 加载 v9 regime集成模型 ({len(regimes)}个市场状态, {n_models}个子模型)')
+        _filtered_feature_names = _model_data.get('feature_names')
+    elif 'models' in _model_data:
         # v3 集成模型
         print(f'✓ 加载 v3 集成模型 ({len(_model_data["models"])}个子模型)')
         _filtered_feature_names = _model_data.get('feature_names')
@@ -69,10 +89,24 @@ def _load_model():
     return _model_data, _feature_engineer, _filtered_feature_names
 
 
-def _predict_raw(feat_row, model_data):
+def _predict_raw(feat_row, model_data, regime='sideways'):
     """获取模型原始预测值（回归模型返回预测收益率）"""
     try:
-        if 'models' in model_data:
+        if 'regime_models' in model_data:
+            # v9: 市场状态分治 + 加权集成
+            regime_models = model_data['regime_models'].get(regime, model_data['regime_models'].get('sideways', {}))
+            regime_weights = model_data.get('regime_weights', {}).get(regime, {})
+            if not regime_weights:
+                regime_weights = {k: 1.0/len(regime_models) for k in regime_models}
+            raws = []
+            for name, model in regime_models.items():
+                try:
+                    w = regime_weights.get(name, 0)
+                    raws.append(float(model.predict([feat_row])[0]) * w)
+                except Exception:
+                    pass
+            return sum(raws) if raws else 0.0
+        elif 'models' in model_data:
             raws = []
             for model in model_data['models']:
                 try:
@@ -87,23 +121,31 @@ def _predict_raw(feat_row, model_data):
         return 0.0
 
 
-def _predict_proba(feat_row, model_data):
-    """预测上涨概率（支持v4混合/v3集成/v2单模型/回归模型）"""
+def _predict_proba(feat_row, model_data, regime='sideways'):
+    """预测上涨概率（支持v9 regime/v4混合/v3集成/v2单模型/回归模型）"""
     def _model_to_proba(model, feat):
         """单个模型预测 -> 概率"""
         try:
             if hasattr(model, 'predict_proba'):
                 return model.predict_proba([feat])[0][1]
             else:
-                # 回归模型: 用模型预测的收益率符号 + 幅度决定概率
                 raw = model.predict([feat])[0]
-                # 模型预测值通常在 ±0.01 范围，用 tanh 映射到 [0,1]
-                # tanh(0) = 0, tanh(0.01*100) = tanh(1) ≈ 0.76
                 return (np.tanh(raw * 100) + 1) / 2
         except Exception:
             return 0.5
 
-    if 'models' in model_data and 'model_types' in model_data:
+    if 'regime_models' in model_data:
+        # v9: 市场状态分治 + 加权集成
+        regime_models = model_data['regime_models'].get(regime, model_data['regime_models'].get('sideways', {}))
+        regime_weights = model_data.get('regime_weights', {}).get(regime, {})
+        if not regime_weights:
+            regime_weights = {k: 1.0/len(regime_models) for k in regime_models}
+        probs = []
+        for name, model in regime_models.items():
+            w = regime_weights.get(name, 0)
+            probs.append(_model_to_proba(model, feat_row) * w)
+        return sum(probs) if probs else 0.5
+    elif 'models' in model_data and 'model_types' in model_data:
         # v4 混合ensemble
         probs = []
         model_types = model_data.get('model_types', ['lgbm'] * len(model_data['models']))
@@ -119,9 +161,24 @@ def _predict_proba(feat_row, model_data):
         return _model_to_proba(model_data['model'], feat_row)
 
 
-def _predict_direction(feat_row, model_data):
-    """预测方向（集成用投票，单模型用原始预测值符号）"""
-    if 'models' in model_data:
+def _predict_direction(feat_row, model_data, regime='sideways'):
+    """预测方向（v9: 加权投票, v3: 集成投票, v2: 符号决定）"""
+    if 'regime_models' in model_data:
+        # v9: 市场状态分治 + 加权投票
+        regime_models = model_data['regime_models'].get(regime, model_data['regime_models'].get('sideways', {}))
+        regime_weights = model_data.get('regime_weights', {}).get(regime, {})
+        if not regime_weights:
+            regime_weights = {k: 1.0/len(regime_models) for k in regime_models}
+        up_score = 0
+        for name, model in regime_models.items():
+            try:
+                raw = model.predict([feat_row])[0]
+                w = regime_weights.get(name, 0)
+                up_score += w if raw > 0 else -w
+            except Exception:
+                pass
+        return 1 if up_score > 0 else 0
+    elif 'models' in model_data:
         # v3 集成投票
         preds = []
         for model in model_data['models']:
@@ -135,10 +192,8 @@ def _predict_direction(feat_row, model_data):
         model = model_data['model']
         raw = model.predict([feat_row])[0]
         if hasattr(model, 'predict_proba'):
-            # 分类器: 返回 0/1
             return int(raw)
         else:
-            # 回归模型: 符号决定方向
             return 1 if raw > 0 else 0
 
 
@@ -193,10 +248,13 @@ def forecast_7days(symbol):
         current_price = float(df.iloc[last_idx]['close'])
         last_date = str(df.iloc[last_idx]['date'])
 
+        # 检测当前市场状态
+        current_regime = _detect_regime(df['close'].values)
+
         # 取最近一条特征，用模型预测收益率
         feat_row = features.iloc[last_idx].fillna(0).values
-        raw_pred = _predict_raw(feat_row, model_data)
-        up_prob = float(_predict_proba(feat_row, model_data))
+        raw_pred = _predict_raw(feat_row, model_data, current_regime)
+        up_prob = float(_predict_proba(feat_row, model_data, current_regime))
 
         # 用模型预测的日收益率（将horizon期收益率转换）
         # 模型预测 horizon=3 期（约1.5小时）的收益率
@@ -239,7 +297,7 @@ def forecast_7days(symbol):
                 'priceHigh': round(price_high, 2),
             })
 
-        model_version = 'v8-lgbm' if 'model_version' in model_data else 'v2-single'
+        model_version = model_data.get('model_version', 'v8-lgbm')
 
         return jsonify({
             'status': 'success',
@@ -311,6 +369,7 @@ def forecast_history(symbol):
         df['date'] = pd.to_datetime(df['date'], format='mixed')
         horizon = model_data.get('horizon', 3)
         threshold = model_data.get('threshold', 0.015)
+        current_regime = _detect_regime(df['close'].values)
 
         # 取过去N天的数据
         cutoff_date = df['date'].max() - timedelta(days=days)
@@ -330,7 +389,7 @@ def forecast_history(symbol):
                     continue
                 try:
                     feat_row = features.iloc[idx].fillna(0).values
-                    up_prob = float(_predict_proba(feat_row, model_data))
+                    up_prob = float(_predict_proba(feat_row, model_data, current_regime))
 
                     future_close = float(df.iloc[idx + horizon]['close'])
                     current_close = float(df.iloc[idx]['close'])
@@ -447,6 +506,7 @@ def forecast_stats():
                     features_calc = features_calc[[c for c in features_calc.columns if c not in drop_cols]]
 
                 df['date'] = pd.to_datetime(df['date'], format='mixed')
+                current_regime = _detect_regime(df['close'].values)
                 seven_days_ago = df['date'].max() - timedelta(days=7)
 
                 # 最近1个月评估（步长=5减少计算量）
@@ -459,7 +519,7 @@ def forecast_stats():
                 for i in range(start_idx, len(df) - horizon, 5):  # step=5节省内存
                     try:
                         feat_row = features_calc.iloc[i].fillna(0).values
-                        up_prob = _predict_proba(feat_row, model_data)
+                        up_prob = _predict_proba(feat_row, model_data, current_regime)
                         pred_dir = 1 if up_prob >= 0.55 else 0
 
                         future_close = float(df.iloc[i + horizon]['close'])
@@ -579,6 +639,7 @@ def forecast_accuracy(symbol):
         min_history = 150
 
         df['date'] = pd.to_datetime(df['date'], format='mixed')
+        current_regime = _detect_regime(df['close'].values)
         cutoff_date = df['date'].max() - timedelta(days=30 * months)
         cutoff_idx = df[df['date'] >= cutoff_date].index[0] if len(df[df['date'] >= cutoff_date]) > 0 else min_history
         start_idx = max(cutoff_idx, min_history)
@@ -594,7 +655,7 @@ def forecast_accuracy(symbol):
                 if feat_row.isna().any():
                     feat_row = feat_row.fillna(0)
 
-                up_prob = _predict_proba(feat_row.values, model_data)
+                up_prob = _predict_proba(feat_row.values, model_data, current_regime)
 
                 future_close = float(df.iloc[i + horizon]['close'])
                 current_close = float(df.iloc[i]['close'])
@@ -617,7 +678,7 @@ def forecast_accuracy(symbol):
             return jsonify({'status': 'error', 'message': '验证区间无有效预测'}), 404
 
         # 准确率指标
-        pred_labels = [_predict_direction(features.iloc[start_idx + j * step].fillna(0).values, model_data)
+        pred_labels = [_predict_direction(features.iloc[start_idx + j * step].fillna(0).values, model_data, current_regime)
                        for j in range(len(predictions))]
         correct = sum(1 for p, a in zip(pred_labels, actual_directions) if p == a)
         accuracy = correct / len(predictions) * 100
@@ -681,7 +742,7 @@ def forecast_accuracy(symbol):
                 ) if p == a) / len(day_dirs) * 100 if day_dirs else 0
             })
 
-        model_version = 'v3-ensemble' if 'models' in model_data else 'v2-single'
+        model_version = model_data.get('model_version', 'v3-ensemble' if 'models' in model_data else 'v2-single')
         n_sub_models = len(model_data.get('models', []))
 
         return jsonify({
