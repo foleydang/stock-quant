@@ -14,7 +14,7 @@
   python strategy/train_enhanced.py --no-ensemble       # 不集成，只训练LGBM
 """
 
-import os, sys, json, pickle, time, warnings, argparse
+import os, sys, json, pickle, time, warnings, argparse, gc
 import numpy as np
 import pandas as pd
 import sqlite3
@@ -37,20 +37,20 @@ LGBM_PARAMS = {
     'n_estimators': 2000, 'learning_rate': 0.03, 'num_leaves': 63,
     'max_depth': 6, 'min_child_samples': 50, 'subsample': 0.7,
     'colsample_bytree': 0.6, 'reg_alpha': 0.01, 'reg_lambda': 0.1,
-    'random_state': 42, 'n_jobs': -1, 'verbosity': -1
+    'random_state': 42, 'n_jobs': 1, 'verbosity': -1
 }
 
 XGB_PARAMS = {
     'n_estimators': 2000, 'learning_rate': 0.03, 'max_depth': 6,
     'min_child_weight': 3, 'subsample': 0.7, 'colsample_bytree': 0.6,
     'reg_alpha': 0.01, 'reg_lambda': 0.1, 'random_state': 42,
-    'n_jobs': -1, 'verbosity': 0
+    'n_jobs': 1, 'verbosity': 0
 }
 
 CATBOOST_PARAMS = {
     'iterations': 2000, 'learning_rate': 0.03, 'depth': 6,
     'l2_leaf_reg': 3, 'random_seed': 42, 'verbose': 0,
-    'thread_count': -1
+    'thread_count': 1
 }
 
 QUICK_PARAMS = {
@@ -62,7 +62,7 @@ QUICK_PARAMS = {
 def load_db():
     return sqlite3.connect(DB_PATH)
 
-def load_kline_data(conn):
+def load_kline_data(conn, max_stocks=0):
     """加载所有A股的30分钟K线，按日聚合"""
     print("📊 加载K线数据...")
     df = pd.read_sql("""
@@ -74,6 +74,9 @@ def load_kline_data(conn):
         GROUP BY symbol, substr(date,1,10)
         ORDER BY symbol, trade_date
     """, conn)
+    if max_stocks > 0:
+        top_symbols = pd.read_sql("SELECT symbol FROM (SELECT symbol, COUNT(*) as cnt FROM kline_30m WHERE (symbol LIKE '%.SZ' OR symbol LIKE '%.SH') GROUP BY symbol ORDER BY cnt DESC LIMIT " + str(max_stocks) + ")", conn)['symbol'].tolist()
+        df = df[df['symbol'].isin(top_symbols)]
     df['trade_date'] = pd.to_datetime(df['trade_date'])
     return df
 
@@ -274,7 +277,10 @@ def calculate_features(df, conn):
         feats['sector_code'] = hash(industry) % 100  # 板块编码
         
         results[sym] = (stock_df, feats)
+        if len(results) % 20 == 0:
+            gc.collect()
     
+    gc.collect()
     return results
 
 
@@ -393,6 +399,7 @@ def main():
     parser.add_argument('--no-ensemble', action='store_true', help='不集成，只训练LGBM')
     parser.add_argument('--horizon', type=int, default=3, help='预测周期')
     parser.add_argument('--db', default=DB_PATH, help='数据库路径')
+    parser.add_argument('--max-stocks', type=int, default=0, help='最大股票数')
     args = parser.parse_args()
     
     conn = sqlite3.connect(args.db)
@@ -407,7 +414,7 @@ def main():
     
     # 1. 加载数据
     t0 = time.time()
-    df = load_kline_data(conn)
+    df = load_kline_data(conn, args.max_stocks)
     print(f"   共 {len(df['symbol'].unique())} 只股票, {len(df)} 条日线")
     
     # 2. 计算特征
