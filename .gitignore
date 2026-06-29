@@ -50,3 +50,5 @@ python/logs/
 python/.pytest_cache/
 python/models/
 mlruns/
+models/
+python/python/
