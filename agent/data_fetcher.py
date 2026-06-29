@@ -170,6 +170,7 @@ def get_stock_data(symbol: str) -> Dict:
         'symbol': symbol, 'name': name,
         'current_price': current_price, 'change_pct': change_pct,
         'change_amount': change_amount,
+        'volume': rt.get('volume') if rt else None,
     }
 
 
@@ -204,30 +205,97 @@ def get_t_suggestions() -> List[Dict]:
 # ========== 交易信号 ==========
 
 def get_signals_data() -> Dict:
-    """获取交易信号"""
+    """获取交易信号 - LGBM 模型 window=3 预测均值"""
     try:
         from lgbm_backtest import LGBMBacktesterOptimized
+        import numpy as np
+        import math
+
         bt = LGBMBacktesterOptimized()
+
+        if not bt.models:
+            logger.warning("LGBM模型未加载，跳过信号生成")
+            return {'signals': []}
+
         signals = []
-        for item in WATCHLIST[:5]:
+        stock_list = []
+        for item in WATCHLIST[:10]:
             symbol = item.get('symbol')
             name = item.get('name', symbol)
-            result = bt.run_backtest(symbol)
-            if result and result.get('summary'):
-                pred = result.get('predictions', [])
-                last_pred = pred[-1] if pred else {}
-                up_prob = last_pred.get('up_probability', 0)
-                action = '买入' if up_prob > 0.52 else '卖出' if up_prob < 0.48 else '持有'
-                rt = get_stock_data(symbol)
-                signals.append({
-                    'stock_name': name, 'symbol': symbol,
-                    'current_price': rt.get('current_price', 0),
-                    'signal': action, 'up_prob': up_prob,
-                    'reason': f"上涨概率{up_prob:.1%}",
-                })
+            stock_list.append({'symbol': symbol, 'name': name})
+
+        # 加载所有股票数据
+        all_data = {}
+        for stock in stock_list:
+            symbol = stock['symbol']
+            df = bt.load_data(symbol)
+            if df is not None and len(df) >= 20:
+                df = df.reset_index(drop=True)
+                all_data[symbol] = df
+
+        if not all_data:
+            logger.warning("LGBM: 无有效股票数据")
+            return {'signals': []}
+
+        # 预计算特征
+        bt.preload_features(all_data)
+
+        # 窗口参数（回测验证 window=3 最优）
+        PRED_WINDOW = 3
+
+        # 对每只股票获取预测
+        for stock in stock_list:
+            symbol = stock['symbol']
+            name = stock['name']
+            if symbol not in all_data:
+                continue
+
+            df = all_data[symbol]
+            last_idx = len(df) - 1
+
+            # 取最近 PRED_WINDOW 个 bar 的预测均值
+            preds = []
+            for j in range(max(0, last_idx - PRED_WINDOW + 1), last_idx + 1):
+                p, _ = bt._get_model_prediction(symbol, j)
+                preds.append(p)
+
+            avg_pred = float(np.mean(preds)) if preds else 0.0
+            pred_std = float(np.std(preds)) if len(preds) > 1 else 0.0
+
+            # 一致性：最近几个bar预测方向是否一致
+            consistency = sum(1 for p in preds if p > 0) / len(preds) if preds else 0.5
+
+            # 将预期收益率映射为上涨概率
+            # 使用更合理的缩放：mean_pred ~ 0.001, std ~ 0.002
+            up_prob = 1.0 / (1.0 + math.exp(-avg_pred * 500))
+            up_prob = max(0.0, min(1.0, up_prob))
+
+            # 获取当前价格
+            rt = get_stock_data(symbol)
+            current_price = rt.get('current_price', 0) if rt else 0
+
+            # 信号判断：考虑预测方向一致性
+            if consistency >= 0.67 and avg_pred > 0.0005:
+                action = '买入'
+            elif consistency <= 0.33 and avg_pred < -0.0005:
+                action = '卖出'
+            else:
+                action = '持有'
+
+            signals.append({
+                'stock_name': name, 'symbol': symbol,
+                'current_price': current_price,
+                'signal': action, 'up_prob': up_prob,
+                'reason': f"预期收益{avg_pred:+.4f}(σ={pred_std:.4f},c={consistency:.0%}) | 概率{up_prob:.1%}",
+            })
+
+        # 按概率排序
+        signals.sort(key=lambda x: x['up_prob'], reverse=True)
         return {'signals': signals}
     except Exception as e:
         logger.error(f"信号获取失败: {e}")
+        import traceback
+        traceback.print_exc()
         return {'signals': []}
 
 
