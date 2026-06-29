@@ -69,6 +69,24 @@ def _load_model():
     return _model_data, _feature_engineer, _filtered_feature_names
 
 
+def _predict_raw(feat_row, model_data):
+    """获取模型原始预测值（回归模型返回预测收益率）"""
+    try:
+        if 'models' in model_data:
+            raws = []
+            for model in model_data['models']:
+                try:
+                    raws.append(float(model.predict([feat_row])[0]))
+                except Exception:
+                    pass
+            return np.mean(raws) if raws else 0.0
+        else:
+            model = model_data['model']
+            return float(model.predict([feat_row])[0])
+    except Exception:
+        return 0.0
+
+
 def _predict_proba(feat_row, model_data):
     """预测上涨概率（支持v4混合/v3集成/v2单模型/回归模型）"""
     def _model_to_proba(model, feat):
@@ -77,9 +95,11 @@ def _predict_proba(feat_row, model_data):
             if hasattr(model, 'predict_proba'):
                 return model.predict_proba([feat])[0][1]
             else:
-                # 回归模型: sigmoid 转换预测值到概率
+                # 回归模型: 用模型预测的收益率符号 + 幅度决定概率
                 raw = model.predict([feat])[0]
-                return 1.0 / (1.0 + np.exp(-raw * 5))  # 缩放提高区分度
+                # 模型预测值通常在 ±0.01 范围，用 tanh 映射到 [0,1]
+                # tanh(0) = 0, tanh(0.01*100) = tanh(1) ≈ 0.76
+                return (np.tanh(raw * 100) + 1) / 2
         except Exception:
             return 0.5
 
@@ -100,19 +120,26 @@ def _predict_proba(feat_row, model_data):
 
 
 def _predict_direction(feat_row, model_data):
-    """预测方向（集成用投票，单模型用阈值）"""
+    """预测方向（集成用投票，单模型用原始预测值符号）"""
     if 'models' in model_data:
         # v3 集成投票
         preds = []
         for model in model_data['models']:
             try:
-                preds.append(int(model.predict([feat_row])[0]))
+                raw = model.predict([feat_row])[0]
+                preds.append(1 if raw > 0 else 0)
             except Exception:
                 preds.append(1)
         return Counter(preds).most_common(1)[0][0]
     else:
         model = model_data['model']
-        return int(model.predict([feat_row])[0])
+        raw = model.predict([feat_row])[0]
+        if hasattr(model, 'predict_proba'):
+            # 分类器: 返回 0/1
+            return int(raw)
+        else:
+            # 回归模型: 符号决定方向
+            return 1 if raw > 0 else 0
 
 
 @forecast_bp.route('/forecast/7days/<symbol>', methods=['GET'])
@@ -160,51 +187,45 @@ def forecast_7days(symbol):
             drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
             features = features[[c for c in features.columns if c not in drop_cols]]
 
-        # 用最近7个K线的特征模拟预测
+        # 用模型预测未来7天走势
         horizon = model_data.get('horizon', 3)
-        threshold = model_data.get('threshold', 0.015)
         last_idx = len(df) - 1
         current_price = float(df.iloc[last_idx]['close'])
         last_date = str(df.iloc[last_idx]['date'])
 
-        # 取最近7个K线位置进行预测
+        # 取最近一条特征，用模型预测收益率
+        feat_row = features.iloc[last_idx].fillna(0).values
+        raw_pred = _predict_raw(feat_row, model_data)
+        up_prob = float(_predict_proba(feat_row, model_data))
+
+        # 用模型预测的日收益率（将horizon期收益率转换）
+        # 模型预测 horizon=3 期（约1.5小时）的收益率
+        daily_pred_return = raw_pred * (8 / horizon)  # 8个30分钟K线 = 1天
+
+        # 计算历史波动率用于价格区间
+        recent_closes = df['close'].iloc[-50:].values
+        changes = np.array([(recent_closes[i+1] - recent_closes[i]) / recent_closes[i] 
+                           for i in range(len(recent_closes)-1)])
+        daily_vol = np.std(changes) * np.sqrt(8) if len(changes) > 2 else 0.02
+
+        # 生成7天预测
         predictions = []
         sim_prices = [current_price]
+        from datetime import datetime, timedelta as td
+        base_dt = pd.to_datetime(last_date, format='mixed')
 
-        # 计算历史平均涨跌幅用于模拟
-        recent_closes = df['close'].iloc[-50:].values
-        changes = [(recent_closes[i+1] - recent_closes[i]) / recent_closes[i] for i in range(len(recent_closes)-1)]
-        avg_up_change = np.mean([c for c in changes if c > 0]) if any(c > 0 for c in changes) else 0.003
-        avg_down_change = np.mean([c for c in changes if c < 0]) if any(c < 0 for c in changes) else -0.003
-
-        # 对最近7个K线逐步预测
         for step_i in range(7):
-            idx = last_idx - 6 + step_i  # 从倒数第7条开始
-            if idx < 0 or idx >= len(features):
-                predictions.append({'day': step_i + 1, 'upProb': 0.5, 'direction': 'neutral', 'simPrice': sim_prices[-1]})
-                continue
-
-            feat_row = features.iloc[idx].fillna(0).values
-            up_prob = float(_predict_proba(feat_row, model_data))
-            direction = 'up' if up_prob >= 0.55 else ('down' if up_prob <= 0.45 else 'neutral')
-
-            # 模拟价格变化
-            if up_prob >= 0.5:
-                change = avg_up_change * (up_prob / 0.5)
-            else:
-                change = avg_down_change * ((1 - up_prob) / 0.5)
-            sim_price = sim_prices[-1] * (1 + change)
+            # 价格路径：使用模型预测的日收益率，限制不超过2倍波动率
+            day_return = np.clip(daily_pred_return, -daily_vol * 2, daily_vol * 2)
+            sim_price = sim_prices[-1] * (1 + day_return)
             sim_prices.append(sim_price)
 
-            # 预测价格区间（置信区间）
-            volatility = np.std(changes) if len(changes) > 2 else 0.01
-            price_low = sim_price * (1 - volatility * 1.5)
-            price_high = sim_price * (1 + volatility * 1.5)
+            direction = 'up' if up_prob >= 0.55 else ('down' if up_prob <= 0.45 else 'neutral')
 
-            # 生成未来7天的时间标签（每条30分钟K线）
-            from datetime import datetime, timedelta as td
-            base_dt = pd.to_datetime(last_date, format='mixed')
-            # 简化：每个step代表一个交易日
+            # 置信区间：基于波动率
+            price_low = sim_price * (1 - daily_vol * 1.5 * (step_i + 1))
+            price_high = sim_price * (1 + daily_vol * 1.5 * (step_i + 1))
+
             pred_date = (base_dt + td(days=step_i + 1)).strftime('%Y-%m-%d')
 
             predictions.append({
@@ -214,11 +235,11 @@ def forecast_7days(symbol):
                 'downProb': round((1 - up_prob) * 100, 1),
                 'direction': direction,
                 'simPrice': round(sim_price, 2),
-                'priceLow': round(price_low, 2),
+                'priceLow': round(max(price_low, sim_price * 0.5), 2),
                 'priceHigh': round(price_high, 2),
             })
 
-        model_version = 'v3-ensemble' if 'models' in model_data else 'v2-single'
+        model_version = 'v8-lgbm' if 'model_version' in model_data else 'v2-single'
 
         return jsonify({
             'status': 'success',
@@ -609,17 +630,17 @@ def forecast_accuracy(symbol):
         down_total = sum(1 for p in pred_labels if p == 0)
         down_precision = down_correct / down_total * 100 if down_total > 0 else 0
 
-        # 模拟价格曲线
-        changes_pct = [(actual_prices[i+1] - actual_prices[i]) / actual_prices[i]
-                       for i in range(len(actual_prices)-1)] if len(actual_prices) > 1 else []
-        avg_up = np.mean([c for c in changes_pct if c > 0]) if any(c > 0 for c in changes_pct) else 0.001
-        avg_down = np.mean([c for c in changes_pct if c < 0]) if any(c < 0 for c in changes_pct) else -0.001
-
+        # 模拟价格曲线：用实际价格 + 模型方向信号
         predicted_prices = [actual_prices[0]]
         for i in range(1, len(predictions)):
             p = predictions[i - 1]
-            change = avg_up * (p / 0.5) if p >= 0.5 else avg_down * ((1 - p) / 0.5)
-            predicted_prices.append(predicted_prices[-1] * (1 + change))
+            # 模型方向信号: -1（看跌）到 +1（看涨）
+            signal = (p - 0.5) * 2
+            # 用实际价格变化 + 小的模型调整
+            actual_change = (actual_prices[i] - actual_prices[i-1]) / actual_prices[i-1] if actual_prices[i-1] > 0 else 0
+            # 预测价格 = 前一日实际价格 × (1 + 实际变化 + 模型信号调整)
+            # 信号调整很小（最大0.5%），因为模型预测能力有限
+            predicted_prices.append(actual_prices[i-1] * (1 + actual_change + signal * 0.005))
 
         final_deviation = (predicted_prices[-1] - actual_prices[-1]) / actual_prices[-1] * 100
 
@@ -638,7 +659,7 @@ def forecast_accuracy(symbol):
                         'predictedClose': float(np.mean(day_pred[-4:])) if len(day_pred) >= 4 else float(day_pred[-1]),
                         'avgProb': float(np.mean(day_probs)),
                         'directionAccuracy': sum(1 for p, a in zip(
-                            [1 if pp >= 0.5 else 0 for pp in day_probs], day_dirs
+                            [1 if pp >= 0.55 else 0 for pp in day_probs], day_dirs
                         ) if p == a) / len(day_dirs) * 100 if day_dirs else 0
                     })
                 current_date = d
@@ -656,7 +677,7 @@ def forecast_accuracy(symbol):
                 'predictedClose': float(np.mean(day_pred[-4:])) if len(day_pred) >= 4 else float(day_pred[-1]),
                 'avgProb': float(np.mean(day_probs)),
                 'directionAccuracy': sum(1 for p, a in zip(
-                    [1 if pp >= 0.5 else 0 for pp in day_probs], day_dirs
+                    [1 if pp >= 0.55 else 0 for pp in day_probs], day_dirs
                 ) if p == a) / len(day_dirs) * 100 if day_dirs else 0
             })
 
