@@ -48,3 +48,5 @@ python/logs/
 .env
 .env.localmlruns/
 python/.pytest_cache/
+python/models/
+mlruns/
