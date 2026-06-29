@@ -29,7 +29,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'python'))
 
 DB_PATH = os.path.join(ROOT, 'python', 'data', 'stock_data.db')
-MODEL_DIR = os.path.join(ROOT, 'python', 'models', 'lgb_hs300_enhanced')
+MODEL_DIR = os.path.join(ROOT, 'models', 'lgb_hs300_enhanced')
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # === 模型参数 ===
