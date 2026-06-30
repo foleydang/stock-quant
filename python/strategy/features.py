@@ -25,6 +25,11 @@ import sqlite3
 import os
 from typing import Dict, List, Optional, Tuple
 
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, **kw): return iterable
+
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data/stock_data.db')
 
 # 延迟导入, 避免循环依赖
@@ -383,7 +388,7 @@ class CrossSectionFeatures:
     @staticmethod
     def calculate(all_features: Dict[str, pd.DataFrame],
                   all_dates: List) -> Dict[str, pd.DataFrame]:
-        """计算截面排名特征
+        """计算截面排名特征 (向量化版本, 逻辑等价于逐行版)
 
         Args:
             all_features: {symbol: DataFrame(index=date, columns=features)}
@@ -392,50 +397,52 @@ class CrossSectionFeatures:
         Returns:
             {symbol: DataFrame(截面排名特征)}
         """
-        # 初始化结果
-        result = {sym: pd.DataFrame(index=feats.index) for sym, feats in all_features.items()}
+        targets = CrossSectionFeatures.RANK_TARGETS
+        available = [t for t in targets
+                     if any(t in f.columns for f in all_features.values())]
+        if not available:
+            return {sym: pd.DataFrame(index=feats.index)
+                    for sym, feats in all_features.items()}
 
-        # 确保 all_dates 是 sorted unique
-        all_dates = sorted(set(all_dates))
-
-        for date in all_dates:
-            # 收集该日期所有股票的可用特征
-            date_data = {}
-            for sym, feats in all_features.items():
-                if date in feats.index:
-                    row = feats.loc[date]
-                    if isinstance(row, pd.DataFrame):
-                        row = row.iloc[0]  # 取第一个匹配
-                    if not bool(row.isna().all()):
-                        date_data[sym] = row
-
-            if len(date_data) < 10:  # 至少需要10只股票才有意义
+        print(f"   截面排名特征: 拼接 {len(all_features)} 只股票...")
+        pieces = []
+        for sym, feats in all_features.items():
+            cols = feats.columns.intersection(available)
+            sub = feats[cols].copy()
+            not_all_nan = ~sub.isna().all(axis=1)
+            sub = sub.loc[not_all_nan]
+            if sub.empty:
                 continue
+            sub['_sym'] = sym
+            pieces.append(sub)
+        big = pd.concat(pieces)
+        big.index.name = '_date'
 
-            # 构建该日期的特征矩阵
-            symbols = list(date_data.keys())
-            for target in CrossSectionFeatures.RANK_TARGETS:
-                values = []
-                for sym in symbols:
-                    val = date_data[sym].get(target, np.nan)
-                    values.append(val)
+        counts = big.groupby(level='_date').size()
+        valid_dates = counts[counts >= 10].index
+        big = big.loc[big.index.isin(valid_dates)]
 
-                values = np.array(values, dtype=float)
-                valid = ~np.isnan(values)
+        print(f"   截面排名特征: 对 {len(valid_dates)} 个时间戳 × {len(available)} 个特征做排名...")
+        rank_cols = {}
+        for t in tqdm(available, desc='   截面排名', unit='feat'):
+            if t not in big.columns:
+                continue
+            col = big[t]
+            per_date_valid = col.groupby(level='_date').transform(lambda x: x.notna().sum())
+            col_filtered = col.where(per_date_valid >= 5)
+            ranked = col_filtered.groupby(level='_date').rank(pct=True)
+            rank_cols[f'cs_rank_{t}'] = ranked
 
-                if valid.sum() < 5:
-                    continue
+        rank_df = pd.DataFrame(rank_cols, index=big.index)
+        rank_df['_sym'] = big['_sym']
 
-                # 排名 (0~1, 值越大排名越高)
-                ranks = np.full(len(values), np.nan)
-                ranks[valid] = pd.Series(values[valid]).rank(pct=True).values
-
-                # 写入结果
-                for i, sym in enumerate(symbols):
-                    col_name = f'cs_rank_{target}'
-                    if col_name not in result[sym].columns:
-                        result[sym][col_name] = np.nan
-                    result[sym].loc[date, col_name] = ranks[i]
+        print(f"   截面排名特征: 拆分回各股票...")
+        result = {}
+        for sym, feats in all_features.items():
+            mask = rank_df['_sym'] == sym
+            sub = rank_df.loc[mask].drop(columns='_sym')
+            sub = sub.reindex(feats.index)
+            result[sym] = sub
 
         return result
 

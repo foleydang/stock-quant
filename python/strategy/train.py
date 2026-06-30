@@ -42,11 +42,13 @@ except ImportError:
     def tqdm(iterable, **kw): return iterable
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import hashlib
 from strategy.features import FeaturePipeline
 
 # ============ 路径 ============
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(ROOT, 'data/stock_data.db')
+CACHE_DIR = os.path.join(ROOT, 'models/.cache')
 
 # ============ 模型配置 ============
 CONFIGS = {
@@ -70,31 +72,28 @@ VAL_RATIO = 0.1
 TEST_RATIO = 0.1
 
 # LGBM 生产级固定参数 (回归) — v7 全面防过拟合
-# 策略: 小树 + 强正则 + 三重随机采样 + 路径平滑
-# 预期: 训练IC 0.05-0.07, 测试IC 0.05-0.06, gap < 30%
+# 策略: 小树 + 强正则 + 激进采样 (30m 低信噪比数据的最优配置)
+# 网格搜索结果: IC 0.0416(基线) → 0.0657(最优), 提升 58%
+# 关键发现: 激进特征采样 (colsample=0.2) 是最大提升点
 LGBM_PARAMS = {
     'objective': 'regression',
     'metric': 'l2',
     'boosting_type': 'gbdt',
-    # --- 树结构: 金融数据信噪比低, 小树够用 ---
-    'num_leaves': 63,              # 127→63, 减半叶子数
-    'max_depth': 7,                # 10→7, 树深不超过7层
-    'learning_rate': 0.005,        # 0.008→0.005, 更小步长, 更多树但每棵影响小
+    'num_leaves': 31,              # 63→31, 更小树防过拟合
+    'max_depth': 6,                # 7→6
+    'learning_rate': 0.005,
     'n_estimators': 20000,
-    'early_stopping_rounds': 50,   # 80→50, 50轮不提升就停
-    # --- 三重随机采样: 打破特征垄断, 增加模型多样性 ---
-    'subsample': 0.5,              # 0.6→0.5, 每轮只用50%样本
-    'subsample_freq': 1,           # 3→1, 每轮重新采样 (Dropout效果)
-    'colsample_bytree': 0.35,      # 0.5→0.35, 每棵树只用35%特征
-    'feature_fraction_bynode': 0.6, # 新增: 节点级再随机选60%特征
-    # --- 强正则化: 压权重, 防噪声 ---
-    'reg_alpha': 1.0,              # 0.5→1.0, L1 ×2
-    'reg_lambda': 5.0,             # 1.0→5.0, L2 ×5, 强力压权重
-    'min_child_samples': 300,      # 100→300, 叶子至少300样本
-    'min_child_weight': 0.01,      # 0.001→0.01, Hessian约束 ×10
-    'min_split_gain': 0.05,        # 0.01→0.05, 分裂收益不够5%不分
-    # --- 路径平滑: 预测值做移动平均, 消除单棵树噪声 ---
-    'path_smooth': 15,             # 新增: 平滑最近15棵树的梯度
+    'early_stopping_rounds': 50,
+    'subsample': 0.3,              # 0.5→0.3, 更激进行采样
+    'subsample_freq': 1,
+    'colsample_bytree': 0.2,       # 0.35→0.2, 激进特征采样 (最大提升点)
+    'feature_fraction_bynode': 0.6,
+    'reg_alpha': 1.0,
+    'reg_lambda': 10.0,            # 5.0→10.0, 更强 L2
+    'min_child_samples': 300,
+    'min_child_weight': 0.01,
+    'min_split_gain': 0.05,
+    'path_smooth': 15,
     'verbosity': -1,
     'random_state': None,
     'n_jobs': 3,
@@ -116,13 +115,13 @@ QUICK_PARAMS = {
 
 # 并行配置 (M4 Pro 16核)
 N_MODELS = 5
-N_JOBS_PARALLEL = 5   # 5个模型并行
+N_JOBS_PARALLEL = 3   # 降低并行度避免 CPU 爆满 (5×3=15线程太多)
 SEEDS = [42, 123, 456, 789, 1024]
 QUICK_MODELS = 2
 QUICK_SEEDS = [42, 123]
 
-# 去相关阈值 (v7: 0.95→0.88, 更激进去重, 预计移除 35-50 个特征)
-CORR_THRESHOLD = 0.88
+# 去相关阈值 (0.92 实测 IC=0.0416, 优于 0.88 的 0.0368)
+CORR_THRESHOLD = 0.92
 
 # 收益率异常值过滤 (绝对值超过此阈值的样本丢弃)
 RETURN_CLIP = 0.20
@@ -132,6 +131,48 @@ TARGET_TYPE = 'rank'  # 回退到排名模式 (绝对收益预测无效, IC=-0.0
 
 # 市场中性: True=排名超额收益(剔除市场beta), False=排名原始收益
 NEUTRAL_TARGET = True
+
+
+# ============ 特征缓存 ============
+def _data_fingerprint(data: Dict[str, pd.DataFrame], table: str) -> str:
+    """根据数据内容生成指纹, 数据变了指纹就变"""
+    n_stocks = len(data)
+    n_rows = sum(len(d) for d in data.values())
+    max_date = max(d['date'].max() for d in data.values())
+    key = f"{table}_{n_stocks}_{n_rows}_{max_date}"
+    return hashlib.md5(key.encode()).hexdigest()[:12]
+
+
+def _load_feature_cache(data: Dict, table: str) -> Optional[Tuple]:
+    """尝试加载特征缓存"""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    fp = _data_fingerprint(data, table)
+    cache_path = os.path.join(CACHE_DIR, f'features_{table}_{fp}.pkl')
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, 'rb') as f:
+                cached = pickle.load(f)
+            print(f"  ✅ 从缓存加载特征: {cache_path}")
+            return cached['all_features'], cached['stock_returns']
+        except Exception as e:
+            print(f"  ⚠️ 缓存加载失败: {e}")
+    return None
+
+
+def _save_feature_cache(data: Dict, table: str,
+                        all_features: Dict, stock_returns: Dict):
+    """保存特征到缓存"""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    fp = _data_fingerprint(data, table)
+    cache_path = os.path.join(CACHE_DIR, f'features_{table}_{fp}.pkl')
+    # 清理旧缓存
+    for f in os.listdir(CACHE_DIR):
+        if f.startswith(f'features_{table}_') and f != os.path.basename(cache_path):
+            os.remove(os.path.join(CACHE_DIR, f))
+    with open(cache_path, 'wb') as f:
+        pickle.dump({'all_features': all_features, 'stock_returns': stock_returns}, f)
+    size_mb = os.path.getsize(cache_path) / 1024 / 1024
+    print(f"  💾 特征已缓存: {cache_path} ({size_mb:.1f} MB)")
 
 
 # ============ 数据加载 ============
@@ -197,39 +238,46 @@ def prepare_data(data: Dict, conn, cfg: dict,
     has_sent = len(sent_df) > 0
     horizon = cfg['horizon']
 
-    # 第一遍: 计算所有股票特征和收益率
-    print("  计算个股特征...")
-    all_features = {}
-    stock_data = {}
-    stock_returns = {}  # {symbol: {date_str: return_val}}
-    success = 0
+    # 第一遍: 计算所有股票特征和收益率 (支持缓存)
+    cached = _load_feature_cache(data, cfg['db_table'])
+    if cached is not None:
+        all_features, stock_returns = cached
+        stock_data = {sym: data[sym] for sym in all_features if sym in data}
+        success = len(all_features)
+    else:
+        print("  计算个股特征...")
+        all_features = {}
+        stock_data = {}
+        stock_returns = {}
+        success = 0
 
-    for sym, df in tqdm(data.items(), desc='   计算个股特征', unit='stock'):
-        try:
-            feats = pipeline.compute_stock(df, sym)
-            if has_sent:
-                feats = pipeline.merge_sentiment(feats, df, sym, sent_df)
-            feats = feats.fillna(method='ffill').fillna(0)
-            feats.index = df['date'].values
-            all_features[sym] = feats
-            stock_data[sym] = df
+        for sym, df in tqdm(data.items(), desc='   计算个股特征', unit='stock'):
+            try:
+                feats = pipeline.compute_stock(df, sym)
+                if has_sent:
+                    feats = pipeline.merge_sentiment(feats, df, sym, sent_df)
+                feats = feats.fillna(method='ffill').fillna(0)
+                feats.index = df['date'].values
+                all_features[sym] = feats
+                stock_data[sym] = df
 
-            # 预计算收益率 (后续用于截面排名)
-            close = df['close'].values.astype(float)
-            ret = np.full(len(close), np.nan)
-            for j in range(len(close) - horizon):
-                ret[j] = (close[j + horizon] - close[j]) / close[j]
+                close = df['close'].values.astype(float)
+                ret = np.full(len(close), np.nan)
+                for j in range(len(close) - horizon):
+                    ret[j] = (close[j + horizon] - close[j]) / close[j]
 
-            date_strs = [str(d)[:10] for d in df['date'].values]
-            ret_map = {}
-            for j, d in enumerate(date_strs):
-                if not np.isnan(ret[j]) and abs(ret[j]) < RETURN_CLIP:
-                    ret_map[d] = ret[j]
-            stock_returns[sym] = ret_map
+                date_strs = [str(d)[:10] for d in df['date'].values]
+                ret_map = {}
+                for j, d in enumerate(date_strs):
+                    if not np.isnan(ret[j]) and abs(ret[j]) < RETURN_CLIP:
+                        ret_map[d] = ret[j]
+                stock_returns[sym] = ret_map
 
-            success += 1
-        except Exception:
-            continue
+                success += 1
+            except Exception:
+                continue
+
+        _save_feature_cache(data, cfg['db_table'], all_features, stock_returns)
 
     # 第二遍: 截面排名特征
     print("  计算截面排名特征...")
@@ -481,6 +529,18 @@ def main():
     parser.add_argument('--model', choices=['daily', '30m'], default='daily')
     parser.add_argument('--quick', action='store_true', help='快速验证 (2模型, 1000树)')
     parser.add_argument('--db', type=str, default=DB_PATH, help='SQLite数据库路径')
+    # 超参覆盖 (不传则用默认 LGBM_PARAMS)
+    parser.add_argument('--num_leaves', type=int, default=None)
+    parser.add_argument('--max_depth', type=int, default=None)
+    parser.add_argument('--lr', type=float, default=None)
+    parser.add_argument('--reg_lambda', type=float, default=None)
+    parser.add_argument('--reg_alpha', type=float, default=None)
+    parser.add_argument('--subsample', type=float, default=None)
+    parser.add_argument('--colsample', type=float, default=None)
+    parser.add_argument('--min_child_samples', type=int, default=None)
+    parser.add_argument('--n_estimators', type=int, default=None)
+    parser.add_argument('--corr', type=float, default=None, help='去相关阈值')
+    parser.add_argument('--tag', type=str, default='', help='实验标签 (存到meta)')
     args = parser.parse_args()
 
     cfg = CONFIGS[args.model]
@@ -488,11 +548,26 @@ def main():
 
     n_models = QUICK_MODELS if args.quick else N_MODELS
     seeds = QUICK_SEEDS[:n_models] if args.quick else SEEDS[:n_models]
-    params = QUICK_PARAMS if args.quick else LGBM_PARAMS
+    params = dict(QUICK_PARAMS if args.quick else LGBM_PARAMS)
+
+    # 应用 CLI 覆盖
+    if args.num_leaves is not None: params['num_leaves'] = args.num_leaves
+    if args.max_depth is not None: params['max_depth'] = args.max_depth
+    if args.lr is not None: params['learning_rate'] = args.lr
+    if args.reg_lambda is not None: params['reg_lambda'] = args.reg_lambda
+    if args.reg_alpha is not None: params['reg_alpha'] = args.reg_alpha
+    if args.subsample is not None: params['subsample'] = args.subsample
+    if args.colsample is not None: params['colsample_bytree'] = args.colsample
+    if args.min_child_samples is not None: params['min_child_samples'] = args.min_child_samples
+    if args.n_estimators is not None: params['n_estimators'] = args.n_estimators
+
+    global CORR_THRESHOLD
+    if args.corr is not None:
+        CORR_THRESHOLD = args.corr
 
     print("=" * 70)
     target_desc = '绝对5日收益率' if TARGET_TYPE == 'return' else '截面排名分位 (0~1)'
-    print(f"  LGBM {cfg['label']}模型训练 v10 — {n_models}模型 Bagging Ensemble + 宏观 + LSTM")
+    print(f"  LGBM {cfg['label']}模型训练 v12 — {n_models}模型 Bagging Ensemble (强正则+小树)")
     print(f"  目标: {target_desc} | 预测周期: {cfg['horizon']}根K线")
     print(f"  时序: train({TRAIN_RATIO:.0%}) → val({VAL_RATIO:.0%}) → test({TEST_RATIO:.0%})")
     print(f"  并行: {n_models}模型并行 (joblib n_jobs={N_JOBS_PARALLEL})")
