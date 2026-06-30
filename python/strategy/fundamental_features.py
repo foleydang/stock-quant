@@ -93,7 +93,7 @@ class FundamentalFeatures:
             mask = bv > 0
             pb = np.full(len(close), np.nan)
             pb[mask] = close[mask] / bv[mask]
-            pb = pd.Series(pb, index=df.index).fillna(method='ffill').fillna(2.0)
+            pb = pd.Series(pb, index=df.index).ffill().fillna(2.0)
             f['fund_pb_proxy'] = pb
             f['fund_pb_pct'] = pb.rolling(250, min_periods=20).apply(
                 lambda x: (x.iloc[-1] < x).mean(), raw=False
@@ -107,7 +107,7 @@ class FundamentalFeatures:
             mask = eps_val > 0
             pe = np.full(len(close), np.nan)
             pe[mask] = close[mask] / eps_val[mask]
-            pe = pd.Series(pe, index=df.index).fillna(method='ffill').fillna(20.0)
+            pe = pd.Series(pe, index=df.index).ffill().fillna(20.0)
             f['fund_pe_proxy'] = pe
             f['fund_pe_pct'] = pe.rolling(250, min_periods=20).apply(
                 lambda x: (x.iloc[-1] < x).mean(), raw=False

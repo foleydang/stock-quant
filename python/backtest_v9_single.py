@@ -139,7 +139,7 @@ def run_backtest(symbol='300124.SZ', n_days=30, calib_days=60):
             feats[c] = 0
     feats = feats[feature_names]
 
-    regime = detect_market_regime(stock_df)
+    regime = detect_market_regime(stock_df, db_path=DB_PATH)
 
     close = stock_df['close'].values
     actual_ret = np.full(len(close), np.nan)

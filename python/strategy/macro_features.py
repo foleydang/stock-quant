@@ -174,7 +174,7 @@ class MacroFeatures:
             f['macro_stock_vol_elastic'] = stock_ret.rolling(60, min_periods=20).std() / (
                 hs300_ret.rolling(60, min_periods=20).std() + 1e-10)
 
-        return f.fillna(method='ffill').fillna(0)
+        return f.ffill().fillna(0)
 
     @staticmethod
     def _map(df_dates, macro_series):
@@ -187,4 +187,4 @@ class MacroFeatures:
             idx = np.searchsorted(md_vals, np.datetime64(d), side='right') - 1
             if idx >= 0:
                 result.iloc[i] = mv[idx]
-        return result.fillna(method='ffill')
+        return result.ffill()
