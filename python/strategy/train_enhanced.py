@@ -192,36 +192,7 @@ def calculate_features(df, conn):
                     ).fillna(0).values
                     feats[f'sent_{col}'] = mapped
 
-        # 龙虎榜 + 融资融券
-        sent_stock2 = sentiment[sentiment['symbol'] == sym].copy()
-        if len(sent_stock2) > 0:
-            sent_stock2 = sent_stock2.set_index('trade_date')
-            for col in ['lhb_net_buy', 'lhb_ret_5d', 'lhb_net_buy_ratio',
-                        'margin_balance_chg', 'short_balance']:
-                if col in sent_stock2.columns:
-                    feats[f'extra_{col}'] = stock_df['trade_date'].map(
-                        lambda d: sent_stock2.loc[d, col] if d in sent_stock2.index else 0
-                    ).fillna(0).values
-
-        # 基本面
-        fund_stock = fundamental[fundamental['symbol'] == sym].copy()
-        if len(fund_stock) > 0:
-            fund_stock = fund_stock.set_index('trade_date')
-            for col in ['roe', 'debt_ratio', 'net_profit_yoy', 'revenue_yoy']:
-                if col in fund_stock.columns:
-                    feats[f'extra_fund_{col}'] = stock_df['trade_date'].map(
-                        lambda d: fund_stock.loc[d, col] if d in fund_stock.index else 0
-                    ).fillna(0).values
-
-        # 北向资金
-        if len(north_flow) > 0:
-            nf = north_flow.set_index('trade_date')
-            for col in ['north_net', 'total_net']:
-                feats[f'extra_north_{col}'] = stock_df['trade_date'].map(
-                    lambda d: nf.loc[d, col] if d in nf.index else 0
-                ).fillna(0).values
-
-        # 板块
+        # 板块 (龙虎榜/融资融券/基本面/北向 已在 FeaturePipeline 中计算, 不重复添加)
         industry = sector_map.get(sym, '未知')
         feats['sector_code'] = hash(industry) % 100
 
@@ -294,24 +265,59 @@ def _calc_adx(high, low, close, period=14):
     return adx.values
 
 
-# === 市场状态识别 ===
-def detect_market_regime(df, window=60):
-    """识别市场状态: bull(牛市), bear(熊市), sideways(震荡)"""
-    ma20 = df['close'].rolling(20).mean()
+# === 市场状态识别 (基于 HS300 大盘) ===
+_hs300_regime_cache = {}
+
+def load_hs300_regimes(db_path=None):
+    """预加载 HS300 大盘牛熊状态, 返回 {date_str: regime}"""
+    if db_path in _hs300_regime_cache:
+        return _hs300_regime_cache[db_path]
+
+    if db_path is None:
+        db_path = DB_PATH
+    conn = sqlite3.connect(db_path)
+    df = pd.read_sql("SELECT CAST(trade_date AS TEXT) as td, close FROM hs300_daily ORDER BY td", conn)
+    conn.close()
+
+    df['td'] = df['td'].str.replace('.0', '', regex=False)
+    df['close'] = pd.to_numeric(df['close'], errors='coerce')
+    df = df.dropna(subset=['close'])
+    # normalize date format to YYYY-MM-DD
+    def _norm_date(d):
+        d = d.strip()
+        if '-' in d:
+            return d[:10]
+        return f"{d[:4]}-{d[4:6]}-{d[6:8]}"
+    df['td'] = df['td'].apply(_norm_date)
+    df = df.drop_duplicates(subset='td', keep='first').reset_index(drop=True)
+
     ma60 = df['close'].rolling(60).mean()
-    returns = df['close'].pct_change(window)
-    
+    ret60 = df['close'].pct_change(60)
+
+    regimes = {}
+    for i in range(len(df)):
+        date_str = df['td'].iloc[i]
+        if pd.isna(ma60.iloc[i]):
+            regimes[date_str] = 'sideways'
+        elif df['close'].iloc[i] > ma60.iloc[i] and ret60.iloc[i] > 0.05:
+            regimes[date_str] = 'bull'
+        elif df['close'].iloc[i] < ma60.iloc[i] and ret60.iloc[i] < -0.05:
+            regimes[date_str] = 'bear'
+        else:
+            regimes[date_str] = 'sideways'
+
+    _hs300_regime_cache[db_path] = regimes
+    return regimes
+
+
+def detect_market_regime(df, window=60, db_path=None):
+    """基于 HS300 大盘识别市场状态 (所有股票同一天同一 regime)"""
+    hs300_regimes = load_hs300_regimes(db_path)
+    dates = df['trade_date'].values
     regimes = np.full(len(df), 'sideways', dtype=object)
-    
-    # 牛市: 价格 > MA60 且 60日收益 > 5%
-    bull_mask = (df['close'] > ma60) & (returns > 0.05)
-    regimes[bull_mask] = 'bull'
-    
-    # 熊市: 价格 < MA60 且 60日收益 < -5%
-    bear_mask = (df['close'] < ma60) & (returns < -0.05)
-    regimes[bear_mask] = 'bear'
-    
-    # 震荡: 其余情况
+    for i, d in enumerate(dates):
+        date_str = pd.Timestamp(d).strftime('%Y-%m-%d')
+        regimes[i] = hs300_regimes.get(date_str, 'sideways')
     return regimes
 
 
@@ -391,6 +397,78 @@ def ensemble_weight(models, cv_scores):
     return {k: v/w_sum for k, v in weights.items()} if w_sum > 0 else weights
 
 
+def prepare_dataset(results, horizon, db_path=None, drop_macro=False):
+    """从 calculate_features 的结果准备训练数据 (截面排名目标)
+
+    Returns: (X_all, y_all, regimes_all, dates_all, all_features)
+    """
+    X_all, y_all, regimes_all, dates_all = [], [], [], []
+
+    all_features = set()
+    for sym, (stock_df, feats) in results.items():
+        all_features.update(feats.columns)
+
+    if drop_macro:
+        macro_prefixes = ('macro_', 'mi_', 'mkt_')
+        before = len(all_features)
+        all_features = {f for f in all_features if not f.startswith(macro_prefixes)}
+        print(f"  去除宏观特征: {before} → {len(all_features)} (删除 {before - len(all_features)} 个)")
+
+    all_features = sorted(all_features)
+
+    stock_returns_by_date = {}
+    stock_data_dict = {}
+
+    for sym, (stock_df, feats) in results.items():
+        close = stock_df['close'].values
+        target = np.full(len(close), np.nan)
+        for i in range(len(close) - horizon):
+            target[i] = (close[i + horizon] - close[i]) / (close[i] + 1e-9)
+        dates = stock_df['trade_date'].values
+        for i in range(len(close)):
+            if not np.isnan(target[i]):
+                d = pd.Timestamp(dates[i]).strftime('%Y-%m-%d')
+                if d not in stock_returns_by_date:
+                    stock_returns_by_date[d] = {}
+                stock_returns_by_date[d][sym] = target[i]
+        stock_data_dict[sym] = (stock_df, feats, target)
+
+    rank_targets = {sym: {} for sym in stock_data_dict}
+    for d, sym_rets in stock_returns_by_date.items():
+        if len(sym_rets) < 10:
+            continue
+        rets = np.array(list(sym_rets.values()))
+        market_ret = np.nanmean(rets)
+        alpha_rets = rets - market_ret
+        ranks = pd.Series(alpha_rets).rank(pct=True).values - 0.5
+        for i, sym in enumerate(sym_rets.keys()):
+            rank_targets[sym][d] = float(ranks[i])
+
+    for sym, (stock_df, feats, abs_target) in stock_data_dict.items():
+        date_strs = [pd.Timestamp(d).strftime('%Y-%m-%d') for d in stock_df['trade_date'].values]
+        target = np.array([rank_targets[sym].get(d, np.nan) for d in date_strs])
+        regime = detect_market_regime(stock_df, db_path=db_path)
+        feats = feats.fillna(0).replace([np.inf, -np.inf], 0)
+        for c in all_features:
+            if c not in feats.columns:
+                feats[c] = 0
+        feats = feats[all_features]
+        valid = ~np.isnan(target)
+        valid[:120] = False
+        X_all.append(feats[valid].values)
+        y_all.append(target[valid])
+        regimes_all.append(regime[valid])
+        dates_all.append(stock_df['trade_date'].values[valid])
+
+    X_all = np.vstack(X_all)
+    y_all = np.concatenate(y_all)
+    regimes_all = np.concatenate(regimes_all)
+    dates_all = np.concatenate(dates_all)
+
+    valid_mask = np.abs(y_all) < 0.5
+    return X_all[valid_mask], y_all[valid_mask], regimes_all[valid_mask], dates_all[valid_mask], all_features
+
+
 # === 主流程 ===
 def main():
     parser = argparse.ArgumentParser()
@@ -400,6 +478,7 @@ def main():
     parser.add_argument('--horizon', type=int, default=3, help='预测周期')
     parser.add_argument('--db', default=DB_PATH, help='数据库路径')
     parser.add_argument('--max-stocks', type=int, default=0, help='最大股票数')
+    parser.add_argument('--drop-macro', action='store_true', help='去除宏观/市场共性特征')
     args = parser.parse_args()
     
     conn = sqlite3.connect(args.db)
@@ -423,95 +502,17 @@ def main():
     
     # 3. 准备训练数据
     print("\n📦 准备训练数据...")
-    X_all, y_all, regimes_all, dates_all = [], [], [], []
-
-    # 第一遍: 收集所有特征列的并集
-    all_features = set()
-    for sym, (stock_df, feats) in results.items():
-        all_features.update(feats.columns)
-    all_features = sorted(all_features)
+    X_all, y_all, regimes_all, dates_all, all_features = prepare_dataset(
+        results, args.horizon, db_path=args.db, drop_macro=args.drop_macro)
     print(f"   统一特征数: {len(all_features)}")
-
-    # 第一遍: 计算每只股票的绝对收益, 后面转截面排名
-    stock_returns_by_date = {}  # {date: {symbol: return}}
-    stock_data_dict = {}
-
-    for sym, (stock_df, feats) in results.items():
-        close = stock_df['close'].values
-        target = np.full(len(close), np.nan)
-        for i in range(len(close) - args.horizon):
-            target[i] = (close[i + args.horizon] - close[i]) / (close[i] + 1e-9)
-
-        dates = stock_df['trade_date'].values
-        for i in range(len(close)):
-            if not np.isnan(target[i]):
-                d = pd.Timestamp(dates[i]).strftime('%Y-%m-%d')
-                if d not in stock_returns_by_date:
-                    stock_returns_by_date[d] = {}
-                stock_returns_by_date[d][sym] = target[i]
-        stock_data_dict[sym] = (stock_df, feats, target)
-
-    # 第二遍: 截面排名 → 市场中性目标 (中心化到 -0.5 ~ 0.5)
-    print("   计算截面排名目标 (市场中性)...")
-    rank_targets = {}  # {sym: {date_str: rank_pct}}
-    for sym in stock_data_dict:
-        rank_targets[sym] = {}
-    n_dates_ranked = 0
-    for d, sym_rets in stock_returns_by_date.items():
-        if len(sym_rets) < 10:
-            continue
-        rets = np.array(list(sym_rets.values()))
-        market_ret = np.nanmean(rets)
-        alpha_rets = rets - market_ret  # 去市场 beta
-        ranks = pd.Series(alpha_rets).rank(pct=True).values - 0.5
-        for i, sym in enumerate(sym_rets.keys()):
-            rank_targets[sym][d] = float(ranks[i])
-        n_dates_ranked += 1
-    print(f"   截面排名完成: {n_dates_ranked} 天, {len(stock_data_dict)} 只股票")
-
-    for sym, (stock_df, feats, abs_target) in stock_data_dict.items():
-        # 目标: 截面排名分位 (市场中性)
-        date_strs = [pd.Timestamp(d).strftime('%Y-%m-%d') for d in stock_df['trade_date'].values]
-        target = np.array([rank_targets[sym].get(d, np.nan) for d in date_strs])
-
-        # 市场状态
-        regime = detect_market_regime(stock_df)
-
-        # 对齐到统一特征列 (缺失的填0)
-        feats = feats.fillna(0).replace([np.inf, -np.inf], 0)
-        for c in all_features:
-            if c not in feats.columns:
-                feats[c] = 0
-        feats = feats[all_features]
-
-        valid = ~np.isnan(target)
-        valid[:120] = False  # 前120条作为历史
-
-        X_all.append(feats[valid].values)
-        y_all.append(target[valid])
-        regimes_all.append(regime[valid])
-        dates_all.append(stock_df['trade_date'].values[valid])
-
-    X_all = np.vstack(X_all)
-    y_all = np.concatenate(y_all)
-    regimes_all = np.concatenate(regimes_all)
-    dates_all = np.concatenate(dates_all)
-
-    # 去除极端值 (排名目标已经在 [-0.5, 0.5], 不需要 clip)
-    valid_mask = np.abs(y_all) < 0.5
-    X_all = X_all[valid_mask]
-    y_all = y_all[valid_mask]
-    regimes_all = regimes_all[valid_mask]
-    dates_all = dates_all[valid_mask]
-
     print(f"   总样本: {len(X_all)}")
     print(f"   特征数: {len(all_features)}")
     print(f"   牛市: {(regimes_all == 'bull').sum()}")
     print(f"   熊市: {(regimes_all == 'bear').sum()}")
     print(f"   震荡: {(regimes_all == 'sideways').sum()}")
 
-    # 4. 训练/验证分割 (按时间切分)
-    train_cutoff = np.percentile(dates_all.astype('datetime64[D]').astype(int), 80)
+    # 4. 训练/验证分割 (按时间切分) — 只留最后约1个月做早停验证
+    train_cutoff = np.percentile(dates_all.astype('datetime64[D]').astype(int), 97)
     train_cutoff = np.datetime64(int(train_cutoff), 'D')
     # purged gap: drop samples in [train_cutoff - horizon, train_cutoff) to avoid target leakage
     horizon = args.horizon
@@ -606,7 +607,41 @@ def main():
             mae = np.mean(np.abs(ensemble_pred - y_val[mask]))
             print(f"    {'Ensemble':10s}: IC={ic:.4f} MAE={mae:.4f}")
     
-    # 7. 保存模型
+    # 7. 特征重要性分析
+    print("\n📊 特征重要性分析...")
+    importance_dict = defaultdict(list)
+    for regime, models in all_models.items():
+        for name, model in models.items():
+            imp = None
+            if hasattr(model, 'feature_importances_'):
+                imp = model.feature_importances_
+            elif hasattr(model, 'get_feature_importance'):
+                imp = model.get_feature_importance()
+            if imp is not None and len(imp) == len(all_features):
+                for i, feat in enumerate(all_features):
+                    importance_dict[feat].append(float(imp[i]))
+
+    sorted_features = sorted(
+        [(f, np.mean(scores)) for f, scores in importance_dict.items()],
+        key=lambda x: -x[1])
+
+    print("  Top-20:")
+    for f, imp in sorted_features[:20]:
+        print(f"    {f:40s}: {imp:.1f}")
+    zero_imp = [f for f, imp in sorted_features if imp < 1.0]
+    print(f"  低重要性 (<1.0): {len(zero_imp)}/{len(sorted_features)} 特征")
+
+    # 保存 importance CSV
+    import csv
+    imp_path = os.path.join(MODEL_DIR, 'feature_importance.csv')
+    with open(imp_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['rank', 'feature', 'avg_importance'])
+        for rank, (feat, imp) in enumerate(sorted_features, 1):
+            writer.writerow([rank, feat, f'{imp:.2f}'])
+    print(f"  保存到 {imp_path}")
+
+    # 8. 保存模型
     print(f"\n💾 保存模型到 {MODEL_DIR}...")
     
     model_data = {
@@ -622,6 +657,7 @@ def main():
         'market_regimes': not args.no_regime,
         'n_stocks': len(results),
         'n_samples': len(X_all),
+        'feature_importance': sorted_features,
     }
     
     # 兼容旧版预测API: 添加 models 列表 (取所有 bagging 模型)

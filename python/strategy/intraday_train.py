@@ -224,7 +224,7 @@ def prepare_samples(data: Dict[str, pd.DataFrame],
         try:
             df = data[sym]
             feats = pipeline.compute_stock(df, sym)
-            feats = feats.fillna(method='ffill').fillna(0)
+            feats = feats.ffill().fillna(0)
             feats.index = df['date'].values
             all_features[sym] = feats
             success += 1

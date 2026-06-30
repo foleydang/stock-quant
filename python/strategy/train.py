@@ -256,7 +256,7 @@ def prepare_data(data: Dict, conn, cfg: dict,
                 feats = pipeline.compute_stock(df, sym)
                 if has_sent:
                     feats = pipeline.merge_sentiment(feats, df, sym, sent_df)
-                feats = feats.fillna(method='ffill').fillna(0)
+                feats = feats.ffill().fillna(0)
                 feats.index = df['date'].values
                 all_features[sym] = feats
                 stock_data[sym] = df

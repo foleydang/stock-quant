@@ -258,7 +258,7 @@ class EnsembleBacktest:
         # 计算特征
         try:
             feats = self._feature_pipeline.compute_stock(hist, symbol)
-            feats = feats.fillna(method='ffill').fillna(0)
+            feats = feats.ffill().fillna(0)
 
             # 对齐到训练时的特征列
             if self.intraday_feature_names:

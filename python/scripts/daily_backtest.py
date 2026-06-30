@@ -52,7 +52,7 @@ for sym in symbols:
 
     try:
         feats = pipeline.compute_stock(df, sym)
-        feats = feats.fillna(method='ffill').fillna(0)
+        feats = feats.ffill().fillna(0)
         feats = feats.reindex(columns=feature_names, fill_value=0)
     except Exception:
         continue
