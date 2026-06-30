@@ -178,12 +178,13 @@ class MacroFeatures:
 
     @staticmethod
     def _map(df_dates, macro_series):
-        """前向填充映射"""
+        """前向填充映射: 找每个 stock date 对应的最近宏观数据"""
         result = pd.Series(np.nan, index=range(len(df_dates)))
         md = macro_series.index
         mv = macro_series.values
+        md_vals = md.values
         for i, d in enumerate(df_dates):
-            mask = md <= d
-            if mask.any():
-                result.iloc[i] = mv[np.argmax(mask)]
+            idx = np.searchsorted(md_vals, np.datetime64(d), side='right') - 1
+            if idx >= 0:
+                result.iloc[i] = mv[idx]
         return result.fillna(method='ffill')

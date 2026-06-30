@@ -28,8 +28,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'python'))
 
-DB_PATH = os.path.join(ROOT, 'python', 'data', 'stock_data.db')
-MODEL_DIR = os.path.join(ROOT, 'models', 'lgb_hs300_enhanced')
+DB_PATH = os.path.join(ROOT, 'data', 'stock_data.db')
+MODEL_DIR = os.path.join(ROOT, '..', 'models', 'lgb_hs300_enhanced')
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # === 模型参数 (V8 网格搜索最优: IC 0.0416→0.0664) ===
@@ -67,13 +67,21 @@ def load_kline_data(conn, max_stocks=0):
     """加载所有A股的30分钟K线，按日聚合"""
     print("📊 加载K线数据...")
     df = pd.read_sql("""
-        SELECT symbol, substr(date,1,10) as trade_date,
-               MIN(open) as open, MAX(high) as high, MIN(low) as low,
-               MAX(close) as close, SUM(volume) as volume
-        FROM kline_30m
-        WHERE (symbol LIKE '%.SZ' OR symbol LIKE '%.SH')
-        GROUP BY symbol, substr(date,1,10)
-        ORDER BY symbol, trade_date
+        SELECT t.symbol, t.trade_date,
+               first_bar.open as open, t.high, t.low,
+               last_bar.close as close, t.volume
+        FROM (
+            SELECT symbol, substr(date,1,10) as trade_date,
+                   MAX(high) as high, MIN(low) as low,
+                   SUM(volume) as volume,
+                   MIN(date) as first_date, MAX(date) as last_date
+            FROM kline_30m
+            WHERE (symbol LIKE '%.SZ' OR symbol LIKE '%.SH')
+            GROUP BY symbol, substr(date,1,10)
+        ) t
+        JOIN kline_30m first_bar ON first_bar.symbol = t.symbol AND first_bar.date = t.first_date
+        JOIN kline_30m last_bar ON last_bar.symbol = t.symbol AND last_bar.date = t.last_date
+        ORDER BY t.symbol, t.trade_date
     """, conn)
     if max_stocks > 0:
         top_symbols = pd.read_sql("SELECT symbol FROM (SELECT symbol, COUNT(*) as cnt FROM kline_30m WHERE (symbol LIKE '%.SZ' OR symbol LIKE '%.SH') GROUP BY symbol ORDER BY cnt DESC LIMIT " + str(max_stocks) + ")", conn)['symbol'].tolist()
@@ -505,14 +513,18 @@ def main():
     # 4. 训练/验证分割 (按时间切分)
     train_cutoff = np.percentile(dates_all.astype('datetime64[D]').astype(int), 80)
     train_cutoff = np.datetime64(int(train_cutoff), 'D')
-    train_mask = dates_all < train_cutoff
+    # purged gap: drop samples in [train_cutoff - horizon, train_cutoff) to avoid target leakage
+    horizon = args.horizon
+    purge_start = train_cutoff - np.timedelta64(horizon + 2, 'D')
+    train_mask = dates_all < purge_start
     val_mask = dates_all >= train_cutoff
 
     X_train, X_val = X_all[train_mask], X_all[val_mask]
     y_train, y_val = y_all[train_mask], y_all[val_mask]
     r_train, r_val = regimes_all[train_mask], regimes_all[val_mask]
 
-    print(f"\n  ⏰ 时间切分: train < {train_cutoff} | val >= {train_cutoff}")
+    n_purged = ((dates_all >= purge_start) & (dates_all < train_cutoff)).sum()
+    print(f"\n  ⏰ 时间切分: train < {purge_start} | purge gap {n_purged} 条 | val >= {train_cutoff}")
     print(f"     train: {train_mask.sum()} 条 | val: {val_mask.sum()} 条")
     
     # 5. 训练模型
