@@ -48,7 +48,8 @@ python/logs/
 .env
 .env.localmlruns/
 python/.pytest_cache/
-python/models/
 mlruns/
-models/
+# 模型文件直接提交,方便服务器pull即用
+!models/
+!models/**
 python/python/
