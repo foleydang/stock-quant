@@ -1183,14 +1183,14 @@ def v8_intraday_push():
         position_advice = predictor.get_position_advice(positions) if positions else []
 
         # 构建飞书消息
-        spearman = predictor.model_data.get('final_spearman') if predictor.model_data else None
+        spearman = predictor.model_data.get('test_ic') if predictor.model_data else None
         thresholds = predictor._regime_info if hasattr(predictor, '_regime_info') else {}
         regime = thresholds.get('regime', '?')
 
         regime_emoji = {'bull': '🐂', 'bear': '🐻', 'sideways': '📊'}.get(regime, '📊')
         regime_cn = {'bull': '牛市', 'bear': '熊市', 'sideways': '震荡'}.get(regime, '?')
 
-        lines = [f"**📊 v8 回归模型 — 盘中预测**\n"]
+        lines = [f"**📊 v9 Ensemble — 盘中预测 (window=3)**\n"]
         lines.append(f"{regime_emoji} 大盘: **{regime_cn}** | "
                     f"趋势强度: {thresholds.get('trend_strength', 0):.2%} | "
                     f"阈值×{thresholds.get('adjustment', 1.0):.1f}\n")

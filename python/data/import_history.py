@@ -13,42 +13,42 @@ ts.set_token(os.getenv('TUSHARE_TOKEN', ''))
 pro = ts.pro_api()
 
 def import_history(symbol, days=365):
-    """导入历史日线数据"""
+    """导入历史日线数据到 kline_daily 表"""
     start = (datetime.now() - timedelta(days=days)).strftime('%Y%m%d')
     end = datetime.now().strftime('%Y%m%d')
-    
+
     print(f"{symbol}: 获取 {days} 天历史...")
-    
+
     # Tushare 可能有限制，分批获取
     df = pro.daily(ts_code=symbol, start_date=start, end_date=end)
-    
+
     if df is not None and not df.empty:
         df = df.rename(columns={'trade_date': 'date', 'vol': 'volume'})
-        df['date'] = pd.to_datetime(df['date'], format='mixed')
+        df['date'] = pd.to_datetime(df['date'], format='mixed').dt.strftime('%Y-%m-%d')
         df = df[['date', 'open', 'high', 'low', 'close', 'volume']]
         df = df.sort_values('date').reset_index(drop=True)
-        
+
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        
-        # 删除旧数据
-        cursor.execute('DELETE FROM kline_30m WHERE symbol=?', (symbol,))
-        
-        # 写入新数据
+
+        # 删除旧数据 (日线表, 不是30m表)
+        cursor.execute('DELETE FROM kline_daily WHERE symbol=?', (symbol,))
+
+        # 写入新数据 (volume 保持 Tushare 原始单位: 手, 与 update_daily_data.py 一致)
         for _, row in df.iterrows():
             cursor.execute('''
-                INSERT INTO kline_30m (symbol, date, open, high, low, close, volume)
+                INSERT INTO kline_daily (symbol, date, open, high, low, close, volume)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (symbol, row['date'].strftime('%Y-%m-%d %H:%M:%S'),
+            ''', (symbol, row['date'],
                   float(row['open']), float(row['high']), float(row['low']),
-                  float(row['close']), float(row['volume']) * 100))
-        
+                  float(row['close']), float(row['volume'])))
+
         conn.commit()
         conn.close()
-        
-        print(f"  ✓ 导入 {len(df)} 条")
+
+        print(f"  ✓ 导入 {len(df)} 条到 kline_daily")
         return len(df)
-    
+
     print(f"  ✗ 获取失败")
     return 0
 
@@ -68,9 +68,9 @@ def main():
     
     print("\n=== 最终数据量 ===")
     for symbol in positions:
-        cursor.execute('SELECT COUNT(*) FROM kline_30m WHERE symbol=?', (symbol,))
+        cursor.execute('SELECT COUNT(*) FROM kline_daily WHERE symbol=?', (symbol,))
         cnt = cursor.fetchone()[0]
-        print(f"{symbol}: {cnt} 条")
+        print(f"{symbol}: {cnt} 条 (kline_daily)")
     
     conn.close()
 

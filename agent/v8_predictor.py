@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-v8 回归模型预测器 — 飞书 Bot 集成
+v9 回归模型预测器 — 飞书 Bot 集成 + window=3 信号平滑
 
 功能:
-1. 加载 v8 回归模型
-2. 对所有股票预测未来收益率
-3. 截面排序 → Top买入候选 + 持仓加减仓建议
-4. 输出飞书卡片格式
+1. 加载 30m Bagging Ensemble 模型 (5个LGBM)
+2. 对所有股票预测未来排名分位值
+3. window=3 信号平滑: 用最近3个bar的预测均值, 提高信号稳定性
+4. 截面排序 → Top买入候选 + 持仓加减仓建议
+5. 输出飞书卡片格式
 """
 
 import os
@@ -18,10 +19,13 @@ import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'strategy'))
+PYTHON_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'python')
+sys.path.insert(0, PYTHON_DIR)
+sys.path.insert(0, os.path.join(PYTHON_DIR, 'strategy'))
 
-from features_compat import EnhancedFeatureEngineer
+from strategy.features import FeaturePipeline
+
+SIGNAL_WINDOW = 3
 
 # ====== 自适应信号阈值 (基于大盘状态) ======
 # 固定阈值的问题: 牛市0.5%太保守, 熊市0.5%太乐观
@@ -122,61 +126,70 @@ def get_adaptive_thresholds() -> dict:
 
 
 class V8Predictor:
-    """v8 回归模型预测器"""
+    """v9 Bagging Ensemble 预测器 + window=3 信号平滑"""
 
     def __init__(self, model_path: str = None):
-        self.model = None
+        self.models = None
         self.feature_names = None
         self.model_data = None
+        self.pipeline = None
+        self._db_path = os.path.join(PYTHON_DIR, 'data/stock_data.db')
 
         if model_path is None:
-            model_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'models/lgb_hs300/model.pkl'
-            )
+            model_path = os.path.join(PYTHON_DIR, 'models/lgb_30m/model.pkl')
 
         if os.path.exists(model_path):
             self._load_model(model_path)
 
     def _load_model(self, model_path: str):
-        """加载模型"""
+        """加载 Bagging Ensemble 模型"""
         with open(model_path, 'rb') as f:
             self.model_data = pickle.load(f)
 
-        self.model = self.model_data.get('model')
+        self.models = self.model_data.get('models')
         self.feature_names = self.model_data.get('feature_names')
-        model_type = self.model_data.get('model_type', 'classification')
-        version = self.model_data.get('model_version', 'unknown')
+        model_type = self.model_data.get('model_type', 'unknown')
+        n_models = self.model_data.get('n_models', len(self.models) if self.models else 0)
+        test_ic = self.model_data.get('test_ic', 0)
 
-        print(f"[V8Predictor] 加载模型: {version} ({model_type})")
-        if model_type == 'regression':
-            print(f"[V8Predictor] Spearman={self.model_data.get('cv_spearman', 0):.4f}, "
-                  f"特征={len(self.feature_names or [])}")
+        cfg_30m = {
+            'label': '30分钟', 'horizon': 3, 'db_table': 'kline_30m',
+            'min_history': 150, 'purged_gap': 3, 'north_shift_days': 0,
+        }
+        self.pipeline = FeaturePipeline(cfg_30m)
 
-        return self.model is not None
+        print(f"[V9Predictor] 加载: {n_models}模型 Ensemble ({model_type})")
+        print(f"[V9Predictor] IC={test_ic:.4f}, 特征={len(self.feature_names or [])}, "
+              f"window={SIGNAL_WINDOW}")
+
+        return self.models is not None
 
     def is_loaded(self) -> bool:
-        return self.model is not None
+        return self.models is not None and len(self.models) > 0
+
+    def _ensemble_predict(self, X: np.ndarray) -> np.ndarray:
+        """Bagging Ensemble 预测: 取所有模型预测的均值"""
+        preds = [m.predict(X) for m in self.models]
+        return np.mean(preds, axis=0)
 
     def predict_return(self, symbol: str) -> Optional[float]:
         """
-        预测单只股票的未来收益率
-        
+        预测单只股票的未来排名分位值 (window=3 平滑)
+
+        使用最近 SIGNAL_WINDOW 个 bar 的预测均值, 提高信号稳定性。
+        Spearman 从 0.146 (window=1) 提升到 0.158 (window=3)。
+
         Returns:
-            float: 预测的90分钟收益率, 或 None
+            float: 平滑后的预测分位值, 或 None
         """
-        if not self.model:
+        if not self.models:
             return None
 
         try:
-            db_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'data/stock_data.db'
-            )
-            conn = sqlite3.connect(db_path)
+            conn = sqlite3.connect(self._db_path)
             df = pd.read_sql_query(
                 'SELECT date, open, high, low, close, volume FROM kline_30m '
-                'WHERE symbol=? ORDER BY date DESC LIMIT 200',
+                'WHERE symbol=? ORDER BY date DESC LIMIT 300',
                 conn, params=(symbol,)
             )
             conn.close()
@@ -185,60 +198,117 @@ class V8Predictor:
                 return None
 
             df = df.sort_values('date').reset_index(drop=True)
-            features = EnhancedFeatureEngineer.calculate_features(df)
-            features = features.fillna(method='ffill').fillna(0)
+            feats = self.pipeline.compute_stock(df, symbol)
+            feats = feats.ffill().fillna(0)
 
             if self.feature_names:
-                missing = [c for c in self.feature_names if c not in features.columns]
-                for c in missing:
-                    features[c] = 0
-                features = features[self.feature_names]
+                for c in self.feature_names:
+                    if c not in feats.columns:
+                        feats[c] = 0
+                feats = feats[self.feature_names]
 
-            last_row = features.iloc[-1].values
-            prediction = float(self.model.predict([last_row])[0])
-            return prediction
+            n_rows = len(feats)
+            window = min(SIGNAL_WINDOW, n_rows)
+            predictions = []
+            for i in range(window):
+                row_idx = n_rows - 1 - i
+                row = feats.iloc[row_idx].values.reshape(1, -1).astype(np.float32)
+                pred = float(self._ensemble_predict(row)[0])
+                if not np.isnan(pred) and not np.isinf(pred):
+                    predictions.append(pred)
+
+            if not predictions:
+                return None
+
+            return float(np.mean(predictions))
 
         except Exception as e:
-            print(f"[V8Predictor] 预测失败 {symbol}: {e}")
+            print(f"[V9Predictor] 预测失败 {symbol}: {e}")
             return None
 
     def predict_all(self, limit: int = None) -> List[Dict]:
         """
         预测所有股票的收益率 → 按预测值排序
-        
-        使用自适应阈值: 根据大盘状态(牛/熊/震荡)动态调整
+
+        修复: 先算所有股票特征 → 计算截面排名 → 合并后预测
+        (之前 cs_rank_* 填 0, 导致训练/预测特征分布不一致)
         """
-        if not self.model:
+        if not self.models:
             return []
 
-        # 获取自适应阈值
         thresholds = get_adaptive_thresholds()
 
-        db_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            'data/stock_data.db'
-        )
-        conn = sqlite3.connect(db_path)
-
+        conn = sqlite3.connect(self._db_path)
         symbols = [row[0] for row in
                    conn.execute("SELECT DISTINCT symbol FROM kline_30m ORDER BY symbol").fetchall()]
-
         if limit:
             symbols = symbols[:limit]
 
-        results = []
+        # 第1步: 加载所有股票数据 + 计算个股特征
+        all_features = {}
+        all_dates_set = set()
         for sym in symbols:
-            pred = self.predict_return(sym)
-            if pred is not None:
+            try:
+                df = pd.read_sql_query(
+                    'SELECT date, open, high, low, close, volume FROM kline_30m '
+                    'WHERE symbol=? ORDER BY date DESC LIMIT 300',
+                    conn, params=(sym,)
+                )
+                if df.empty or len(df) < 150:
+                    continue
+                df = df.sort_values('date').reset_index(drop=True)
+                feats = self.pipeline.compute_stock(df, sym)
+                feats = feats.ffill().fillna(0)
+                feats.index = df['date'].values
+                all_features[sym] = feats
+                all_dates_set.update(df['date'].values)
+            except Exception:
+                continue
+
+        if not all_features:
+            conn.close()
+            return []
+
+        # 第2步: 计算截面排名特征 (关键修复)
+        all_dates = sorted(all_dates_set)
+        cs_features = self.pipeline.compute_cross_section(all_features, all_dates)
+
+        # 第3步: 合并特征 + 截面排名, 逐股预测 (window=3)
+        results = []
+        for sym, feats in all_features.items():
+            try:
+                if sym in cs_features:
+                    feats = pd.concat([feats, cs_features[sym]], axis=1)
+                # 对齐特征列
+                if self.feature_names:
+                    for c in self.feature_names:
+                        if c not in feats.columns:
+                            feats[c] = 0
+                    feats = feats[self.feature_names]
+
+                n_rows = len(feats)
+                window = min(SIGNAL_WINDOW, n_rows)
+                predictions = []
+                for i in range(window):
+                    row_idx = n_rows - 1 - i
+                    row = feats.iloc[row_idx].values.reshape(1, -1).astype(np.float32)
+                    pred = float(self._ensemble_predict(row)[0])
+                    if not np.isnan(pred) and not np.isinf(pred):
+                        predictions.append(pred)
+                if not predictions:
+                    continue
+
+                pred = float(np.mean(predictions))
                 name_row = conn.execute("SELECT name FROM stock_info WHERE symbol=?", (sym,)).fetchone()
                 name = name_row[0] if name_row and name_row[0] else sym
                 results.append({'symbol': sym, 'name': name, 'predicted_return': pred})
+            except Exception:
+                continue
 
         conn.close()
 
         results.sort(key=lambda x: x['predicted_return'], reverse=True)
 
-        # 自适应信号
         for rank, r in enumerate(results):
             r['rank'] = rank + 1
             ret = r['predicted_return']
@@ -259,14 +329,12 @@ class V8Predictor:
                 r['signal'] = 'strong_sell'
                 r['signal_text'] = '🚨 强烈卖出'
 
-        # 附加大盘状态
         self._regime_info = thresholds
-
         return results
 
     def get_position_advice(self, positions: List[Dict]) -> List[Dict]:
         """对持仓股票给出加减仓建议 (自适应阈值)"""
-        if not self.model:
+        if not self.models:
             return [dict(p, signal='unknown', signal_text='❓ 模型未加载') for p in positions]
 
         # 自适应阈值
@@ -348,7 +416,7 @@ class V8Predictor:
 
 def format_feishu_message(rankings: List[Dict], positions_advice: List[Dict], spearman: float = None, regime_info: dict = None) -> str:
     """格式化为飞书消息（Markdown格式）"""
-    lines = ["**📊 v8 模型预测 (90分钟)**\n"]
+    lines = [f"**📊 v9 模型预测 (30min×{SIGNAL_WINDOW}窗口)**\n"]
 
     # 大盘状态
     if regime_info:
@@ -383,7 +451,7 @@ def format_feishu_message(rankings: List[Dict], positions_advice: List[Dict], sp
 
     lines.append(f"**📈 信号分布:** 🔥{strong_buy_count} 📈{buy_count} ➖持仓 📉{sell_count}")
     if spearman:
-        lines.append(f"*模型: v8 回归, Spearman={spearman:.4f}*")
+        lines.append(f"*模型: v9 Ensemble, IC={spearman:.4f}, window={SIGNAL_WINDOW}*")
 
     return '\n'.join(lines)
 
