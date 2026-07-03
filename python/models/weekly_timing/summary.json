@@ -1,0 +1,60 @@
+{
+  "train_ic": 0.488696092530635,
+  "train_ric": 0.47354537342407754,
+  "val_ic": 0.13208153442796186,
+  "val_ric": 0.004379380788307839,
+  "test_ic": 0.041243212153809376,
+  "test_ric": -0.05516744211806612,
+  "backtest": {
+    "000001.SZ": {
+      "n_weeks": 19,
+      "ml_annual_return": 0.0,
+      "ml_sharpe": 0.0,
+      "ml_trades": 0,
+      "ml_win_rate": 0.0,
+      "ma_annual_return": 0.06645805315108544,
+      "ma_sharpe": 1.734990522417859,
+      "bh_annual_return": -0.08180278539657593
+    },
+    "600519.SH": {
+      "n_weeks": 19,
+      "ml_annual_return": 0.0,
+      "ml_sharpe": 0.0,
+      "ml_trades": 0,
+      "ml_win_rate": 0.0,
+      "ma_annual_return": 0.0,
+      "ma_sharpe": 0.0,
+      "bh_annual_return": 0.16008508205413818
+    },
+    "000858.SZ": {
+      "n_weeks": 19,
+      "ml_annual_return": 0.0,
+      "ml_sharpe": 0.0,
+      "ml_trades": 0,
+      "ml_win_rate": 0.0,
+      "ma_annual_return": 0.0,
+      "ma_sharpe": 0.0,
+      "bh_annual_return": -0.2721707224845886
+    },
+    "600036.SH": {
+      "n_weeks": 19,
+      "ml_annual_return": -0.08389190036001226,
+      "ml_sharpe": -1.6535266275149034,
+      "ml_trades": 2,
+      "ml_win_rate": 0.0,
+      "ma_annual_return": -0.002620760912677045,
+      "ma_sharpe": -0.17333499710787537,
+      "bh_annual_return": -0.07845449447631836
+    },
+    "000333.SZ": {
+      "n_weeks": 19,
+      "ml_annual_return": 0.0,
+      "ml_sharpe": 0.0,
+      "ml_trades": 0,
+      "ml_win_rate": 0.0,
+      "ma_annual_return": 0.015603053691630508,
+      "ma_sharpe": 0.3960321244834636,
+      "bh_annual_return": 0.20949041843414307
+    }
+  }
+}

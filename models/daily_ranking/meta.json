@@ -1,0 +1,95 @@
+{
+  "model": "LightGBM",
+  "type": "daily_ranking",
+  "horizon": 5,
+  "n_features": 26,
+  "train_samples": 357051,
+  "test_samples": 14041,
+  "train_ic": 0.416,
+  "test_ic": 0.0041,
+  "train_rankic": 0.1721,
+  "test_rankic": 0.0191,
+  "timestamp": "2026-06-22T22:58:45.587489",
+  "top_features": [
+    [
+      "vol_20",
+      609.0
+    ],
+    [
+      "vol_ratio_20",
+      587.0
+    ],
+    [
+      "ampl_5",
+      583.0
+    ],
+    [
+      "ma60_ratio",
+      502.0
+    ],
+    [
+      "vol_ratio_5",
+      434.0
+    ],
+    [
+      "ret_20d",
+      424.0
+    ],
+    [
+      "macd_sig",
+      412.0
+    ],
+    [
+      "macd_hist",
+      404.0
+    ],
+    [
+      "ampl",
+      372.0
+    ],
+    [
+      "macd",
+      367.0
+    ],
+    [
+      "bb_lower",
+      357.0
+    ],
+    [
+      "rsi_14",
+      350.0
+    ],
+    [
+      "vol_5",
+      349.0
+    ],
+    [
+      "low_5",
+      327.0
+    ],
+    [
+      "ret_1d",
+      315.0
+    ],
+    [
+      "bb_upper",
+      307.0
+    ],
+    [
+      "ret_lag5",
+      277.0
+    ],
+    [
+      "high_5",
+      268.0
+    ],
+    [
+      "ret_lag2",
+      263.0
+    ],
+    [
+      "ret_lag1",
+      261.0
+    ]
+  ]
+}

@@ -32,8 +32,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'python'))
 
-DB_PATH = os.path.join(ROOT, 'data', 'stock_data.db')
-LSTM_EMB_PATH = os.path.join(ROOT, 'data', 'lstm_embeddings.pkl')
+DB_PATH = os.path.join(ROOT, 'python', 'data', 'stock_data.db')
+LSTM_EMB_PATH = os.path.join(ROOT, 'python', 'data', 'lstm_embeddings.pkl')
 MODEL_30M_DIR = os.path.join(ROOT, 'python', 'models', 'lgb_30m')
 MODEL_DAILY_DIR = os.path.join(ROOT, '..', 'models', 'lgb_hs300_enhanced')
 

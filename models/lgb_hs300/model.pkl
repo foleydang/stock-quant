@@ -1,0 +1,1 @@
+/root/github/stock-quant/python/models/lgb_hs300/model.pkl
