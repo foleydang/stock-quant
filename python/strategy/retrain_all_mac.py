@@ -32,9 +32,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'python'))
 
-DB_PATH = os.path.join(ROOT, 'python', 'data', 'stock_data.db')
-LSTM_EMB_PATH = os.path.join(ROOT, 'python', 'data', 'lstm_embeddings.pkl')
-MODEL_30M_DIR = os.path.join(ROOT, 'python', 'models', 'lgb_30m')
+DB_PATH = os.path.join(ROOT, 'data', 'stock_data.db')
+LSTM_EMB_PATH = os.path.join(ROOT, 'data', 'lstm_embeddings.pkl')
+MODEL_30M_DIR = os.path.join(ROOT, 'models', 'lgb_30m')
 MODEL_DAILY_DIR = os.path.join(ROOT, '..', 'models', 'lgb_hs300_enhanced')
 
 from lightgbm import LGBMRegressor
@@ -58,6 +58,15 @@ QUICK_PARAMS = {
 
 N_SEEDS = 5  # ensemble 数量
 HORIZON = 3  # 预测未来3期
+
+
+def parse_dates(date_values):
+    """健壮解析日期: 同时支持 '2023-01-03' 和 '20230103' 两种格式"""
+    s = pd.Series(date_values).astype(str).str.strip()
+    # 无分隔符的纯数字 YYYYMMDD
+    if s.str.fullmatch(r'\d{8}').all():
+        return pd.to_datetime(s, format='%Y%m%d').values
+    return pd.to_datetime(s, format='mixed').values
 
 
 def load_lstm_embeddings():
@@ -92,7 +101,7 @@ def prepare_30m_dataset(conn, lstm_embeddings=None, quick=False):
         'min_history': 150, 'purged_gap': 3, 'north_shift_days': 0,
     })
 
-    all_X, all_y, all_sym, all_date = [], [], [], []
+    stock_feats = []  # (feats_valid_df, y_valid, sym, dates_valid)
     lstm_feat_count = 0
 
     for i, sym in enumerate(symbols):
@@ -102,7 +111,10 @@ def prepare_30m_dataset(conn, lstm_embeddings=None, quick=False):
                 "WHERE symbol=? ORDER BY date", conn, params=(sym,))
             if len(df) < 200:
                 continue
-            df = df.sort_values('date').reset_index(drop=True)
+            df['date'] = pd.to_datetime(parse_dates(df['date'].values))
+            df = (df.drop_duplicates(subset='date', keep='last')
+                    .sort_values('date').reset_index(drop=True))
+            dates = pd.to_datetime(df['date'].values)
 
             # FeaturePipeline 特征
             feats = pipeline.compute_stock(df, sym)
@@ -112,7 +124,6 @@ def prepare_30m_dataset(conn, lstm_embeddings=None, quick=False):
             if lstm_embeddings and sym in lstm_embeddings:
                 emb_dict = lstm_embeddings[sym]
                 emb_cols = []
-                dates = pd.to_datetime(df['date'].values)
                 for j, d in enumerate(dates):
                     date_str = d.strftime('%Y-%m-%d')
                     if date_str in emb_dict:
@@ -133,17 +144,18 @@ def prepare_30m_dataset(conn, lstm_embeddings=None, quick=False):
             for j in range(len(close) - HORIZON):
                 future_ret[j] = (close[j + HORIZON] - close[j]) / close[j]
 
-            valid = ~np.isnan(future_ret)
+            valid = np.isfinite(future_ret)
             if valid.sum() < 50:
                 continue
 
-            all_X.append(feats[valid].values.astype(np.float32))
-            all_y.append(future_ret[valid].astype(np.float32))
-            all_sym.extend([sym] * valid.sum())
-            all_date.extend(dates[valid])
+            stock_feats.append((
+                feats[valid].reset_index(drop=True),
+                future_ret[valid].astype(np.float32),
+                sym, dates[valid]))
 
             if (i + 1) % 50 == 0:
-                print(f"   [{i+1}/{len(symbols)}] {len(all_X)} 只已处理, {sum(len(y) for y in all_y):,} 样本")
+                print(f"   [{i+1}/{len(symbols)}] {len(stock_feats)} 只已处理, "
+                      f"{sum(len(s[1]) for s in stock_feats):,} 样本")
 
         except Exception as e:
             if i == 0:
@@ -152,13 +164,30 @@ def prepare_30m_dataset(conn, lstm_embeddings=None, quick=False):
         finally:
             gc.collect()
 
+    # 统一特征列 (部分股票缺少基本面/宏观特征, 列数不一致)
+    all_cols = set()
+    for f, _, _, _ in stock_feats:
+        all_cols.update(f.columns)
+    feat_names = sorted(all_cols)
+
+    all_X, all_y, all_sym, all_date = [], [], [], []
+    for f, yv, sym, dts in stock_feats:
+        f = f.reindex(columns=feat_names, fill_value=0)
+        all_X.append(f.values.astype(np.float32))
+        all_y.append(yv)
+        all_sym.extend([sym] * len(yv))
+        all_date.extend(dts)
+    del stock_feats
+    gc.collect()
+
     X = np.vstack(all_X)
+    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     y = np.concatenate(all_y)
     print(f"\n   最终: {X.shape[1]} 特征, {len(y):,} 样本, {len(set(all_sym))} 只股票")
     if lstm_feat_count:
         print(f"   含 {lstm_feat_count} 维 LSTM embeddings")
 
-    return X, y, all_sym, all_date, list(feats.columns)
+    return X, y, all_sym, all_date, feat_names
 
 
 def prepare_daily_dataset(conn, lstm_embeddings=None, quick=False):
@@ -183,7 +212,7 @@ def prepare_daily_dataset(conn, lstm_embeddings=None, quick=False):
         'min_history': 120, 'purged_gap': 3, 'north_shift_days': 1,
     })
 
-    all_X, all_y, all_sym, all_date = [], [], [], []
+    stock_feats = []  # (feats_valid_df, y_valid, sym, dates_valid)
     lstm_feat_count = 0
 
     for i, sym in enumerate(symbols):
@@ -193,7 +222,10 @@ def prepare_daily_dataset(conn, lstm_embeddings=None, quick=False):
                 "WHERE symbol=? ORDER BY date", conn, params=(sym,))
             if len(df) < 200:
                 continue
-            df = df.sort_values('date').reset_index(drop=True)
+            df['date'] = pd.to_datetime(parse_dates(df['date'].values))
+            df = (df.drop_duplicates(subset='date', keep='last')
+                    .sort_values('date').reset_index(drop=True))
+            dates = pd.to_datetime(df['date'].values)
 
             feats = pipeline.compute_stock(df, sym)
             feats = feats.ffill().fillna(0)
@@ -202,7 +234,6 @@ def prepare_daily_dataset(conn, lstm_embeddings=None, quick=False):
             if lstm_embeddings and sym in lstm_embeddings:
                 emb_dict = lstm_embeddings[sym]
                 emb_cols = []
-                dates = pd.to_datetime(df['date'].values)
                 for j, d in enumerate(dates):
                     date_str = d.strftime('%Y-%m-%d')
                     if date_str in emb_dict:
@@ -222,17 +253,17 @@ def prepare_daily_dataset(conn, lstm_embeddings=None, quick=False):
             for j in range(len(close) - HORIZON):
                 future_ret[j] = (close[j + HORIZON] - close[j]) / close[j]
 
-            valid = ~np.isnan(future_ret)
+            valid = np.isfinite(future_ret)
             if valid.sum() < 50:
                 continue
 
-            all_X.append(feats[valid].values.astype(np.float32))
-            all_y.append(future_ret[valid].astype(np.float32))
-            all_sym.extend([sym] * valid.sum())
-            all_date.extend(dates[valid])
+            stock_feats.append((
+                feats[valid].reset_index(drop=True),
+                future_ret[valid].astype(np.float32),
+                sym, dates[valid]))
 
             if (i + 1) % 50 == 0:
-                print(f"   [{i+1}/{len(symbols)}] {len(all_X)} 只已处理")
+                print(f"   [{i+1}/{len(symbols)}] {len(stock_feats)} 只已处理")
 
         except Exception as e:
             if i == 0:
@@ -241,13 +272,30 @@ def prepare_daily_dataset(conn, lstm_embeddings=None, quick=False):
         finally:
             gc.collect()
 
+    # 统一特征列 (部分股票缺少基本面/宏观特征, 列数不一致)
+    all_cols = set()
+    for f, _, _, _ in stock_feats:
+        all_cols.update(f.columns)
+    feat_names = sorted(all_cols)
+
+    all_X, all_y, all_sym, all_date = [], [], [], []
+    for f, yv, sym, dts in stock_feats:
+        f = f.reindex(columns=feat_names, fill_value=0)
+        all_X.append(f.values.astype(np.float32))
+        all_y.append(yv)
+        all_sym.extend([sym] * len(yv))
+        all_date.extend(dts)
+    del stock_feats
+    gc.collect()
+
     X = np.vstack(all_X)
+    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     y = np.concatenate(all_y)
     print(f"\n   最终: {X.shape[1]} 特征, {len(y):,} 样本, {len(set(all_sym))} 只股票")
     if lstm_feat_count:
         print(f"   含 {lstm_feat_count} 维 LSTM embeddings")
 
-    return X, y, all_sym, all_date, list(feats.columns)
+    return X, y, all_sym, all_date, feat_names
 
 
 def train_ensemble(X, y, feature_names, model_dir, model_name, params, n_seeds, quick=False):
@@ -312,7 +360,7 @@ def save_model(models, feature_names, model_dir, model_name, ic, mse, ic_list, m
         'horizon': HORIZON,
         'model_type': 'lgbm_ensemble',
         'train_date': datetime.now().strftime('%Y-%m-%d %H:%M'),
-        'train_samples': len(models[0]._Booster),
+        'train_samples': None,
         'seeds': list(range(len(models))),
         'n_trees_per_model': models[0].n_estimators_,
         'avg_n_trees': np.mean([m.n_estimators_ for m in models]),
