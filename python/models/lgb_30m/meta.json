@@ -1,0 +1,39 @@
+{
+  "model_type": "30m",
+  "label": "30分钟",
+  "horizon": 3,
+  "n_features": 309,
+  "n_models": 5,
+  "n_trees_per_model": [
+    891,
+    597,
+    996,
+    746,
+    874
+  ],
+  "avg_n_trees": 820,
+  "n_train": 4090356,
+  "n_test": 8338,
+  "test_ic": 0.0269,
+  "test_mse": 0.065604,
+  "val_ic": 0.0732,
+  "params": {
+    "boosting_type": "gbdt",
+    "num_leaves": 63,
+    "max_depth": 7,
+    "learning_rate": 0.005,
+    "subsample": 0.5,
+    "subsample_freq": 1,
+    "colsample_bytree": 0.35,
+    "feature_fraction_bynode": 0.6,
+    "reg_alpha": 1.0,
+    "reg_lambda": 5.0,
+    "min_child_samples": 300,
+    "min_child_weight": 0.01,
+    "min_split_gain": 0.05,
+    "path_smooth": 15
+  },
+  "role": "γ择时层",
+  "trained_at": "2026-06-16T02:49:59.096639",
+  "size_mb": 25.1
+}

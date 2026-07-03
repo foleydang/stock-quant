@@ -1,0 +1,22 @@
+{
+  "model_type": "intraday_timing",
+  "horizon": 3,
+  "skip_bars": 3,
+  "n_features": 302,
+  "n_models": 5,
+  "n_train": 1351909,
+  "n_test": 3516,
+  "n_trees": [
+    2,
+    1,
+    18,
+    3,
+    1
+  ],
+  "avg_trees": 5.0,
+  "test_ic": 0.0468,
+  "test_mse": 0.000681,
+  "test_hit": 0.4053,
+  "trained_at": "2026-06-17T15:44:01.511941",
+  "size_mb": 0.4
+}

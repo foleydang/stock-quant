@@ -1,0 +1,25 @@
+{
+  "model": "LightGBM-Optuna-v3",
+  "horizon": 5,
+  "label": "cs_rank_5d",
+  "features": 105,
+  "IC": 0.3243,
+  "RankIC": 0.3189,
+  "best_params": {
+    "num_leaves": 256,
+    "learning_rate": 0.042926,
+    "n_estimators": 1427,
+    "subsample": 0.965304,
+    "colsample_bytree": 0.830763,
+    "subsample_freq": 1,
+    "reg_alpha": 2.395739,
+    "reg_lambda": 0.011121,
+    "min_child_samples": 48,
+    "max_depth": 11
+  },
+  "optuna_trials": 100,
+  "optuna_best_rankic": 0.2856,
+  "train_samples": 640966,
+  "val_samples": 274700,
+  "timestamp": "2026-06-23T01:27:07.318147"
+}

@@ -1,0 +1,52 @@
+{
+  "model": "LightGBM",
+  "horizon": 8,
+  "label_type": "binary",
+  "universe": "all (372 stocks)",
+  "IC": 0.3203,
+  "RankIC": 0.0728,
+  "train_time_s": 201,
+  "timestamp": "2026-06-22T15:31:22.004980",
+  "top_features": [
+    [
+      "$open",
+      6101.0
+    ],
+    [
+      "$high",
+      4539.0
+    ],
+    [
+      "$low",
+      3930.0
+    ],
+    [
+      "$close",
+      3801.0
+    ],
+    [
+      "$open_1",
+      3580.0
+    ],
+    [
+      "$high_1",
+      3508.0
+    ],
+    [
+      "$low_1",
+      3379.0
+    ],
+    [
+      "$close_1",
+      3239.0
+    ],
+    [
+      "$volume",
+      3021.0
+    ],
+    [
+      "$volume_1",
+      2884.0
+    ]
+  ]
+}
