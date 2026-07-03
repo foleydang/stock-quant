@@ -202,10 +202,8 @@ class V8Predictor:
             feats = feats.ffill().fillna(0)
 
             if self.feature_names:
-                for c in self.feature_names:
-                    if c not in feats.columns:
-                        feats[c] = 0
-                feats = feats[self.feature_names]
+                from strategy.features import rename_features_for_model
+                feats = rename_features_for_model(feats, self.feature_names)
 
             n_rows = len(feats)
             window = min(SIGNAL_WINDOW, n_rows)
@@ -281,10 +279,8 @@ class V8Predictor:
                     feats = pd.concat([feats, cs_features[sym]], axis=1)
                 # 对齐特征列
                 if self.feature_names:
-                    for c in self.feature_names:
-                        if c not in feats.columns:
-                            feats[c] = 0
-                    feats = feats[self.feature_names]
+                    from strategy.features import rename_features_for_model
+                    feats = rename_features_for_model(feats, self.feature_names)
 
                 n_rows = len(feats)
                 window = min(SIGNAL_WINDOW, n_rows)

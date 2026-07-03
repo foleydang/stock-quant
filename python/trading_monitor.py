@@ -29,7 +29,8 @@ from config_loader import get_base_dir, get_db_path, get_available_cash, get_wat
 
 BASE_DIR = get_base_dir()
 DB_PATH = get_db_path()
-MODEL_PATH = os.path.join(BASE_DIR, 'models/lgb_hs300/model.pkl')
+MODEL_PATH = os.path.join(BASE_DIR, 'python/models/lgb_30m/model.pkl')
+DAILY_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'lgb_hs300_enhanced', 'model.pkl')
 LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 sys.path.insert(0, BASE_DIR)
 
@@ -42,7 +43,7 @@ except ImportError:
     EMAIL_AVAILABLE = False
 
 try:
-    from strategy.features import EnhancedFeatureEngineer
+    from strategy.features import FeaturePipeline, rename_features_for_model
     FEATURE_ENGINEER_AVAILABLE = True
 except ImportError:
     FEATURE_ENGINEER_AVAILABLE = False
@@ -115,23 +116,47 @@ class TradingMonitor:
         self.watchlist = get_watchlist()  # 从配置读取
 
     def _load_model(self):
-        """加载模型（支持v3集成和v2单模型）"""
+        """加载30分钟模型 (lgb_30m v8) + 日线模型 (v9)"""
+        # 30分钟模型
         if os.path.exists(self.model_path):
             try:
                 with open(self.model_path, 'rb') as f:
                     model_data = pickle.load(f)
                 self.model_data = model_data
-                if 'models' in model_data:
-                    # v3 集成
-                    print(f"✓ 加载v3集成模型 ({len(model_data['models'])}个子模型)")
-                elif 'model' in model_data:
-                    # v2 单模型
-                    self.model = model_data.get('model')
-                    print(f"✓ 加载v2单模型")
-                else:
-                    print(f"⚠ 未识别的模型格式")
+                self.models = model_data.get('models', [])
+                self.feature_names = model_data.get('feature_names', [])
+                n_models = len(self.models)
+                ic = model_data.get('test_ic', 0)
+                print(f"✓ 30m模型: {n_models}子模型, IC={ic:.4f}, {len(self.feature_names)}特征")
             except Exception as e:
-                print(f"⚠ 模型加载失败: {e}")
+                print(f"⚠ 30m模型加载失败: {e}")
+        
+        # 30m FeaturePipeline
+        self.pipeline_30m = FeaturePipeline({
+            'label': '30分钟', 'horizon': 3, 'db_table': 'kline_30m',
+            'min_history': 150, 'purged_gap': 3, 'north_shift_days': 0,
+        }) if FEATURE_ENGINEER_AVAILABLE else None
+        
+        # 日线 v9 模型 (可选)
+        self.daily_model_data = None
+        self.daily_models = []
+        self.daily_feature_names = []
+        if os.path.exists(DAILY_MODEL_PATH):
+            try:
+                with open(DAILY_MODEL_PATH, 'rb') as f:
+                    daily_data = pickle.load(f)
+                self.daily_model_data = daily_data
+                self.daily_models = daily_data.get('models', [])
+                self.daily_feature_names = daily_data.get('feature_names', [])
+                print(f"✓ 日线v9模型: {len(self.daily_models)}子模型, {len(self.daily_feature_names)}特征")
+            except Exception as e:
+                print(f"⚠ 日线模型加载失败: {e}")
+        
+        # 日线 FeaturePipeline
+        self.pipeline_daily = FeaturePipeline({
+            'label': '日线', 'horizon': 3, 'db_table': 'kline_daily',
+            'min_history': 120, 'purged_gap': 3, 'north_shift_days': 1,
+        }) if FEATURE_ENGINEER_AVAILABLE and self.daily_models else None
 
     def _get_conn(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
@@ -182,57 +207,61 @@ class TradingMonitor:
         conn.close()
         return positions
 
+    def _predict_daily(self, symbol: str) -> Optional[float]:
+        """v9日线预测 — 用于选股过滤"""
+        if not self.daily_models or not self.pipeline_daily:
+            return None
+        
+        conn = self._get_conn()
+        df = pd.read_sql_query(
+            'SELECT date, open, high, low, close, volume FROM kline_daily WHERE symbol=? ORDER BY date',
+            conn, params=(symbol,)
+        )
+        conn.close()
+        
+        if len(df) < 120:
+            return None
+        
+        try:
+            df = df.sort_values('date').reset_index(drop=True)
+            feats = self.pipeline_daily.compute_stock(df, symbol)
+            feats = feats.ffill().fillna(0)
+            
+            if self.daily_feature_names:
+                feats = rename_features_for_model(feats, self.daily_feature_names)
+            
+            keep_cols = [c for c in self.daily_feature_names if c in feats.columns]
+            last_row = feats[keep_cols].iloc[-1].fillna(0).values.reshape(1, -1).astype(np.float32)
+            preds = [m.predict(last_row)[0] for m in self.daily_models]
+            return float(np.mean(preds))
+        except Exception as e:
+            return None
+
     def _predict_up_prob(self, symbol: str) -> Optional[float]:
-        """预测预期收益率（支持v5集成和v2单模型）"""
-        if self.model_data is None or not FEATURE_ENGINEER_AVAILABLE:
+        """预测预期收益率 — 使用 FeaturePipeline + lgb_30m"""
+        if not self.models or not self.pipeline_30m:
             return None
 
         conn = self._get_conn()
-        df = pd.read_sql_query('SELECT * FROM kline_30m WHERE symbol=? ORDER BY date', conn, params=(symbol,))
+        df = pd.read_sql_query('SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date', conn, params=(symbol,))
         conn.close()
 
         if len(df) < 150:
             return None
 
         try:
-            # 基础特征
-            features = EnhancedFeatureEngineer.calculate_features(df)
+            df = df.sort_values('date').reset_index(drop=True)
+            feats = self.pipeline_30m.compute_stock(df, symbol)
+            feats = feats.ffill().fillna(0)
 
-            # v3 高级特征
-            try:
-                from strategy.features import AdvancedFeatureEngineer, TIME_FEATURES, ZERO_IMP_FEATURES
-                adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
-                features = pd.concat([features, adv_features], axis=1)
-            except Exception:
-                ZERO_IMP_FEATURES = []
-                TIME_FEATURES = ['day_of_week', 'day_of_month', 'hour', 'minute', 'is_morning', 'is_afternoon', 'is_first_hour', 'is_last_hour']
-
-            # 过滤时间特征 + 零重要性特征 + 使用模型特征名
-            feature_names = self.model_data.get('feature_names')
-            if feature_names:
-                missing = [c for c in feature_names if c not in features.columns]
-                for c in missing:
-                    features[c] = 0
-                features = features[feature_names]
-            else:
-                drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
-                features = features[[c for c in features.columns if c not in drop_cols]]
-
-            last_features = features.iloc[-1].fillna(0)
-
-            # 预测
-            if 'models' in self.model_data:
-                # v5 集成：预测均值
-                preds = []
-                for m in self.model_data['models']:
-                    try:
-                        preds.append(m.predict([last_features.values])[0])
-                    except Exception:
-                        preds.append(0.0)
-                return float(np.mean(preds))
-            else:
-                # v2/v1 单模型
-                return self.model.predict([last_features.values])[0]
+            if self.feature_names:
+                feats = rename_features_for_model(feats, self.feature_names)
+            
+            # 确保只保留模型需要的特征
+            keep_cols = [c for c in self.feature_names if c in feats.columns]
+            last_row = feats[keep_cols].iloc[-1].fillna(0).values.reshape(1, -1).astype(np.float32)
+            preds = [m.predict(last_row)[0] for m in self.models]
+            return float(np.mean(preds))
         except Exception as e:
             sys.stderr.write(f"预测失败 {symbol}: {e}\n")
             return None
@@ -260,6 +289,7 @@ class TradingMonitor:
 
         for symbol, pos in positions.items():
             pred_ret = self._predict_up_prob(symbol)
+            daily_pred = self._predict_daily(symbol)  # v9日线选股信号
             profit_pct = pos.profit_pct
 
             suggestion = {
@@ -271,6 +301,7 @@ class TradingMonitor:
                 'profit': pos.profit,
                 'profit_pct': profit_pct,
                 'up_prob': pred_ret or 0,
+                'daily_pred': daily_pred,  # v9日线预期收益
                 'action': '持有',
                 'reason': ''
             }
@@ -400,7 +431,7 @@ class TradingMonitor:
             action_emoji = {'补仓': '🟢', '减仓': '🔴', '持有': '⚪', '观望': '⚠️'}.get(s['action'], '⚪')
             profit_emoji = '✅' if s['profit'] > 0 else '❌'
             print(f"  {profit_emoji} {s['stock_name']}: {s['shares']}股 @ ¥{s['cost_price']:.2f} → ¥{s['current_price']:.2f}")
-            print(f"     盈亏: ¥{s['profit']:,.0f} ({s['profit_pct']:.1f}%) | 预期收益: {s['up_prob']:.4f}")
+            print(f"     盈亏: ¥{s['profit']:,.0f} ({s['profit_pct']:.1f}%) | 30m: {s['up_prob']:.4f}" + (f" | 日线: {s['daily_pred']:.4f}" if s.get('daily_pred') is not None else ""))
             print(f"     {action_emoji} {s['action']}: {s['reason']}")
 
         # 做T建议
@@ -488,8 +519,11 @@ class TradingMonitor:
             action_color = {'补仓': '#28a745', '减仓': '#dc3545', '持有': '#6c757d', '观望': '#ffc107'}[s['action']]
             # 预期收益率颜色
             pred_ret = s['up_prob']
+            daily_pred = s.get('daily_pred')
             prob_color = "green" if pred_ret >= 0.01 else "red" if pred_ret < -0.005 else "gray"
-            prob_text = f"看涨{pred_ret:.4f}" if pred_ret >= 0.01 else f"看跌{pred_ret:.4f}" if pred_ret < -0.005 else f"中性{pred_ret:.4f}"
+            prob_text = f"30m:{pred_ret:+.3f}"
+            if daily_pred is not None:
+                prob_text += f" 日线:{daily_pred:+.3f}"
             rows += f"""
             <tr>
                 <td>{s['stock_name']}</td>
