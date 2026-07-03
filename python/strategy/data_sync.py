@@ -19,11 +19,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 DB_PATH = os.path.join(ROOT, 'data', 'stock_data.db')
-TUSHARE_TOKEN = '***REMOVED***'
-OSS_BUCKET = 'yanten-data'
-OSS_ENDPOINT = 'https://oss-cn-hangzhou.aliyuncs.com'
-OSS_AK = '***REMOVED***'
-OSS_SK = '***REMOVED***'
+
+# 从环境变量加载敏感配置
+TUSHARE_TOKEN = os.environ.get('TUSHARE_TOKEN', '')
+OSS_BUCKET = os.environ.get('OSS_BUCKET', 'yanten-data')
+OSS_ENDPOINT = os.environ.get('OSS_ENDPOINT', 'https://oss-cn-hangzhou.aliyuncs.com')
+OSS_AK = os.environ.get('OSS_ACCESS_KEY_ID', '')
+OSS_SK = os.environ.get('OSS_ACCESS_KEY_SECRET', '')
 
 
 def is_trading_time():
