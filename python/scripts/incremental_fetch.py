@@ -238,12 +238,15 @@ def step_kline_daily(conn):
                 df_filtered = df
             
             for _, row in df_filtered.iterrows():
+                # Tushare返回YYYYMMDD，转为YYYY-MM-DD
+                td = row['trade_date']
+                date_fmt = f"{td[:4]}-{td[4:6]}-{td[6:8]}"
                 conn.execute(
                     """INSERT OR IGNORE INTO kline_daily 
                     (symbol, date, open, high, low, close, volume)
                     VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (row['ts_code'], row['trade_date'], row['open'],
-                     row['high'], row['low'], row['close'], row['vol'])
+                    (row['ts_code'], date_fmt, row['open'],
+                     row['high'], row['low'], row['close'], row['vol'] * 100)
                 )
             
             conn.commit()

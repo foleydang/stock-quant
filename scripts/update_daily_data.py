@@ -42,8 +42,8 @@ for row in cursor.fetchall():
 for w in WATCHLIST:
     symbols_to_update.append(w.get('symbol'))
 
-# 也加上 stock_info 里有的热门股（top 50 by volume）
-cursor.execute("SELECT symbol FROM stock_info ORDER BY ROWID LIMIT 50")
+# 也加上 stock_info 里的所有股票
+cursor.execute("SELECT symbol FROM stock_info")
 for row in cursor.fetchall():
     if row[0] not in symbols_to_update:
         symbols_to_update.append(row[0])

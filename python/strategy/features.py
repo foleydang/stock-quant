@@ -32,6 +32,113 @@ except ImportError:
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data/stock_data.db')
 
+# ============ 特征名映射工具 ============
+# 模型训练时的特征名 vs 特征工程输出的特征名可能不一致
+# 此函数统一处理映射，避免各脚本重复实现
+
+# 旧模型 (lgb_hs300, 56特征) 的特征名 → 特征工程输出名
+_OLD_MODEL_NAME_MAP = {
+    'return_': 'price_ret_',
+    'volatility_': 'price_vol_',
+    'parkinson_vol': 'price_parkinson_vol',
+    'ma5_ratio': 'price_ma5_ratio',
+    'ma10_ratio': 'price_ma10_ratio',
+    'ma20_ratio': 'price_ma20_ratio',
+    'ma60_ratio': 'price_ma60_ratio',
+    'ma120_ratio': 'price_ma120_ratio',
+    'ma20_ma60': 'price_ma20_60_dist',
+    'ma60_ma120': 'price_ma60_120_dist',
+    'rsi_14': 'price_rsi_14',
+    'rsi_24': 'price_rsi_24',
+    'rsi_50': 'price_rsi_50',
+    'macd': 'price_macd',
+    'macd_signal': 'price_macd_signal',
+    'macd_hist': 'price_macd_hist',
+    'macd_hist_slope': 'price_macd_hist_chg',
+    'kdj_k': 'price_kdj_k',
+    'kdj_d': 'price_kdj_d',
+    'kdj_j': 'price_kdj_j',
+    'kdj_cross': 'price_kdj_kd_dist',
+    'bb_upper_20': 'price_bb20_pos',
+    'bb_width_20': 'price_bb20_width',
+    'bb_width_30': 'price_bb30_width',
+    'atr_10': 'price_atr_10',
+    'high_10_ratio': 'price_high_dist_10',
+    'price_position_20': 'price_pos_20',
+    'high_20_ratio': 'price_high_dist_20',
+    'high_60_ratio': 'price_high_dist_60',
+    'adx': 'price_adx',
+    'trend_strength': 'price_adx_trend',
+}
+
+# v8 模型 (lgb_30m, 309特征) 的额外特征名映射
+_V8_NAME_MAP = {
+    'sent_is_limit_up': 'sent_limit_up',
+    'sent_is_limit_down': 'sent_limit_down',
+    'sent_lhb_net_buy_ratio': 'sent_lhb_net_buy',
+    'sent_vol_ratio_20': 'sent_vol_ratio_ma5',
+}
+
+
+def _map_single_name(old_name: str, name_map: dict) -> str:
+    """将模型特征名映射为特征工程特征名"""
+    if old_name in name_map:
+        return name_map[old_name]
+    for old_prefix, new_prefix in name_map.items():
+        if old_name.startswith(old_prefix) and old_prefix.endswith('_'):
+            return new_prefix + old_name[len(old_prefix):]
+    return old_name
+
+
+def rename_features_for_model(features: pd.DataFrame, model_feature_names: List[str]) -> pd.DataFrame:
+    """
+    将特征工程输出的列名映射为模型期望的列名，缺失的列填0。
+
+    自动检测使用哪种命名映射：
+    - 如果模型特征名包含 'return_' → 使用旧模型映射
+    - 否则 → 使用通用映射 (price_ 前缀剥离 + v8 特有映射)
+
+    Args:
+        features: 特征工程输出的 DataFrame
+        model_feature_names: 模型期望的特征名列表
+    Returns:
+        重命名并对齐后的 DataFrame (只包含 model_feature_names 中的列)
+    """
+    if not model_feature_names:
+        return features
+
+    # 检测模型类型
+    has_old_naming = any('return_' in f for f in model_feature_names)
+    name_map = _OLD_MODEL_NAME_MAP if has_old_naming else _V8_NAME_MAP
+
+    # 建立改名映射: engineer_name → model_name
+    rename_map = {}
+
+    # 策略1: 去掉 price_ 前缀尝试匹配
+    for col in features.columns:
+        if col.startswith('price_'):
+            bare = col[6:]
+            if bare in model_feature_names:
+                rename_map[col] = bare
+
+    # 策略2: 使用 name_map 逐个映射
+    for old_name in model_feature_names:
+        mapped = _map_single_name(old_name, name_map)
+        if mapped != old_name and mapped in features.columns:
+            rename_map[mapped] = old_name
+
+    features = features.rename(columns=rename_map)
+    # 去重: 改名后可能产生重复列 (如 price_vol_chg_20 → vol_chg_20 与原始 vol_chg_20 冲突)
+    features = features.loc[:, ~features.columns.duplicated(keep='last')]
+
+    # 缺失的填0
+    missing = [c for c in model_feature_names if c not in features.columns]
+    for c in missing:
+        features[c] = 0
+
+    return features[model_feature_names]
+
+
 # 延迟导入, 避免循环依赖
 def _get_macro_features():
     from strategy.macro_features import MacroFeatures

@@ -9,18 +9,25 @@
 
 import sys
 import os
+import warnings
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# 抑制 sklearn 特征名警告 (每笔预测都触发, 严重影响性能)
+warnings.filterwarnings('ignore', message='X does not have valid feature names')
+warnings.filterwarnings('ignore', message='DataFrame is highly fragmented')
+warnings.filterwarnings('ignore', category=FutureWarning, module='sklearn')
 
 import pandas as pd
 import numpy as np
 import pickle
 import logging
+import bisect
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from collections import Counter
 
-from strategy.features import EnhancedFeatureEngineer, MarketFeatureEngineer, AdvancedFeatureEngineer, ZERO_IMP_FEATURES, TIME_FEATURES
+from strategy.features import FeaturePipeline, rename_features_for_model
 
 # 配置日志
 logger = logging.getLogger(__name__)  
@@ -75,36 +82,52 @@ class Trade:
 class LGBMBacktesterOptimized:
     """优化版回测引擎 - 预计算特征 + 时间匹配修复"""
 
-    def __init__(self, initial_capital: float = 100000, model_path: str = None):
+    def __init__(self, initial_capital: float = 100000, model_path: str = None, rank_mode: bool = False, rank_top_n: int = 3):
         self.initial_capital = initial_capital
         self.cash = initial_capital
         self.positions: Dict[str, Position] = {}
         self.trades: List[Trade] = []
         self.daily_values = []
+        
+        # 相对排名模式
+        self.rank_mode = rank_mode
+        self.rank_top_n = rank_top_n
 
-        # 加载v3 ensemble模型
+        # 30分钟模型: lgb_30m (v8, 309特征)
         if model_path is None:
-            model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_hs300/model.pkl')
+            model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_30m/model.pkl')
 
         self.model_data = self._load_model(model_path)
         self.models = self.model_data.get('models', []) if self.model_data else []
         self.feature_names = self.model_data.get('feature_names', []) if self.model_data else []
-        self.keep_features = self.model_data.get('keep_features', []) if self.model_data else []
+        
+        ic = self.model_data.get('test_ic', 0) if self.model_data else 0
+        logger.info(f"📊 30分钟模型: {len(self.models)}个子模型, IC={ic:.4f}, {len(self.feature_names)}特征")
+        
+        # 30m FeaturePipeline
+        self.pipeline_30m = FeaturePipeline({
+            'label': '30分钟', 'horizon': 3, 'db_table': 'kline_30m',
+            'min_history': 150, 'purged_gap': 3, 'north_shift_days': 0,
+        })
 
-        logger.info(f"📊 30分钟模型: {len(self.models)} 个子模型")
-
-        # 日线模型 — 双层架构第一层，判断趋势方向
+        # 日线模型 — v9 enhanced (312特征)
         self.daily_model_data = None
         self.daily_models = []
-        daily_path = os.path.join(os.path.dirname(__file__), 'models/lgb_daily/model.pkl')
+        self.daily_feature_names = []
+        daily_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'lgb_hs300_enhanced', 'model.pkl')
         if os.path.exists(daily_path):
             self.daily_model_data = self._load_model(daily_path)
             self.daily_models = self.daily_model_data.get('models', []) if self.daily_model_data else []
-            logger.info(f"📊 日线模型: {len(self.daily_models)} 个子模型 (双层架构)")
-            cv_f1 = self.daily_model_data.get('cv_f1', '?') if self.daily_model_data else '?'
-            logger.info(f"   日线F1: {cv_f1}")
+            self.daily_feature_names = self.daily_model_data.get('feature_names', []) if self.daily_model_data else []
+            logger.info(f"📊 日线v9模型: {len(self.daily_models)}个子模型, {len(self.daily_feature_names)}特征 (双层架构)")
         else:
-            logger.info(f"⚠️ 日线模型未找到 ({daily_path})，使用单层30分钟模型")
+            logger.info(f"⚠️ 日线v9模型未找到，使用单层30分钟模型")
+        
+        # 日线 FeaturePipeline
+        self.pipeline_daily = FeaturePipeline({
+            'label': '日线', 'horizon': 3, 'db_table': 'kline_daily',
+            'min_history': 120, 'purged_gap': 3, 'north_shift_days': 1,
+        }) if self.daily_models else None
 
         # 参数 - 短线策略
         self.position_pct = 0.30  # 仓位比例
@@ -123,17 +146,17 @@ class LGBMBacktesterOptimized:
         self.time_index_map: Dict[str, Dict[datetime, int]] = {}
 
     def _preload_daily_features(self, all_data: Dict[str, pd.DataFrame]):
-        """预计算日线特征 (双层架构第一层)
-        特征集: Enhanced + Advanced + Market (与训练时一致)
-        """
-        logger.info("\n预计算日线特征 (Enhanced + Advanced + Market)...")
+        """预计算日线特征 (v9 FeaturePipeline) + 日期索引"""
+        if not self.daily_models or not self.pipeline_daily:
+            return
+        
+        logger.info("\n预计算日线特征 (v9 FeaturePipeline)...")
         import sqlite3
         from config_loader import get_db_path
-        from strategy.features import EnhancedFeatureEngineer, AdvancedFeatureEngineer, MarketFeatureEngineer
 
         self.daily_features_cache = {}
+        self.daily_date_index = {}  # symbol → {date_str: row_idx}
         db_path = get_db_path()
-        daily_feature_names = self.daily_model_data.get('feature_names', [])
 
         symbols = list(all_data.keys())
         for symbol in symbols:
@@ -145,75 +168,28 @@ class LGBMBacktesterOptimized:
                 )
                 conn.close()
 
-                if len(df) < 60:
+                if len(df) < 120:
                     continue
 
-                df["date"] = pd.to_datetime(df["date"], format="mixed")
-                for col in ['open', 'high', 'low', 'close', 'volume']:
-                    df[col] = df[col].astype(float)
+                df = df.sort_values('date').reset_index(drop=True)
+                feats = self.pipeline_daily.compute_stock(df, symbol)
+                feats = feats.ffill().fillna(0)
 
-                # 与训练时一致的增强特征 + 高级特征 + 市场特征
-                base = EnhancedFeatureEngineer.calculate_features(df)
-                adv = AdvancedFeatureEngineer.calculate_advanced_features(df)
-                market = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
-                features = pd.concat([base, adv, market], axis=1)
-                features = features.fillna(0)
+                if self.daily_feature_names:
+                    feats = rename_features_for_model(feats, self.daily_feature_names)
 
-                if daily_feature_names:
-                    missing = [c for c in daily_feature_names if c not in features.columns]
-                    for c in missing:
-                        features[c] = 0
-                    features = features[daily_feature_names]
-
-                self.daily_features_cache[symbol] = features
-            except Exception:
-                pass
+                # 构建日期索引: date_str → row array
+                dates = pd.to_datetime(df['date'].values)
+                self.daily_features_cache[symbol] = feats
+                self.daily_date_index[symbol] = {d.strftime('%Y-%m-%d'): i for i, d in enumerate(dates)}
+            except Exception as e:
+                logger.debug(f"日线特征失败 {symbol}: {e}")
+            finally:
+                import gc; gc.collect()
 
         logger.info(f"日线特征预计算完成，共 {len(self.daily_features_cache)} 只股票")
 
     # Feature name mapping: old model names → new engineer names
-    _FEATURE_NAME_MAP = {
-        'return_': 'price_ret_',
-        'volatility_': 'price_vol_',
-        'parkinson_vol': 'price_parkinson_vol',
-        'ma5_ratio': 'price_ma5_ratio',
-        'ma120_ratio': 'price_ma120_ratio',
-        'ma20_ma60': 'price_ma20_60_dist',
-        'ma60_ma120': 'price_ma60_120_dist',
-        'rsi_14': 'price_rsi_14',
-        'rsi_24': 'price_rsi_24',
-        'rsi_50': 'price_rsi_50',
-        'macd': 'price_macd',
-        'macd_signal': 'price_macd_signal',
-        'macd_hist': 'price_macd_hist',
-        'macd_hist_slope': 'price_macd_hist_chg',
-        'kdj_k': 'price_kdj_k',
-        'kdj_d': 'price_kdj_d',
-        'kdj_j': 'price_kdj_j',
-        'kdj_cross': 'price_kdj_kd_dist',
-        'bb_upper_20': 'price_bb20_pos',
-        'bb_width_20': 'price_bb20_width',
-        'bb_width_30': 'price_bb30_width',
-        'atr_10': 'price_atr_10',
-        'high_10_ratio': 'price_high_dist_10',
-        'price_position_20': 'price_pos_20',
-        'high_20_ratio': 'price_high_dist_20',
-        'high_60_ratio': 'price_high_dist_60',
-        'adx': 'price_adx',
-        'trend_strength': 'price_adx_trend',
-    }
-
-    @classmethod
-    def _map_feature_name(cls, old_name: str) -> str:
-        """Map old model feature name to new engineer feature name"""
-        if old_name in cls._FEATURE_NAME_MAP:
-            return cls._FEATURE_NAME_MAP[old_name]
-        # Try prefix matching
-        for old_prefix, new_prefix in cls._FEATURE_NAME_MAP.items():
-            if old_name.startswith(old_prefix) and old_prefix.endswith('_'):
-                return new_prefix + old_name[len(old_prefix):]
-        return old_name
-
     def _load_model(self, model_path: str) -> Optional[Dict]:
         """加载模型 — 兼容 dict/object 两种格式"""
         if not os.path.exists(model_path):
@@ -241,7 +217,7 @@ class LGBMBacktesterOptimized:
         return data
 
     def _get_model_prediction(self, symbol: str, local_idx: int) -> Tuple[float, str]:
-        """获取30分钟模型预测"""
+        """获取30分钟模型预测 (lgb_30m)"""
         if not self.models:
             return 0.5, "模型未加载"
 
@@ -257,58 +233,40 @@ class LGBMBacktesterOptimized:
             preds = []
             for model in self.models:
                 try:
-                    p = model.predict([last_row.values])[0]
-                    # 回归: 预测值为预期收益率
+                    p = model.predict([last_row.values.astype(np.float32)])[0]
                     preds.append(p)
                 except Exception:
                     preds.append(0.0)
 
             avg_pred = float(np.mean(preds))
-            return avg_pred, f"预期收益:{avg_pred:.4f}({len(self.models)}LGBM)"
+            return avg_pred, f"30m:{avg_pred:.4f}({len(self.models)}LGBM)"
 
         except Exception as e:
             return 0.5, f"预测错误:{e}"
 
     def _get_daily_trend(self, symbol: str, current_time: datetime) -> Tuple[float, str]:
-        """获取日线模型趋势判断 — 双层架构第一层"""
+        """获取v9日线模型趋势判断 (O(1)日期索引)"""
         if not self.daily_models:
             return 0.5, "无日线模型"
 
-        # 日线数据缓存
-        if not hasattr(self, 'daily_features_cache'):
-            self.daily_features_cache = {}
-
-        features = self.daily_features_cache.get(symbol)
-        if features is None:
+        feats = self.daily_features_cache.get(symbol)
+        date_idx = self.daily_date_index.get(symbol, {})
+        if feats is None or not date_idx:
             return 0.5, "无日线特征"
 
-        # 找到当前时间对应的最近一个交易日
         try:
-            current_date = pd.Timestamp(current_time).normalize()
-            # 在日线特征中找 <= current_date 的最近一条
-            dates = pd.to_datetime(features.index)
-            mask = dates <= current_date
-            if not mask.any():
-                return 0.5, "日期超出范围"
-            daily_idx = mask.sum() - 1  # 最后一个 <= current_date 的索引
-            if daily_idx < 0:
+            date_str = current_time.strftime('%Y-%m-%d') if hasattr(current_time, 'strftime') else str(current_time)[:10]
+            # 找 <= current_date 的最近交易日
+            available = sorted(date_idx.keys())
+            pos = bisect.bisect_right(available, date_str) - 1
+            if pos < 0:
                 return 0.5, "无历史日线"
-
-            last_row = features.iloc[daily_idx]
-            if last_row.isna().any():
-                last_row = last_row.fillna(0)
-
-            preds = []
-            for model in self.daily_models:
-                try:
-                    p = model.predict([last_row.values])[0]
-                    # 回归: 预测值为预期收益率
-                    preds.append(p)
-                except Exception:
-                    preds.append(0.0)
-
+            idx = date_idx[available[pos]]
+            
+            last_row = feats.iloc[idx].fillna(0).values.reshape(1, -1).astype(np.float32)
+            preds = [m.predict(last_row)[0] for m in self.daily_models]
             daily_pred = float(np.mean(preds))
-            return daily_pred, f"日线预期收益:{daily_pred:.4f}"
+            return daily_pred, f"v9日线:{daily_pred:.4f}"
         except Exception as e:
             return 0.5, f"日线错误:{e}"
 
@@ -341,65 +299,25 @@ class LGBMBacktesterOptimized:
         return None
 
     def preload_features(self, all_data: Dict[str, pd.DataFrame]):
-        """预计算所有特征 + 建立时间索引映射
-        
-        P0修复: 
-        - v8模型不用MarketFeatureEngineer(日级别特征不应在30分钟回测)
-        - 始终从模型读取feature_names, 不硬编码ZERO_IMP_FEATURES
-        """
-        logger.info("\n预计算特征...")
-        
-        # 从模型获取需要的特征名
-        model_feature_names = None
-        if self.model_data and 'feature_names' in self.model_data:
-            model_feature_names = self.model_data['feature_names']
-            logger.info(f"  使用模型特征集: {len(model_feature_names)}个特征")
+        """预计算30分钟特征 — FeaturePipeline + lgb_30m"""
+        logger.info("\n预计算30分钟特征 (FeaturePipeline)...")
         
         for symbol, df in all_data.items():
-            logger.debug(f"计算 {symbol} 特征...")
-            
-            if model_feature_names is not None:
-                # v8+: 只计算模型需要的特征
-                base_features = EnhancedFeatureEngineer.calculate_features(df)
-                all_features = base_features
-            else:
-                # 兼容旧模型: 计算全部特征
-                base_features = EnhancedFeatureEngineer.calculate_features(df)
-                adv_features = AdvancedFeatureEngineer.calculate_advanced_features(df)
-                market_features = MarketFeatureEngineer.calculate_market_features(df, symbol=symbol)
-                all_features = pd.concat([base_features, adv_features, market_features], axis=1)
-            
-            all_features = all_features.fillna(0)
-            
-            # 按模型特征名过滤 — 先重命名字段对齐
-            if model_feature_names is not None:
-                # 将 engineer 特征名映射为模型特征名
-                rename_map = {}
-                for col in all_features.columns:
-                    # 去掉 price_ 前缀试试能否匹配模型特征名
-                    if col.startswith('price_'):
-                        bare = col[6:]  # 去掉 'price_'
-                        if bare in model_feature_names:
-                            rename_map[col] = bare
-                # 也尝试完整映射
-                for old_name in model_feature_names:
-                    mapped = self._map_feature_name(old_name)
-                    if mapped != old_name and mapped in all_features.columns:
-                        rename_map[mapped] = old_name
-
-                all_features = all_features.rename(columns=rename_map)
-
-                missing = [c for c in model_feature_names if c not in all_features.columns]
-                for c in missing:
-                    all_features[c] = 0
-                all_features = all_features[model_feature_names]
-            else:
-                drop_cols = TIME_FEATURES + ZERO_IMP_FEATURES
-                all_features = all_features[[c for c in all_features.columns if c not in drop_cols]]
-            
-            self.features_cache[symbol] = all_features
-            # 建立时间到索引的映射
-            self.time_index_map[symbol] = {row['date']: idx for idx, row in df.iterrows()}
+            try:
+                df = df.sort_values('date').reset_index(drop=True)
+                feats = self.pipeline_30m.compute_stock(df, symbol)
+                feats = feats.ffill().fillna(0)
+                
+                if self.feature_names:
+                    feats = rename_features_for_model(feats, self.feature_names)
+                
+                self.features_cache[symbol] = feats
+                self.time_index_map[symbol] = {row['date']: idx for idx, row in df.iterrows()}
+            except Exception as e:
+                logger.debug(f"30m特征失败 {symbol}: {e}")
+            finally:
+                import gc; gc.collect()
+        
         logger.info(f"30分钟特征预计算完成，共 {len(self.features_cache)} 只股票")
 
         # 双层架构: 预计算日线特征
@@ -416,17 +334,20 @@ class LGBMBacktesterOptimized:
     def run_backtest(self, stocks: List[Dict], start_date: Optional[str] = None, end_date: Optional[str] = None):
         """执行回测 - 支持日期范围"""
         logger.info("=" * 70)
-        logger.info("LGBM 双层模型回测系统")
+        logger.info("LGBM 双层模型回测系统 (v9日线 + lgb_30m)" + (" [相对排名]" if self.rank_mode else ""))
         logger.info("=" * 70)
         logger.info(f"初始资金: {self.initial_capital:.2f} 元")
         if self.model_data:
-            logger.info(f"30分钟模型F1: {self.model_data.get('cv_f1', 0):.2%}")
+            logger.info(f"30分钟模型: lgb_30m, IC={self.model_data.get('test_ic', 0):.4f}")
         if self.daily_model_data:
-            logger.info(f"日线模型F1: {self.daily_model_data.get('cv_f1', 0):.2%}")
-            logger.info(f"双层架构: 日线趋势过滤 + 30分钟信号")
+            logger.info(f"日线模型: v9-enhanced, 312特征")
+            logger.info(f"双层架构: v9日线选股 + lgb_30m择时")
         else:
-            logger.warning("日线模型未加载，使用单层30分钟模型")
-        logger.info(f"买入阈值: 预期收益 > {self.buy_threshold:.4f}")
+            logger.warning("日线v9模型未加载，使用单层30分钟模型")
+        if self.rank_mode:
+            logger.info(f"策略: 相对排名, 日线初筛 → 30m排名 → 买top{self.rank_top_n}")
+        else:
+            logger.info(f"策略: 绝对阈值, 30m_pred > {self.buy_threshold:.4f}")
         logger.info("=" * 70)
 
         # 加载数据
@@ -574,7 +495,78 @@ class LGBMBacktesterOptimized:
             return 'neutral'
 
     def _check_buy_ml(self, all_data: Dict, current_time: datetime, stocks: List[Dict]):
-        """检查买入 — 双层架构: 日线趋势确认 + 30分钟信号"""
+        """检查买入 — 双层架构: 日线趋势确认 + 30分钟信号
+        
+        两种模式:
+        - 绝对阈值 (rank_mode=False): 30m_pred > buy_threshold 才买入
+        - 相对排名 (rank_mode=True): 每天对所有股票排名，买 top N
+        """
+        if len(self.positions) >= self.max_positions:
+            return
+        
+        if self.rank_mode:
+            self._check_buy_rank(all_data, current_time, stocks)
+        else:
+            self._check_buy_threshold(all_data, current_time, stocks)
+    
+    def _check_buy_rank(self, all_data: Dict, current_time: datetime, stocks: List[Dict]):
+        """相对排名买入: 日线初筛 → 30m排名 → 买 top N"""
+        candidates = []
+        
+        for stock in stocks:
+            symbol = stock['symbol']
+            if symbol in self.positions:
+                continue
+            df = all_data.get(symbol)
+            if df is None:
+                continue
+            current_idx = self._get_stock_local_idx(symbol, current_time)
+            if current_idx is None or current_idx < 120:
+                continue
+            
+            pred_30m, _ = self._get_model_prediction(symbol, current_idx)
+            
+            # 日线初筛
+            daily_pred = 0.0
+            if self.daily_models:
+                daily_pred, _ = self._get_daily_trend(symbol, current_time)
+                if daily_pred < -0.01:  # 日线看跌 → 跳过
+                    continue
+            
+            # 综合评分: 30m 权重 0.4, 日线 权重 0.6
+            score = pred_30m * 0.4 + daily_pred * 0.6
+            candidates.append({
+                'symbol': symbol, 'name': stock['name'],
+                'score': score, 'pred_30m': pred_30m, 'daily_pred': daily_pred,
+                'idx': current_idx, 'df': df,
+            })
+        
+        if not candidates:
+            return
+        
+        # 按综合评分降序排名
+        candidates.sort(key=lambda x: x['score'], reverse=True)
+        
+        # 买入 top N, 但每个至少要有利可图 (score > -0.005)
+        slots = self.max_positions - len(self.positions)
+        buy_count = 0
+        for c in candidates[:self.rank_top_n]:
+            if buy_count >= slots:
+                break
+            if c['score'] < -0.005:  # 太差的不买
+                continue
+            
+            # 仓位按排名分配: 第1名 40%, 第2名 30%, 第3名 20%
+            pos_pcts = [0.40, 0.30, 0.20, 0.15, 0.10]
+            pos_pct = pos_pcts[buy_count] if buy_count < len(pos_pcts) else 0.10
+            
+            current_price = float(c['df']['close'].iloc[c['idx']])
+            reason = f"排名#{buy_count+1} 综合={c['score']:.4f} (30m={c['pred_30m']:.4f} 日线={c['daily_pred']:.4f})"
+            self._buy_stock(c['symbol'], c['name'], current_time, current_price, c['idx'], reason, pos_pct=pos_pct)
+            buy_count += 1
+    
+    def _check_buy_threshold(self, all_data: Dict, current_time: datetime, stocks: List[Dict]):
+        """绝对阈值买入: 30m_pred > buy_threshold"""
         if len(self.positions) >= self.max_positions:
             return
 
@@ -780,20 +772,23 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description='LGBM 双层模型回测系统')
     parser.add_argument('--model', type=str, default=None,
-                        help='30分钟模型路径 (默认: models/lgb_hs300/model.pkl)')
+                        help='30分钟模型路径 (默认: models/lgb_30m/model.pkl)')
     parser.add_argument('--daily-model', type=str, default=None,
-                        help='日线模型路径 (默认: models/lgb_daily/model.pkl)')
+                        help='日线模型路径 (默认: models/lgb_hs300_enhanced/model.pkl)')
     parser.add_argument('--capital', type=float, default=500000, help='初始资金 (默认: 50万)')
     parser.add_argument('--no-daily', action='store_true', help='禁用日线模型，只用30分钟模型')
+    parser.add_argument('--rank', action='store_true', help='相对排名模式 (日线初筛 → 30m排名 → 买top N)')
+    parser.add_argument('--rank-top', type=int, default=3, help='排名模式买入top N (默认: 3)')
     args = parser.parse_args()
 
     # 30分钟模型路径
     if args.model:
         model_path = args.model
     else:
-        model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_hs300/model.pkl')
+        model_path = os.path.join(os.path.dirname(__file__), 'models/lgb_30m/model.pkl')
 
-    backtester = LGBMBacktesterOptimized(initial_capital=args.capital, model_path=model_path)
+    backtester = LGBMBacktesterOptimized(initial_capital=args.capital, model_path=model_path,
+                                          rank_mode=args.rank, rank_top_n=args.rank_top)
 
     # 如果指定了 --no-daily，清除日线模型
     if args.no_daily:

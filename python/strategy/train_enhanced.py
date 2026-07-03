@@ -449,10 +449,8 @@ def prepare_dataset(results, horizon, db_path=None, drop_macro=False):
         target = np.array([rank_targets[sym].get(d, np.nan) for d in date_strs])
         regime = detect_market_regime(stock_df, db_path=db_path)
         feats = feats.fillna(0).replace([np.inf, -np.inf], 0)
-        for c in all_features:
-            if c not in feats.columns:
-                feats[c] = 0
-        feats = feats[all_features]
+        from strategy.features import rename_features_for_model
+        feats = rename_features_for_model(feats, all_features)
         valid = ~np.isnan(target)
         valid[:120] = False
         X_all.append(feats[valid].values)
