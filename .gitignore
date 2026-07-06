@@ -28,6 +28,10 @@ data/
 python/data/*.json
 python/data/*.csv
 python/data/backup/
+# 例外: 瘦身版 LSTM embeddings (~0.1MB) 需入库, 供服务器 git pull (全量 273MB 仍走 OSS)
+!python/data/
+python/data/*
+!python/data/lstm_embeddings_latest.pkl
 
 # 前端
 node_modules/

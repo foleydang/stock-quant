@@ -4,9 +4,11 @@
 不重复实现特征/标签/隘口计算。模型由 Mac 完整训练后 git 提交, 服务器 pull 即用。
 """
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 import sys
 import os
+import json
+import time
 import sqlite3
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../python'))
@@ -14,16 +16,26 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../python'))
 from config_loader import get_db_path
 from strategy.features import FeaturePipeline
 from strategy.add_advisor_ml import (
-    load_final_model, score_holding, _verdict, load_holdings, PURGE_DAYS,
+    load_final_model, score_holding, scan_universe, _verdict, load_holdings,
+    PURGE_DAYS,
 )
 
 advisor_bp = Blueprint('advisor', __name__)
 
 _advisor = None       # {model dict, pipeline}
 
+# 扫描结果磁盘缓存 (全票池打分较慢, 缓存 6 小时; ?refresh=1 强制重算)
+_SCAN_CACHE = os.path.join(
+    os.path.dirname(__file__), '../../python/data/advisor_scan.json')
+_SCAN_TTL = 6 * 3600
+
 
 def _load_advisor():
-    """加载模型 + 构建 pipeline, 全局缓存 (与 forecast_routes 同范式)"""
+    """加载模型 + 构建 pipeline, 全局缓存 (与 forecast_routes 同范式)。
+
+    lstm_slim=True: 用瘦身版 LSTM embeddings (~0.1MB), 避免 273MB 全量在
+    1.8GB 服务器上 OOM; 最后一行 lstm 特征与全量逐位相同。
+    """
     global _advisor
     if _advisor is not None:
         return _advisor
@@ -34,6 +46,7 @@ def _load_advisor():
     pipeline = FeaturePipeline({
         'label': '日线', 'horizon': data['horizon'], 'db_table': 'kline_daily',
         'min_history': 120, 'purged_gap': PURGE_DAYS, 'north_shift_days': 1,
+        'lstm_slim': True,
     })
     _advisor = {'data': data, 'pipeline': pipeline}
     return _advisor
@@ -97,3 +110,108 @@ def advisor_holdings():
         'caveat': 'edge 薄 + 港股/ETF无宏观情绪特征(填0) + 5只样本少→靠池化外推, 仅辅助排序',
         'holdings': items,
     })
+
+
+# 分位分桶阈值 (edge 薄, 用横截面相对排名而非绝对阈值)
+_BUCKETS = [
+    (0.10, 'strong_buy', '强烈买入'),
+    (0.25, 'buy', '买入'),
+    (0.75, 'hold', '持有'),
+    (0.90, 'sell', '卖出'),
+    (1.01, 'strong_sell', '强烈卖出'),
+]
+
+
+def _bucket_by_rank(idx, n):
+    """idx: 从高分到低分的 0-based 排名; 返回 (key, 中文信号)"""
+    q = (idx + 0.5) / max(n, 1)
+    for thr, key, label in _BUCKETS:
+        if q < thr:
+            return key, label
+    return 'strong_sell', '强烈卖出'
+
+
+def _build_scan_payload(scored, data):
+    """scored: scan_universe 结果; 按预测 20 日收益(reg)横截面排名分桶"""
+    items = [s for s in scored if s is not None]
+    items.sort(key=lambda s: s['reg'], reverse=True)
+    n = len(items)
+
+    dist = {'strong_buy': 0, 'buy': 0, 'hold': 0, 'sell': 0, 'strong_sell': 0}
+    signals = {'strong_buy': [], 'buy': [], 'sell': [], 'strong_sell': []}
+    pred_date = ''
+    for i, s in enumerate(items):
+        key, label = _bucket_by_rank(i, n)
+        dist[key] += 1
+        pred_date = max(pred_date, s.get('date', '') or '')
+        if key in signals:
+            signals[key].append({
+                'rank': i + 1,
+                'symbol': s['sym'],
+                'name': s.get('name', s['sym']),
+                'score': round(s['reg'], 4),
+                'signal': label,
+                'upProb': round(s['pup'], 3),
+                'tpProb': round(s['ptp'], 3),
+                'candidate': bool(s['cand']),
+            })
+    pred_date = (pred_date or '')[:10].replace('-', '')
+    return {
+        'status': 'success',
+        'predDate': pred_date,
+        'totalStocks': n,
+        'distribution': dist,
+        'signals': signals,
+        'trainDate': data.get('train_date'),
+        'cutoff': data.get('cutoff'),
+        'horizon': data.get('horizon'),
+        'caveat': 'edge 薄(横截面 rank-IC≈0.05), 仅 A 股; 按预测20日收益相对排名分桶, 非绝对信号',
+        'generatedAt': time.strftime('%Y-%m-%d %H:%M'),
+    }
+
+
+@advisor_bp.route('/advisor/scan', methods=['GET'])
+def advisor_scan():
+    """对全 A 股票池用 add_advisor 模型打分, 供每日信号页扫描 (~50+ 只)。
+
+    结果磁盘缓存 6 小时; ?refresh=1 强制重算。
+    """
+    refresh = request.args.get('refresh') in ('1', 'true', 'yes')
+    if not refresh and os.path.exists(_SCAN_CACHE):
+        age = time.time() - os.path.getmtime(_SCAN_CACHE)
+        if age < _SCAN_TTL:
+            try:
+                with open(_SCAN_CACHE) as f:
+                    payload = json.load(f)
+                payload['cached'] = True
+                payload['cacheAgeMin'] = int(age / 60)
+                return jsonify(payload)
+            except Exception:
+                pass
+
+    adv = _load_advisor()
+    if adv is None:
+        return jsonify({
+            'status': 'error',
+            'message': '补仓顾问模型未就绪 (models/add_advisor/model.pkl 缺失)',
+        }), 200
+
+    data = adv['data']
+    pipeline = adv['pipeline']
+    conn = sqlite3.connect(get_db_path())
+    try:
+        scored = scan_universe(
+            conn, pipeline, data['feat_names'],
+            data['reg'], data['clf_s'], data['clf_tb'])
+    finally:
+        conn.close()
+
+    payload = _build_scan_payload(scored, data)
+    try:
+        os.makedirs(os.path.dirname(_SCAN_CACHE), exist_ok=True)
+        with open(_SCAN_CACHE, 'w') as f:
+            json.dump(payload, f, ensure_ascii=False)
+    except Exception:
+        pass
+    payload['cached'] = False
+    return jsonify(payload)
