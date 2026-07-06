@@ -20,8 +20,10 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import TradeRecord from './pages/TradeRecord';
 import ForecastAccuracy from './pages/ForecastAccuracy';
 import Forecast7Tab from './pages/Forecast7Tab';
+import DailySignals from './pages/DailySignals';
 import StockSelection from './pages/StockSelection';
 import Calculator from './pages/Calculator';
+import PositionManager from './pages/PositionManager';
 
 const { RangePicker } = DatePicker;
 
@@ -327,6 +329,12 @@ const App: React.FC = () => {
         <Route path="/calculator" element={
           <Calculator />
         } />
+        <Route path="/signals" element={
+          <DailySignals />
+        } />
+        <Route path="/positions" element={
+          <PositionManager />
+        } />
         <Route path="/" element={
           <div style={{ minHeight: '100vh', backgroundColor: '#1e2229' }}>
             {/* 顶部标题栏 - 深色金融风格 */}
@@ -356,6 +364,14 @@ const App: React.FC = () => {
                 <Link to="/calculator" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
                   <CalculatorOutlined />
                   成本计算
+                </Link>
+                <Link to="/signals" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
+                  <AimOutlined />
+                  交易信号
+                </Link>
+                <Link to="/positions" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
+                  <StockOutlined />
+                  持仓管理
                 </Link>
               </div>
             </div>
