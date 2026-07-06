@@ -295,9 +295,12 @@ def lgbm_backtest(symbol):
         # 运行真实回测
         backtester = LGBMBacktesterOptimized(initial_capital=500000)  # 50万初始资金，适应高价股
         stocks = [{"symbol": symbol, "name": name}]
-        # 支持日期范围
+        # 支持日期范围；默认最近3个月避免超时
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
+        if not start_date:
+            from datetime import date, timedelta
+            start_date = (date.today() - timedelta(days=365)).strftime('%Y-%m-%d')
         
         backtester.run_backtest(stocks, start_date=start_date, end_date=end_date)
         
