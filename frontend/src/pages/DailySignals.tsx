@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, Table, Tag, Spin, Statistic, Row, Col, TableColumnsType } from 'antd';
 import { RiseOutlined, FallOutlined, ThunderboltOutlined, AimOutlined } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const CARD_BG = '#242830';
@@ -80,7 +81,10 @@ export default function DailySignals() {
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: 1 }}>
           <AimOutlined style={{ marginRight: 10, color: GOLD }} /> 每日预测信号
         </h2>
-        <span style={{ color: TEXT_DIM, fontSize: 13 }}>数据日期: {data.predDate ? `${data.predDate.slice(0,4)}-${data.predDate.slice(4,6)}-${data.predDate.slice(6,8)}` : '—'} | 共 {data.totalStocks} 只股票{data.cached ? ' | 缓存' : ''}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ color: TEXT_DIM, fontSize: 13 }}>数据日期: {data.predDate ? `${data.predDate.slice(0,4)}-${data.predDate.slice(4,6)}-${data.predDate.slice(6,8)}` : '—'} | 共 {data.totalStocks} 只股票{data.cached ? ' | 缓存' : ''}</span>
+          <Link to="/" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>← 返回主页</Link>
+        </div>
       </div>
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: 24 }}>
