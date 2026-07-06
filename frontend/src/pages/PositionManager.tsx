@@ -8,10 +8,13 @@ const PositionManager: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [editingPosition, setEditingPosition] = useState<any>(null);
+  const [advisor, setAdvisor] = useState<Record<string, any>>({});
+  const [advisorMeta, setAdvisorMeta] = useState<any>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
     fetchPositions();
+    fetchAdvisor();
   }, []);
 
   const fetchPositions = async () => {
@@ -25,6 +28,22 @@ const PositionManager: React.FC = () => {
       message.error('获取持仓失败');
     }
     setLoading(false);
+  };
+
+  const fetchAdvisor = async () => {
+    try {
+      const res = await axios.get('/api/advisor/holdings');
+      if (res.data.status === 'success') {
+        const map: Record<string, any> = {};
+        (res.data.holdings || []).forEach((h: any) => { map[h.symbol] = h; });
+        setAdvisor(map);
+        setAdvisorMeta(res.data);
+      } else {
+        setAdvisorMeta({ error: res.data.message });
+      }
+    } catch (error) {
+      setAdvisorMeta({ error: '补仓顾问接口不可用' });
+    }
   };
 
   const handleAdd = () => {
@@ -94,6 +113,28 @@ const PositionManager: React.FC = () => {
       )
     },
     {
+      title: '补仓顾问(ML)',
+      key: 'advisor',
+      width: 320,
+      render: (record: any) => {
+        const a = advisor[record.symbol];
+        if (!a || !a.ready) return <Tag>模型未就绪</Tag>;
+        return (
+          <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+            <div>
+              {a.candidate
+                ? <Tag color="orange">补仓候选态</Tag>
+                : <Tag>非候选态</Tag>}
+              <span>RSI {a.rsi}</span>
+            </div>
+            <div>方案2: 20日 {(a.ret20Pred * 100).toFixed(1)}% · 涨概率 {(a.upProb * 100).toFixed(0)}%</div>
+            <div>方案3: P(止盈) {(a.tpProb * 100).toFixed(0)}% · 止盈 {a.tpPrice} / 止损 {a.slPrice}</div>
+            <div style={{ color: '#555', marginTop: 2 }}>{a.verdict}</div>
+          </div>
+        );
+      }
+    },
+    {
       title: '操作',
       key: 'action',
       render: (record: any) => (
@@ -138,6 +179,19 @@ const PositionManager: React.FC = () => {
           />
         </Col>
       </Row>
+
+      {advisorMeta && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fffbe6',
+                      border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12 }}>
+          {advisorMeta.error
+            ? <span>⚠️ 补仓顾问: {advisorMeta.error}</span>
+            : <span>
+                🩺 补仓顾问(ML) · 模型训练截至 {advisorMeta.cutoff} · 预测周期 {advisorMeta.horizon} 交易日 ·
+                方案2 {advisorMeta.a2Usable ? '✅' : '❌薄'} 方案3 {advisorMeta.a3Usable ? '✅' : '❌薄'}
+                <br/>{advisorMeta.caveat} — 模型仅辅助排序, 补仓与否以纪律(破位止损/不接飞刀)为先。
+              </span>}
+        </div>
+      )}
 
       <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} style={{ marginBottom: 16 }}>
         添加持仓
