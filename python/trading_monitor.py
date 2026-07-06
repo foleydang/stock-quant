@@ -48,6 +48,17 @@ try:
 except ImportError:
     FEATURE_ENGINEER_AVAILABLE = False
 
+# 补仓顾问(诚实模型) — 方向信号唯一可信来源, 取代泄漏的 lgb_30m/v9
+try:
+    from strategy.add_advisor_ml import (
+        load_final_model as _load_advisor_model,
+        score_holding as _advisor_score,
+        PURGE_DAYS as _ADVISOR_PURGE,
+    )
+    ADVISOR_AVAILABLE = True
+except ImportError:
+    ADVISOR_AVAILABLE = False
+
 # 做T策略
 try:
     from strategy.t_strategy import TStrategy, TTradeSuggestion, format_t_suggestion, format_t_suggestions_batch
@@ -90,7 +101,6 @@ class TradingMonitor:
 
     def __init__(self):
         self.db_path = DB_PATH
-        self.model_path = MODEL_PATH
         self.data_handler = DataHandler(force_refresh=True)
 
         # 账户参数
@@ -102,8 +112,7 @@ class TradingMonitor:
         self.add_position_up_prob = params.get("add_position_prob", 0.01)
         self.max_add_ratio = params.get("max_add_ratio", 0.30)
 
-        # 模型
-        self.model_data = None
+        # 方向模型(诚实补仓顾问)
         self._load_model()
 
         # 做T策略
@@ -116,47 +125,27 @@ class TradingMonitor:
         self.watchlist = get_watchlist()  # 从配置读取
 
     def _load_model(self):
-        """加载30分钟模型 (lgb_30m v8) + 日线模型 (v9)"""
-        # 30分钟模型
-        if os.path.exists(self.model_path):
+        """加载方向模型 —— 只用诚实的补仓顾问模型。
+        旧的 lgb_30m / v9日线 已停用: 其报告 IC≈0.38 是泄漏假象, 真实样本外 edge≈0。
+        """
+        # 补仓顾问(诚实模型): 方案2上涨概率/预期收益 + 方案3候选态P(止盈)
+        # 这是方向信号的唯一可信来源, 与网页 /advisor/holdings 同一模型
+        self.advisor = None
+        if ADVISOR_AVAILABLE and FEATURE_ENGINEER_AVAILABLE:
             try:
-                with open(self.model_path, 'rb') as f:
-                    model_data = pickle.load(f)
-                self.model_data = model_data
-                self.models = model_data.get('models', [])
-                self.feature_names = model_data.get('feature_names', [])
-                n_models = len(self.models)
-                ic = model_data.get('test_ic', 0)
-                print(f"✓ 30m模型: {n_models}子模型, IC={ic:.4f}, {len(self.feature_names)}特征")
+                adv = _load_advisor_model()
+                adv['pipeline'] = FeaturePipeline({
+                    'label': '日线', 'horizon': adv['horizon'], 'db_table': 'kline_daily',
+                    'min_history': 120, 'purged_gap': _ADVISOR_PURGE, 'north_shift_days': 1,
+                })
+                self.advisor = adv
+                print(f"✓ 补仓顾问模型: 训练截至 {adv.get('cutoff')} "
+                      f"方案2{'可用' if adv.get('a2_usable') else '薄'}/"
+                      f"方案3{'可用' if adv.get('a3_usable') else '薄'}")
+            except FileNotFoundError:
+                print("⚠ 补仓顾问模型缺失(models/add_advisor/model.pkl), 方向信号不可用")
             except Exception as e:
-                print(f"⚠ 30m模型加载失败: {e}")
-        
-        # 30m FeaturePipeline
-        self.pipeline_30m = FeaturePipeline({
-            'label': '30分钟', 'horizon': 3, 'db_table': 'kline_30m',
-            'min_history': 150, 'purged_gap': 3, 'north_shift_days': 0,
-        }) if FEATURE_ENGINEER_AVAILABLE else None
-        
-        # 日线 v9 模型 (可选)
-        self.daily_model_data = None
-        self.daily_models = []
-        self.daily_feature_names = []
-        if os.path.exists(DAILY_MODEL_PATH):
-            try:
-                with open(DAILY_MODEL_PATH, 'rb') as f:
-                    daily_data = pickle.load(f)
-                self.daily_model_data = daily_data
-                self.daily_models = daily_data.get('models', [])
-                self.daily_feature_names = daily_data.get('feature_names', [])
-                print(f"✓ 日线v9模型: {len(self.daily_models)}子模型, {len(self.daily_feature_names)}特征")
-            except Exception as e:
-                print(f"⚠ 日线模型加载失败: {e}")
-        
-        # 日线 FeaturePipeline
-        self.pipeline_daily = FeaturePipeline({
-            'label': '日线', 'horizon': 3, 'db_table': 'kline_daily',
-            'min_history': 120, 'purged_gap': 3, 'north_shift_days': 1,
-        }) if FEATURE_ENGINEER_AVAILABLE and self.daily_models else None
+                print(f"⚠ 补仓顾问模型加载失败: {e}")
 
     def _get_conn(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
@@ -207,64 +196,21 @@ class TradingMonitor:
         conn.close()
         return positions
 
-    def _predict_daily(self, symbol: str) -> Optional[float]:
-        """v9日线预测 — 用于选股过滤"""
-        if not self.daily_models or not self.pipeline_daily:
+    def _predict_advisor(self, symbol: str) -> Optional[Dict]:
+        """诚实模型打分: 返回 pup(上涨概率)/reg(预期20日收益)/ptp(P止盈)/cand(候选态)"""
+        if not self.advisor:
             return None
-        
         conn = self._get_conn()
-        df = pd.read_sql_query(
-            'SELECT date, open, high, low, close, volume FROM kline_daily WHERE symbol=? ORDER BY date',
-            conn, params=(symbol,)
-        )
-        conn.close()
-        
-        if len(df) < 120:
-            return None
-        
         try:
-            df = df.sort_values('date').reset_index(drop=True)
-            feats = self.pipeline_daily.compute_stock(df, symbol)
-            feats = feats.ffill().fillna(0)
-            
-            if self.daily_feature_names:
-                feats = rename_features_for_model(feats, self.daily_feature_names)
-            
-            keep_cols = [c for c in self.daily_feature_names if c in feats.columns]
-            last_row = feats[keep_cols].iloc[-1].fillna(0).values.reshape(1, -1).astype(np.float32)
-            preds = [m.predict(last_row)[0] for m in self.daily_models]
-            return float(np.mean(preds))
-        except Exception as e:
-            return None
-
-    def _predict_up_prob(self, symbol: str) -> Optional[float]:
-        """预测预期收益率 — 使用 FeaturePipeline + lgb_30m"""
-        if not self.models or not self.pipeline_30m:
-            return None
-
-        conn = self._get_conn()
-        df = pd.read_sql_query('SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date', conn, params=(symbol,))
-        conn.close()
-
-        if len(df) < 150:
-            return None
-
-        try:
-            df = df.sort_values('date').reset_index(drop=True)
-            feats = self.pipeline_30m.compute_stock(df, symbol)
-            feats = feats.ffill().fillna(0)
-
-            if self.feature_names:
-                feats = rename_features_for_model(feats, self.feature_names)
-            
-            # 确保只保留模型需要的特征
-            keep_cols = [c for c in self.feature_names if c in feats.columns]
-            last_row = feats[keep_cols].iloc[-1].fillna(0).values.reshape(1, -1).astype(np.float32)
-            preds = [m.predict(last_row)[0] for m in self.models]
-            return float(np.mean(preds))
-        except Exception as e:
-            sys.stderr.write(f"预测失败 {symbol}: {e}\n")
-            return None
+            s = _advisor_score(
+                conn, self.advisor['pipeline'], symbol,
+                self.advisor['feat_names'], self.advisor['reg'],
+                self.advisor['clf_s'], self.advisor['clf_tb'])
+        except Exception:
+            s = None
+        finally:
+            conn.close()
+        return s
 
     def _load_ml_signals(self) -> Optional[Dict]:
         """加载 ML 日线策略信号"""
@@ -287,10 +233,15 @@ class TradingMonitor:
         positions = self.get_positions()
         suggestions = []
 
+        a3_ok = bool(self.advisor and self.advisor.get('a3_usable'))
         for symbol, pos in positions.items():
-            pred_ret = self._predict_up_prob(symbol)
-            daily_pred = self._predict_daily(symbol)  # v9日线选股信号
+            adv = self._predict_advisor(symbol)  # 诚实模型: pup/reg/ptp/cand
             profit_pct = pos.profit_pct
+
+            pup = adv['pup'] if adv else None          # 上涨概率 0-1
+            ret20 = adv['reg'] if adv else None         # 预期20日收益
+            ptp = adv['ptp'] if adv else None           # P(先触止盈)
+            cand = adv['cand'] if adv else False        # 候选态(超卖破MA20)
 
             suggestion = {
                 'symbol': symbol,
@@ -300,35 +251,45 @@ class TradingMonitor:
                 'current_price': pos.current_price,
                 'profit': pos.profit,
                 'profit_pct': profit_pct,
-                'up_prob': pred_ret or 0,
-                'daily_pred': daily_pred,  # v9日线预期收益
+                'up_prob': pup if pup is not None else 0,
+                'daily_pred': ret20,       # 预期20日收益
+                'tp_prob': ptp,
+                'candidate': cand,
                 'action': '持有',
                 'reason': ''
             }
 
-            # 熊市策略：浮亏超过20%且模型看涨，建议补仓
-            if profit_pct <= -20 and pred_ret and pred_ret >= self.add_position_up_prob:
+            if adv is None:
+                suggestion['reason'] = "补仓顾问模型未就绪, 仅规则持有(旧泄漏模型已停用)"
+                suggestions.append(suggestion)
+                continue
+
+            # 补仓: 深浮亏 + 候选态(超卖破MA20) + 方案3占优(P止盈≥0.55)且预期为正
+            # 与网页 _verdict "可小仓试探" 同口径 —— 网页与邮件说同一件事
+            if profit_pct <= -20 and cand and a3_ok and ptp >= 0.55 and ret20 > 0:
                 add_shares = int(pos.shares * self.max_add_ratio / 100) * 100
                 add_amount = add_shares * pos.current_price
-
                 if add_amount <= self.available_cash:
                     suggestion['action'] = '补仓'
-                    suggestion['reason'] = f"浮亏{profit_pct:.0f}%，模型看涨(预期收益{pred_ret:.4f})，建议补仓{add_shares}股"
+                    suggestion['reason'] = (f"浮亏{profit_pct:.0f}%+超卖候选态, "
+                                            f"P(止盈){ptp:.2f}占优, 可小仓试探{add_shares}股(严格止损)")
                     suggestion['add_shares'] = add_shares
                     suggestion['add_amount'] = add_amount
+                else:
+                    suggestion['reason'] = f"浮亏{profit_pct:.0f}%达补仓条件, 但可用资金不足"
 
-            # 浮亏严重但模型看跌，提示风险
-            elif profit_pct <= -25 and pred_ret and pred_ret < -0.005:
+            # 深浮亏但模型不占优 —— 不接飞刀
+            elif profit_pct <= -25 and (pup < 0.45 or ret20 < -0.005):
                 suggestion['action'] = '观望'
-                suggestion['reason'] = f"浮亏{profit_pct:.0f}%，但模型看跌，暂不补仓"
+                suggestion['reason'] = f"浮亏{profit_pct:.0f}%, 模型不占优(涨概率{pup:.2f}), 不补等企稳"
 
-            # 浮盈超过15%且模型看跌，提示减仓机会
-            elif profit_pct >= 15 and pred_ret and pred_ret < -0.005:
+            # 浮盈且模型看跌 —— 减仓机会
+            elif profit_pct >= 15 and (pup < 0.45 or ret20 < -0.005):
                 suggestion['action'] = '减仓'
-                suggestion['reason'] = f"浮盈{profit_pct:.0f}%，模型看跌，可考虑减仓"
+                suggestion['reason'] = f"浮盈{profit_pct:.0f}%, 模型看跌(涨概率{pup:.2f}), 可考虑减仓"
 
             else:
-                suggestion['reason'] = f"持有观望，等待机会"
+                suggestion['reason'] = f"持有观望(涨概率{pup:.2f}, 预期20日{ret20:+.1%})"
 
             suggestions.append(suggestion)
 
@@ -431,7 +392,7 @@ class TradingMonitor:
             action_emoji = {'补仓': '🟢', '减仓': '🔴', '持有': '⚪', '观望': '⚠️'}.get(s['action'], '⚪')
             profit_emoji = '✅' if s['profit'] > 0 else '❌'
             print(f"  {profit_emoji} {s['stock_name']}: {s['shares']}股 @ ¥{s['cost_price']:.2f} → ¥{s['current_price']:.2f}")
-            print(f"     盈亏: ¥{s['profit']:,.0f} ({s['profit_pct']:.1f}%) | 30m: {s['up_prob']:.4f}" + (f" | 日线: {s['daily_pred']:.4f}" if s.get('daily_pred') is not None else ""))
+            print(f"     盈亏: ¥{s['profit']:,.0f} ({s['profit_pct']:.1f}%) | 涨概率: {s['up_prob']:.2f}" + (f" | 预期20日: {s['daily_pred']:+.1%}" if s.get('daily_pred') is not None else "") + (f" | P(止盈): {s['tp_prob']:.2f}" if s.get('tp_prob') is not None else ""))
             print(f"     {action_emoji} {s['action']}: {s['reason']}")
 
         # 做T建议
