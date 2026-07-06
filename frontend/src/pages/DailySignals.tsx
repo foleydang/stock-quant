@@ -14,11 +14,17 @@ interface StockSignal {
   name: string;
   score: number;
   signal: string;
+  upProb?: number;
+  tpProb?: number;
+  candidate?: boolean;
 }
 
 interface DailySignals {
   predDate: string;
   totalStocks: number;
+  caveat?: string;
+  generatedAt?: string;
+  cached?: boolean;
   distribution: {
     strong_buy: number;
     buy: number;
@@ -43,7 +49,7 @@ export default function DailySignals() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/forecast/daily_signals');
+      const res = await axios.get('/api/advisor/scan');
       if (res.data.status === 'success') setData(res.data);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -53,7 +59,9 @@ export default function DailySignals() {
     { title: '排名', dataIndex: 'rank', width: 60, render: (r: number) => <span style={{ color: GOLD }}>#{r}</span> },
     { title: '代码', dataIndex: 'symbol', width: 100 },
     { title: '名称', dataIndex: 'name', width: 100 },
-    { title: '得分', dataIndex: 'score', width: 80, render: (s: number) => <span style={{ color: s > 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>{s > 0 ? '+' : ''}{s.toFixed(4)}</span> },
+    { title: '预测20日收益', dataIndex: 'score', width: 110, render: (s: number) => <span style={{ color: s > 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>{s > 0 ? '+' : ''}{(s * 100).toFixed(2)}%</span> },
+    { title: '上涨概率', dataIndex: 'upProb', width: 90, render: (p?: number) => p == null ? '-' : <span style={{ color: TEXT_DIM }}>{(p * 100).toFixed(1)}%</span> },
+    { title: '超卖候选', dataIndex: 'candidate', width: 90, render: (c?: boolean) => c ? <Tag color="gold">补仓候选</Tag> : <span style={{ color: TEXT_DIM }}>-</span> },
     { title: '信号', dataIndex: 'signal', width: 100, render: (s: string) => {
       if (s.includes('强烈买入')) return <Tag color="green"><ThunderboltOutlined /> 强烈买入</Tag>;
       if (s.includes('买入')) return <Tag color="cyan">买入</Tag>;
@@ -72,10 +80,15 @@ export default function DailySignals() {
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: 1 }}>
           <AimOutlined style={{ marginRight: 10, color: GOLD }} /> 每日预测信号
         </h2>
-        <span style={{ color: TEXT_DIM, fontSize: 13 }}>预测日期: {data.predDate.slice(0,4)}-{data.predDate.slice(4,6)}-{data.predDate.slice(6,8)} | 共 {data.totalStocks} 只股票</span>
+        <span style={{ color: TEXT_DIM, fontSize: 13 }}>数据日期: {data.predDate ? `${data.predDate.slice(0,4)}-${data.predDate.slice(4,6)}-${data.predDate.slice(6,8)}` : '—'} | 共 {data.totalStocks} 只股票{data.cached ? ' | 缓存' : ''}</span>
       </div>
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: 24 }}>
+        {data.caveat && (
+          <div style={{ background: 'rgba(226,176,74,0.08)', border: `1px solid ${GOLD}`, borderRadius: 6, padding: '10px 14px', marginBottom: 16, color: GOLD, fontSize: 13 }}>
+            ⚠️ {data.caveat}
+          </div>
+        )}
         {/* 概览 */}
         <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, marginBottom: 16 }} styles={{ body: { padding: 14 } }}>
           <Row gutter={16}>

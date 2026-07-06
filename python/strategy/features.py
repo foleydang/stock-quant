@@ -926,18 +926,31 @@ class FeaturePipeline:
         return self._fundamental_features
 
     def _load_lstm(self):
-        """延迟加载 LSTM embeddings"""
+        """延迟加载 LSTM embeddings。
+
+        cfg['lstm_slim']=True 时优先加载瘦身版(每股仅最新一天, ~0.1MB), 供低内存
+        服务器"今日打分/扫描"用 —— 最后一行 lstm 特征与全量文件逐位相同。
+        瘦身文件缺失时回退全量文件; 都没有则 lstm 特征全 0(与全量文件中该 bar 无
+        embedding 时的行为一致)。
+        """
         if self._lstm_embeddings is not None:
             return self._lstm_embeddings
         import pickle
-        emb_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                'data/lstm_embeddings.pkl')
-        try:
-            with open(emb_path, 'rb') as f:
-                self._lstm_embeddings = pickle.load(f)
-            print(f"   ✅ LSTM embeddings 已加载 ({len(self._lstm_embeddings)} 只股票)")
-        except FileNotFoundError:
-            self._lstm_embeddings = {}
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+        slim_path = os.path.join(data_dir, 'lstm_embeddings_latest.pkl')
+        full_path = os.path.join(data_dir, 'lstm_embeddings.pkl')
+        candidates = ([slim_path, full_path] if self.cfg.get('lstm_slim')
+                      else [full_path, slim_path])
+        for p in candidates:
+            try:
+                with open(p, 'rb') as f:
+                    self._lstm_embeddings = pickle.load(f)
+                tag = '瘦身版' if p == slim_path else '全量'
+                print(f"   ✅ LSTM embeddings 已加载 ({tag}, {len(self._lstm_embeddings)} 只股票)")
+                return self._lstm_embeddings
+            except FileNotFoundError:
+                continue
+        self._lstm_embeddings = {}
         return self._lstm_embeddings
 
     def compute_stock(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:

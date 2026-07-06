@@ -428,10 +428,22 @@ def fit_final(df_all, feat_names, params):
     return reg, clf_s, clf_tb, str(cutoff)[:10]
 
 
-def score_holding(conn, pipeline, sym, feat_names, reg, clf_s, clf_tb):
-    df = pd.read_sql(
-        "SELECT date, open, high, low, close, volume FROM kline_daily "
-        "WHERE symbol=? ORDER BY date", conn, params=(sym,))
+def score_holding(conn, pipeline, sym, feat_names, reg, clf_s, clf_tb, tail=0):
+    """对单只股票用最新一根 bar 打分。
+
+    tail=0 读全历史(默认, 保证最后一行特征与训练逐位一致)。
+    注意: tail>0 的截尾窗口对部分股票会改变最后一行特征(某些特征用
+    expanding/全历史统计), 已 validate 出偏差, 故扫描一律 tail=0。
+    """
+    if tail and tail > 0:
+        df = pd.read_sql(
+            "SELECT date, open, high, low, close, volume FROM kline_daily "
+            "WHERE symbol=? ORDER BY date DESC LIMIT ?", conn, params=(sym, int(tail)))
+        df = df.iloc[::-1].reset_index(drop=True)
+    else:
+        df = pd.read_sql(
+            "SELECT date, open, high, low, close, volume FROM kline_daily "
+            "WHERE symbol=? ORDER BY date", conn, params=(sym,))
     if len(df) < 120:
         return None
     df['date'] = pd.to_datetime(df['date'].astype(str).str.strip(), format='mixed')
@@ -459,6 +471,46 @@ def score_holding(conn, pipeline, sym, feat_names, reg, clf_s, clf_tb):
         ptp=float(clf_tb.predict_proba(xv)[0, 1]),
         tp_price=last + ATR_TP * atr, sl_price=last - ATR_SL * atr,
     )
+
+
+def scan_universe(conn, pipeline, feat_names, reg, clf_s, clf_tb,
+                  symbols=None, tail=0, min_bars=250, progress=None):
+    """对整个 A 股票池逐只打分(低内存: 每只读完即 gc 释放)。
+
+    模型真实 edge 只在 A 股(港股/ETF 缺宏观情绪特征), 故只扫 .SZ/.SH。
+    tail=0 读全历史(保证特征与训练逐位一致); OOM 的真凶是 273MB lstm pkl,
+    已用瘦身版(lstm_slim)解决, 全历史日线读取本身不占内存。
+    返回 list[dict], 每项含 score_holding 的字段 + name(若 stock_info 有)。
+    """
+    import gc
+    if symbols is None:
+        rows = conn.execute(
+            "SELECT symbol, COUNT(*) c FROM kline_daily "
+            "WHERE symbol LIKE '%.SZ' OR symbol LIKE '%.SH' "
+            "GROUP BY symbol HAVING c>=? ORDER BY symbol", (min_bars,)).fetchall()
+        symbols = [r[0] for r in rows]
+
+    name_map = {}
+    try:
+        name_map = {r[0]: r[1] for r in
+                    conn.execute("SELECT symbol, name FROM stock_info").fetchall()}
+    except Exception:
+        pass
+
+    out = []
+    n = len(symbols)
+    for i, sym in enumerate(symbols):
+        try:
+            s = score_holding(conn, pipeline, sym, feat_names, reg, clf_s, clf_tb, tail=tail)
+        except Exception:
+            s = None
+        if s is not None:
+            s['name'] = name_map.get(sym, sym)
+            out.append(s)
+        if progress and (i + 1) % 50 == 0:
+            progress(i + 1, n, len(out))
+        gc.collect()
+    return out
 
 
 def load_holdings(conn):
