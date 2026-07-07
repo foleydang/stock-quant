@@ -38,6 +38,8 @@ interface StockData {
   low: number;
   close: number;
   volume: number;
+  ma20?: number | null;
+  ma60?: number | null;
 }
 
 const App: React.FC = () => {
@@ -105,11 +107,7 @@ const App: React.FC = () => {
       },
       {
         label: 'MA20',
-        data: stockData.map((_, i, arr) => {
-          if (i < 19) return null;
-          const slice = arr.slice(i - 19, i + 1);
-          return slice.reduce((sum, item) => sum + item.close, 0) / 20;
-        }),
+        data: stockData.map(d => d.ma20 ?? null),
         borderColor: '#faad14',
         borderWidth: 1,
         tension: 0.3,
@@ -118,11 +116,7 @@ const App: React.FC = () => {
       },
       {
         label: 'MA60',
-        data: stockData.map((_, i, arr) => {
-          if (i < 59) return null;
-          const slice = arr.slice(i - 59, i + 1);
-          return slice.reduce((sum, item) => sum + item.close, 0) / 60;
-        }),
+        data: stockData.map(d => d.ma60 ?? null),
         borderColor: '#722ed1',
         borderWidth: 1,
         tension: 0.3,
