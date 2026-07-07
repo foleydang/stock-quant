@@ -91,9 +91,17 @@ const App: React.FC = () => {
     }
   };
 
+  // 横轴标签: 日/周线带年份(YYYY-MM-DD), 月线 YYYY-MM, 30分钟线带具体时间(MM-DD HH:MM)
+  const fmtAxis = (dateStr?: string): string => {
+    if (!dateStr) return '';
+    if (period === '30m') return dateStr.slice(5, 16);
+    if (period === 'monthly') return dateStr.slice(0, 7);
+    return dateStr.slice(0, 10);
+  };
+
   // 股价走势图表
   const priceChartData = {
-    labels: stockData.map((d, i) => i % 8 === 0 ? d?.date?.slice(5, 10) || "" : ''),
+    labels: stockData.map((d, i) => i % 8 === 0 ? fmtAxis(d?.date) : ''),
     datasets: [
       {
         label: '收盘价',
@@ -128,7 +136,7 @@ const App: React.FC = () => {
 
   // 成交量图表
   const volumeChartData = {
-    labels: stockData.map((d, i) => i % 16 === 0 ? d?.date?.slice(5, 10) || "" : ''),
+    labels: stockData.map((d, i) => i % 16 === 0 ? fmtAxis(d?.date) : ''),
     datasets: [
       {
         label: '成交量',
@@ -155,13 +163,12 @@ const App: React.FC = () => {
             return `${context.dataset.label}: ¥${context?.parsed?.y?.toFixed(2) || "0.00"}`;
           },
           title: (items: any) => {
-            const date = items[0]?.label;
-            // 如果是 30 分钟线，显示具体时间
-            if (period === '30m' && date) {
-              const dateObj = new Date(date);
-              return `${dateObj.getMonth() + 1}/${dateObj.getDate()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
-            }
-            return date || '';
+            // 用 dataIndex 取完整日期(标签是抽样稀疏的, 直接读会缺失)
+            const idx = items?.[0]?.dataIndex;
+            const full = idx != null ? stockData[idx]?.date : '';
+            if (!full) return '';
+            // 30分钟线显示到分钟, 其余显示到日
+            return period === '30m' ? full.slice(0, 16) : full.slice(0, 10);
           }
         }
       }
