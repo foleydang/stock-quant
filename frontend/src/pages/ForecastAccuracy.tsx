@@ -72,6 +72,7 @@ export default function ForecastAccuracy() {
   const [symbol, setSymbol] = useState('300124.SZ');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<PredictData | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -97,6 +98,22 @@ export default function ForecastAccuracy() {
   const oos = data?.oos ?? null;
   const cur = data?.current ?? null;
   const dirAcc = oos ? oos.dir_acc * 100 : 0;
+
+  // 方向命中 = 预测涨跌方向与实际一致 (基于可见的月度下采样序列, 与下方表格口径一致)
+  const hitOf = (arr: SeriesPt[]): number | null => {
+    if (!arr.length) return null;
+    const h = arr.filter((p) => (p.pred >= 0) === (p.actual >= 0)).length;
+    return h / arr.length;
+  };
+  const recentHit = (n: number) => (oos ? hitOf(oos.series.slice(-n)) : null);
+  const hit6 = recentHit(6);
+  const hit12 = recentHit(12);
+  const hit24 = recentHit(24);
+  // 最新在前, 供表格 & 卡片
+  const seriesRev = oos ? [...oos.series].reverse() : [];
+  const tableRows = showAll ? seriesRev : seriesRev.slice(0, 24);
+  const hitColor = (h: number | null) =>
+    h === null ? TEXT_DIM : h >= 0.55 ? '#3fb950' : h >= 0.5 ? GOLD : '#f85149';
 
   // 预测 20 日收益 vs 实际 20 日收益 (样本外, 月度下采样)
   const seriesChart = oos && oos.series.length ? {
@@ -207,54 +224,94 @@ export default function ForecastAccuracy() {
 
         {data && !loading && (
           <>
-            {/* OOS 核心指标 */}
+            {/* 最近方向命中率 — 一眼看懂近端成功率 */}
             {oos ? (
-              <Row gutter={12} style={{ marginBottom: 20 }}>
-                <Col span={6}>
-                  <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
-                    <Statistic
-                      title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>方向准确率 (OOS)</span>}
-                      value={dirAcc}
-                      precision={1}
-                      suffix="%"
-                      valueStyle={{ color: dirAcc >= 52 ? '#3fb950' : dirAcc >= 50 ? GOLD : '#f85149', fontSize: 28, fontWeight: 700 }}
-                      prefix={dirAcc >= 50 ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
-                    />
-                  </Card>
-                </Col>
-                <Col span={6}>
-                  <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
-                    <Statistic
-                      title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>看涨命中率 (实际涨)</span>}
-                      value={oos.hit_rate_up === null ? 0 : oos.hit_rate_up * 100}
-                      precision={1}
-                      suffix="%"
-                      valueStyle={{ color: '#58a6ff', fontSize: 28, fontWeight: 700 }}
-                      prefix={<RiseOutlined />}
-                    />
-                  </Card>
-                </Col>
-                <Col span={6}>
-                  <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
-                    <Statistic
-                      title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>预测涨·平均净收益/笔</span>}
-                      value={oos.mean_ret_up_net === null ? 0 : oos.mean_ret_up_net * 100}
-                      precision={2}
-                      suffix="%"
-                      valueStyle={{ color: (oos.mean_ret_up_net ?? 0) >= 0 ? '#3fb950' : '#f85149', fontSize: 28, fontWeight: 700 }}
-                    />
-                  </Card>
-                </Col>
-                <Col span={6}>
-                  <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
-                    <Statistic
-                      title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>OOS 样本数</span>}
-                      value={oos.n}
-                      valueStyle={{ color: TEXT_LIGHT, fontSize: 28, fontWeight: 700 }}
-                    />
-                  </Card>
-                </Col>
-              </Row>
+              <>
+                <Row gutter={12} style={{ marginBottom: 12 }}>
+                  <Col span={6}>
+                    <Card style={{ ...darkCardStyle, borderColor: GOLD }} styles={{ body: { padding: '14px 16px' } }}>
+                      <Statistic
+                        title={<span style={{ color: GOLD, fontSize: 12, fontWeight: 600 }}>近 6 次方向命中</span>}
+                        value={hit6 === null ? 0 : hit6 * 100}
+                        precision={0}
+                        suffix={<span style={{ fontSize: 13, color: TEXT_DIM }}>{hit6 === null ? '' : ` (${Math.round(hit6 * Math.min(6, oos.series.length))}/${Math.min(6, oos.series.length)})`}</span>}
+                        valueStyle={{ color: hitColor(hit6), fontSize: 28, fontWeight: 700 }}
+                        prefix={(hit6 ?? 0) >= 0.5 ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                      <Statistic
+                        title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>近 12 次方向命中</span>}
+                        value={hit12 === null ? 0 : hit12 * 100}
+                        precision={0}
+                        suffix={<span style={{ fontSize: 13, color: TEXT_DIM }}>{hit12 === null ? '' : ` (${Math.round(hit12 * Math.min(12, oos.series.length))}/${Math.min(12, oos.series.length)})`}</span>}
+                        valueStyle={{ color: hitColor(hit12), fontSize: 28, fontWeight: 700 }}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                      <Statistic
+                        title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>近 24 次方向命中</span>}
+                        value={hit24 === null ? 0 : hit24 * 100}
+                        precision={0}
+                        suffix={<span style={{ fontSize: 13, color: TEXT_DIM }}>{hit24 === null ? '' : ` (${Math.round(hit24 * Math.min(24, oos.series.length))}/${Math.min(24, oos.series.length)})`}</span>}
+                        valueStyle={{ color: hitColor(hit24), fontSize: 28, fontWeight: 700 }}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                      <Statistic
+                        title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>全样本方向准确率(日频)</span>}
+                        value={dirAcc}
+                        precision={1}
+                        suffix="%"
+                        valueStyle={{ color: dirAcc >= 52 ? '#3fb950' : dirAcc >= 50 ? GOLD : '#f85149', fontSize: 28, fontWeight: 700 }}
+                      />
+                    </Card>
+                  </Col>
+                </Row>
+                <Row gutter={12} style={{ marginBottom: 20 }}>
+                  <Col span={8}>
+                    <Card style={darkCardStyle} styles={{ body: { padding: '10px 16px' } }}>
+                      <Statistic
+                        title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>看涨命中率 (预测涨→实际涨)</span>}
+                        value={oos.hit_rate_up === null ? 0 : oos.hit_rate_up * 100}
+                        precision={1}
+                        suffix="%"
+                        valueStyle={{ color: '#58a6ff', fontSize: 20 }}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={8}>
+                    <Card style={darkCardStyle} styles={{ body: { padding: '10px 16px' } }}>
+                      <Statistic
+                        title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>预测涨·平均净收益/笔</span>}
+                        value={oos.mean_ret_up_net === null ? 0 : oos.mean_ret_up_net * 100}
+                        precision={2}
+                        suffix="%"
+                        valueStyle={{ color: (oos.mean_ret_up_net ?? 0) >= 0 ? '#3fb950' : '#f85149', fontSize: 20 }}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={8}>
+                    <Card style={darkCardStyle} styles={{ body: { padding: '10px 16px' } }}>
+                      <Statistic
+                        title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>OOS 样本数 (日频)</span>}
+                        value={oos.n}
+                        valueStyle={{ color: TEXT_LIGHT, fontSize: 20 }}
+                      />
+                    </Card>
+                  </Col>
+                </Row>
+                <div style={{ color: TEXT_DIM, fontSize: 12, marginBottom: 20, lineHeight: 1.6 }}>
+                  💡 「近 N 次」按最新的月度采样点算方向命中(涨/跌方向对不对)。<b style={{ color: GOLD }}>单只近端命中率波动极大、常低于 50%</b> —
+                  这正是模型的诚实面: edge 在<b>横截面排序</b>(见「策略回测」), 不是单只择时。别用单只近端命中率下重注。
+                </div>
+              </>
             ) : (
               <Card style={{ ...darkCardStyle, marginBottom: 20 }} styles={{ body: { padding: 24, textAlign: 'center' } }}>
                 <span style={{ color: TEXT_DIM }}>该标的不在 A 股训练池, 无样本外历史。下方仅显示当前信号 (若模型可打分)。</span>
@@ -297,9 +354,19 @@ export default function ForecastAccuracy() {
               </Card>
             )}
 
-            {/* 逐条明细 */}
+            {/* 逐条明细 — 最新在前 */}
             {oos && oos.series.length > 0 && (
               <Card style={darkCardStyle} styles={{ body: { padding: '8px 12px' } }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ color: TEXT_DIM, fontSize: 12 }}>
+                    逐条明细(最新在前) · 共 {seriesRev.length} 条{showAll ? '' : `,默认显示最近 ${Math.min(24, seriesRev.length)} 条`}
+                  </span>
+                  {seriesRev.length > 24 && (
+                    <Button size="small" type="text" style={{ color: GOLD }} onClick={() => setShowAll((s) => !s)}>
+                      {showAll ? '收起' : '展开全部'}
+                    </Button>
+                  )}
+                </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: TEXT_LIGHT }}>
                   <thead>
                     <tr style={{ borderBottom: `2px solid ${GOLD}` }}>
@@ -310,7 +377,7 @@ export default function ForecastAccuracy() {
                     </tr>
                   </thead>
                   <tbody>
-                    {oos.series.map((p) => {
+                    {tableRows.map((p) => {
                       const same = (p.pred >= 0) === (p.actual >= 0);
                       return (
                         <tr key={p.date} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}>
