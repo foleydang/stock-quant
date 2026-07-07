@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Statistic, Row, Col, Tag, Button, Modal, Form, InputNumber, Input, message } from 'antd';
-import { RiseOutlined, FallOutlined, PlusOutlined, EditOutlined, DeleteOutlined, HomeOutlined } from '@ant-design/icons';
+import { Table, Card, Statistic, Row, Col, Tag, Button, Modal, Form, InputNumber, Input, message, Space } from 'antd';
+import { RiseOutlined, FallOutlined, PlusOutlined, EditOutlined, DeleteOutlined, StockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+
+const navLinkStyle: React.CSSProperties = {
+  color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px',
+  background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13,
+  border: '1px solid rgba(226,176,74,0.3)',
+};
 
 const PositionManager: React.FC = () => {
   const [positions, setPositions] = useState<any[]>([]);
@@ -81,8 +87,8 @@ const PositionManager: React.FC = () => {
       }
       setModalVisible(false);
       fetchPositions();
-    } catch (error) {
-      message.error('操作失败');
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '操作失败');
     }
   };
 
@@ -154,10 +160,20 @@ const PositionManager: React.FC = () => {
   const totalReturnPct = totalCost ? (totalProfit / totalCost) * 100 : 0;
 
   return (
-    <Card
-      title="持仓管理"
-      extra={<Link to="/"><Button icon={<HomeOutlined />}>返回主页</Button></Link>}
-    >
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #1e2229 0%, #1a1e25 100%)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', padding: '14px 32px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: 1 }}>
+          <StockOutlined style={{ marginRight: 10, color: '#e2b04a' }} />
+          持仓管理
+        </h2>
+        <Space>
+          <Link to="/" style={navLinkStyle}>← 返回主页</Link>
+          <Link to="/trade" style={navLinkStyle}>交易记录</Link>
+        </Space>
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 48px' }}>
+      <Card>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={6}>
           <Statistic title="持仓市值" value={totalValue} precision={0} prefix="¥" />
@@ -232,7 +248,9 @@ const PositionManager: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+      </Card>
+      </div>
+    </div>
   );
 };
 
