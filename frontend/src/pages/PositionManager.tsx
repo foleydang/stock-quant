@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Statistic, Row, Col, Tag, Button, Modal, Form, InputNumber, Input, message } from 'antd';
-import { RiseOutlined, FallOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { RiseOutlined, FallOutlined, PlusOutlined, EditOutlined, DeleteOutlined, HomeOutlined } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const PositionManager: React.FC = () => {
@@ -153,7 +154,10 @@ const PositionManager: React.FC = () => {
   const totalReturnPct = totalCost ? (totalProfit / totalCost) * 100 : 0;
 
   return (
-    <Card title="持仓管理">
+    <Card
+      title="持仓管理"
+      extra={<Link to="/"><Button icon={<HomeOutlined />}>返回主页</Button></Link>}
+    >
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={6}>
           <Statistic title="持仓市值" value={totalValue} precision={0} prefix="¥" />
@@ -209,13 +213,13 @@ const PositionManager: React.FC = () => {
       </div>
       <Modal
         title={editingPosition ? '编辑持仓' : '添加持仓'}
-        visible={modalVisible}
+        open={modalVisible}
         onOk={handleSubmit}
         onCancel={() => setModalVisible(false)}
       >
         <Form form={form} layout="vertical">
           <Form.Item name="symbol" label="股票代码" rules={[{ required: true }]}>
-            <Input placeholder="如 300124.SZ" disabled={editingPosition} />
+            <Input placeholder="如 300124.SZ" disabled={!!editingPosition} />
           </Form.Item>
           <Form.Item name="name" label="股票名称" rules={[{ required: true }]}>
             <Input placeholder="如 汇川技术" />
