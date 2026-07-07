@@ -93,23 +93,25 @@ const PositionManager: React.FC = () => {
   };
 
   const columns = [
-    { title: '股票代码', dataIndex: 'symbol', key: 'symbol' },
-    { title: '名称', dataIndex: 'name', key: 'name' },
-    { title: '股数', dataIndex: 'shares', key: 'shares', render: (v: number) => v.toLocaleString() },
-    { title: '成本价', dataIndex: 'cost', key: 'cost', render: (v: number) => `¥${v?.toFixed(2) || 0}` },
-    { title: '现价', dataIndex: 'current', key: 'current', render: (v: number) => `¥${v?.toFixed(2) || 0}` },
-    { 
-      title: '盈亏', 
-      dataIndex: 'profit', 
+    { title: '股票代码', dataIndex: 'symbol', key: 'symbol', width: 100 },
+    { title: '名称', dataIndex: 'name', key: 'name', width: 120, ellipsis: true },
+    { title: '股数', dataIndex: 'shares', key: 'shares', width: 90, render: (v: number) => v.toLocaleString() },
+    { title: '成本价', dataIndex: 'cost', key: 'cost', width: 90, render: (v: number) => `¥${v?.toFixed(2) || 0}` },
+    { title: '现价', dataIndex: 'current', key: 'current', width: 90, render: (v: number) => `¥${v?.toFixed(2) || 0}` },
+    {
+      title: '盈亏',
+      dataIndex: 'profit',
       key: 'profit',
-      render: (v: number) => (
-        <Statistic 
-          value={v} 
-          precision={2} 
-          valueStyle={{ color: v >= 0 ? '#3f8600' : '#cf1322' }}
-          prefix={v >= 0 ? <RiseOutlined /> : <FallOutlined />}
-        />
-      )
+      width: 130,
+      // 后端 profit 是"每股盈亏"(现价-成本); 这里 ×股数 才是该股的实际持仓盈亏
+      render: (v: number, record: any) => {
+        const total = (v ?? 0) * (record.shares ?? 0);
+        return (
+          <span style={{ color: total >= 0 ? '#3fb950' : '#f85149', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            {total >= 0 ? <RiseOutlined /> : <FallOutlined />} {total >= 0 ? '+' : '-'}¥{Math.abs(total).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </span>
+        );
+      }
     },
     { 
       title: '盈亏%', 
