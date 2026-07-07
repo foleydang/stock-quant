@@ -73,17 +73,26 @@ def get_stock_data_by_period(symbol, period):
         name = row[0] if row and row[0] else symbol
         
         if period == '30m':
-            # 30分钟线直接从表读
-            limit = 50
-            cursor.execute(f"SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT {limit}", (symbol,))
+            # 30分钟线直接从表读; 多取 59 根做 MA 预热, 保证显示窗内 MA 从最左端就有值
+            disp = 50
+            cursor.execute("SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT ?", (symbol, disp + 59))
             rows = cursor.fetchall()
             conn.close()
-            
+
             if not rows:
                 return jsonify({'status': 'error', 'message': '无数据'}), 404
-            
-            data = [{'date': r[0], 'open': float(r[1]), 'high': float(r[2]), 'low': float(r[3]), 'close': float(r[4]), 'volume': int(r[5])} for r in rows]
-            data.reverse()
+
+            rows = rows[::-1]  # 转成时间正序
+            closes = pd.Series([float(r[4]) for r in rows])
+            ma20 = closes.rolling(20).mean()
+            ma60 = closes.rolling(60).mean()
+            data = [{
+                'date': r[0], 'open': float(r[1]), 'high': float(r[2]), 'low': float(r[3]),
+                'close': float(r[4]), 'volume': int(r[5]),
+                'ma20': None if pd.isna(ma20.iloc[i]) else round(float(ma20.iloc[i]), 3),
+                'ma60': None if pd.isna(ma60.iloc[i]) else round(float(ma60.iloc[i]), 3),
+            } for i, r in enumerate(rows)]
+            data = data[-disp:]  # 只返回最后 disp 根 (MA 已用预热数据算好)
         else:
             # 日线/周线/月线: 从30分钟数据聚合
             cursor.execute("SELECT date, open, high, low, close, volume FROM kline_30m WHERE symbol=? ORDER BY date ASC", (symbol,))
@@ -109,7 +118,7 @@ def get_stock_data_by_period(symbol, period):
                     close=('close', 'last'),
                     volume=('volume', 'sum')
                 ).reset_index()
-                df_agg = df_agg.tail(100)
+                keep = 100
             elif period == 'weekly':
                 df['week'] = df['date'].dt.to_period('W').apply(lambda x: x.start_time)
                 df_agg = df.groupby('week').agg(
@@ -119,7 +128,7 @@ def get_stock_data_by_period(symbol, period):
                     close=('close', 'last'),
                     volume=('volume', 'sum')
                 ).reset_index()
-                df_agg = df_agg.tail(50)
+                keep = 50
             elif period == 'monthly':
                 df['month'] = df['date'].dt.to_period('M').apply(lambda x: x.start_time)
                 df_agg = df.groupby('month').agg(
@@ -129,10 +138,15 @@ def get_stock_data_by_period(symbol, period):
                     close=('close', 'last'),
                     volume=('volume', 'sum')
                 ).reset_index()
-                df_agg = df_agg.tail(24)
+                keep = 24
             else:
                 return jsonify({'status': 'error', 'message': f'未知周期: {period}'}), 400
-            
+
+            # 先在完整历史上算 MA, 再截取显示窗口 → 显示区内 MA 从最左端就有值
+            df_agg['ma20'] = df_agg['close'].rolling(20).mean()
+            df_agg['ma60'] = df_agg['close'].rolling(60).mean()
+            df_agg = df_agg.tail(keep)
+
             data = []
             for _, r in df_agg.iterrows():
                 date_col = 'date' if 'date' in df_agg.columns else 'week' if 'week' in df_agg.columns else 'month'
@@ -142,7 +156,9 @@ def get_stock_data_by_period(symbol, period):
                     'high': float(r['high']),
                     'low': float(r['low']),
                     'close': float(r['close']),
-                    'volume': int(r['volume'])
+                    'volume': int(r['volume']),
+                    'ma20': None if pd.isna(r['ma20']) else round(float(r['ma20']), 3),
+                    'ma60': None if pd.isna(r['ma60']) else round(float(r['ma60']), 3),
                 })
         
         prices = [d['close'] for d in data]
