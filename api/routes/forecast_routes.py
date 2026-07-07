@@ -199,6 +199,18 @@ def _predict_direction(feat_row, model_data, regime='sideways'):
 
 @forecast_bp.route('/forecast/7days/<symbol>', methods=['GET'])
 def forecast_7days(symbol):
+    """[已退役] 旧 lgb_hs300(v9血统)有泄漏且上线特征名 0/56 匹配→恒输出常数。
+    改用诚实的 add_advisor 模型: GET /api/advisor/predict/<symbol> (20日预测)。"""
+    return jsonify({
+        'status': 'error',
+        'retired': True,
+        'message': '该预测已退役 (旧模型有数据泄漏且特征不匹配)。'
+                   '请改用 /api/advisor/predict/' + symbol + ' 获取诚实的 20 日预测。',
+        'redirect': '/api/advisor/predict/' + symbol,
+    }), 410
+
+
+def _forecast_7days_legacy(symbol):
     """预测接下来7天走势"""
     model_data, feature_engineer, filtered_feature_names = _load_model()
     if model_data is None or feature_engineer is None:
@@ -321,6 +333,17 @@ def forecast_7days(symbol):
 
 @forecast_bp.route('/forecast/history/<symbol>', methods=['GET'])
 def forecast_history(symbol):
+    """[已退役] 见 forecast_7days 注释。改用 /api/advisor/predict/<symbol> 的 oos.series。"""
+    return jsonify({
+        'status': 'error',
+        'retired': True,
+        'message': '该历史记录已退役 (旧模型有数据泄漏)。'
+                   '请改用 /api/advisor/predict/' + symbol + ' 的 oos.series (OOS 预测 vs 实际)。',
+        'redirect': '/api/advisor/predict/' + symbol,
+    }), 410
+
+
+def _forecast_history_legacy(symbol):
     """返回过去7天的预测记录vs实际结果"""
     days = int(request.args.get('days', 7))
 

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Line, Bar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Card, Statistic, Row, Col, Tag, Spin, Table, Progress, TableColumnsType } from 'antd';
-import { RiseOutlined, FallOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Card, Statistic, Row, Col, Tag, Spin } from 'antd';
+import { RiseOutlined, FallOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
@@ -16,47 +16,33 @@ const GOLD = '#e2b04a';
 const TEXT_DIM = 'rgba(255,255,255,0.5)';
 const TEXT_LIGHT = 'rgba(255,255,255,0.85)';
 
-interface Prediction7Day {
-  day: number;
-  date: string;
+interface CurrentSignal {
+  dataDate: string;
+  lastPrice: number;
+  rsi: number;
+  candidate: boolean;
+  ret20Pred: number;
   upProb: number;
-  downProb: number;
-  direction: string;
-  simPrice: number;
-  priceLow: number;
-  priceHigh: number;
+  tpProb: number;
+  tpPrice: number;
+  slPrice: number;
+  verdict: string;
 }
-
-interface Forecast7Data {
+interface OosSeriesPt { date: string; pred: number; actual: number; }
+interface Oos {
+  n: number;
+  dir_acc: number;
+  hit_rate_up: number | null;
+  mean_ret_up_net: number | null;
+  series: OosSeriesPt[];
+}
+interface PredictData {
+  status: string;
   symbol: string;
-  stockName: string;
-  currentPrice: number;
-  lastDate: string;
-  predictions: Prediction7Day[];
-  summary: {
-    avgUpProb: number;
-    trendDirection: string;
-    simFinalPrice: number;
-    simReturn: number;
-  };
-}
-
-interface HistoryDay {
-  date: string;
-  predCount: number;
-  correctCount: number;
-  accuracy: number;
-  avgUpProb: number;
-}
-
-interface HistoryData {
-  symbol: string;
-  stockName: string;
-  days: number;
-  overallAccuracy: number;
-  totalPredictions: number;
-  totalCorrect: number;
-  dailyRecords: HistoryDay[];
+  horizon: number;
+  current: CurrentSignal | null;
+  oos: Oos | null;
+  caveat: string;
 }
 
 const darkChartPlugin = {
@@ -71,158 +57,105 @@ const darkChartPlugin = {
   },
 };
 
-interface Props {
-  symbol: string;
-}
+interface Props { symbol: string; }
 
 export default function Forecast7Tab({ symbol }: Props) {
   const [loading, setLoading] = useState(false);
-  const [data7d, setData7d] = useState<Forecast7Data | null>(null);
-  const [historyData, setHistoryData] = useState<HistoryData | null>(null);
+  const [data, setData] = useState<PredictData | null>(null);
+  const [msg, setMsg] = useState<string>('');
 
-  useEffect(() => {
-    fetchData();
-  }, [symbol]);
+  useEffect(() => { fetchData(); }, [symbol]);
 
   const fetchData = async () => {
     setLoading(true);
+    setMsg('');
     try {
-      const [res7d, resHist] = await Promise.all([
-        axios.get(`/api/forecast/7days/${symbol}`),
-        axios.get(`/api/forecast/history/${symbol}`, { params: { days: 7 } }),
-      ]);
-      if (res7d.data.status === 'success') setData7d(res7d.data);
-      else setData7d(null);
-      if (resHist.data.status === 'success') setHistoryData(resHist.data);
-      else setHistoryData(null);
+      const res = await axios.get(`/api/advisor/predict/${symbol}`);
+      if (res.data.status === 'success') setData(res.data);
+      else { setData(null); setMsg(res.data.message || '暂无预测'); }
     } catch {
-      setData7d(null);
-      setHistoryData(null);
+      setData(null);
+      setMsg('无法连接到服务器');
     }
     setLoading(false);
   };
 
   if (loading) return <Spin tip="模型预测中..." style={{ display: 'block', margin: '60px auto' }} />;
-  if (!data7d) return <Card style={{ textAlign: 'center', padding: 40, background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}><p style={{ color: TEXT_DIM }}>暂无预测数据</p></Card>;
+  if (!data) return <Card style={{ textAlign: 'center', padding: 40, background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}><p style={{ color: TEXT_DIM }}>{msg || '暂无预测数据'}</p></Card>;
 
-  // 预测概率图
-  const probData = {
-    labels: data7d.predictions.map(p => `第${p.day}天`),
+  const c = data.current;
+  const oos = data.oos;
+
+  const verdictTag = (v: string) => {
+    if (v.includes('补') && !v.includes('不')) return <Tag color="green" style={{ fontSize: 14 }}><RiseOutlined /> {v}</Tag>;
+    if (v.includes('不补') || v.includes('回避') || v.includes('减')) return <Tag color="red" style={{ fontSize: 14 }}><FallOutlined /> {v}</Tag>;
+    return <Tag color="gold" style={{ fontSize: 14 }}>{v}</Tag>;
+  };
+
+  // OOS 预测 vs 实际 (月度采样序列)
+  const oosChart = oos && oos.series.length ? {
+    labels: oos.series.map((p) => p.date.slice(2)),
     datasets: [
-      { label: '上涨概率(%)', data: data7d.predictions.map(p => p.upProb), borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.15)', fill: true, pointRadius: 4, borderWidth: 2 },
-      { label: '下跌概率(%)', data: data7d.predictions.map(p => p.downProb), borderColor: '#f85149', backgroundColor: 'rgba(248,81,73,0.15)', fill: true, pointRadius: 4, borderWidth: 2 },
-      { label: '50%分界', data: data7d.predictions.map(() => 50), borderColor: GOLD, borderWidth: 1, borderDash: [3, 3], pointRadius: 0, fill: false },
+      { label: '预测20日收益(%)', data: oos.series.map((p) => +(p.pred * 100).toFixed(2)), borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.08)', borderWidth: 2, pointRadius: 2, tension: 0.15, fill: true },
+      { label: '实际20日收益(%)', data: oos.series.map((p) => +(p.actual * 100).toFixed(2)), borderColor: GOLD, borderWidth: 2, pointRadius: 2, tension: 0.15 },
+      { label: '0 轴', data: oos.series.map(() => 0), borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderDash: [3, 3], pointRadius: 0 },
     ],
-  };
-  const probOpts = {
-    responsive: true,
-    plugins: { title: { display: true, text: `${data7d.stockName} 7天预测概率`, color: TEXT_LIGHT, font: { size: 14 } }, legend: { labels: { color: TEXT_DIM } } },
-    scales: { x: { ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } }, y: { min: 0, max: 100, ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } } },
-  };
-
-  // 模拟价格图
-  const priceData = {
-    labels: ['当前', ...data7d.predictions.map(p => `第${p.day}天`)],
-    datasets: [
-      { label: '预测价格', data: [data7d.currentPrice, ...data7d.predictions.map(p => p.simPrice)], borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.08)', fill: true, pointRadius: 4, borderWidth: 2 },
-      { label: '上限', data: [data7d.currentPrice, ...data7d.predictions.map(p => p.priceHigh)], borderColor: 'rgba(63,185,80,0.5)', borderWidth: 1, borderDash: [2, 2], pointRadius: 2, fill: false },
-      { label: '下限', data: [data7d.currentPrice, ...data7d.predictions.map(p => p.priceLow)], borderColor: 'rgba(248,81,73,0.5)', borderWidth: 1, borderDash: [2, 2], pointRadius: 2, fill: false },
-    ],
-  };
-  const priceOpts = {
-    responsive: true,
-    plugins: { title: { display: true, text: `${data7d.stockName} 预测价格走势`, color: TEXT_LIGHT, font: { size: 14 } }, legend: { labels: { color: TEXT_DIM } } },
-    scales: { x: { ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } }, y: { ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } } },
-  };
-
-  // 预测明细表格
-  const predColumns: TableColumnsType<Prediction7Day> = [
-    { title: '天数', dataIndex: 'day', width: 60, render: (d: number) => `第${d}天` },
-    { title: '日期', dataIndex: 'date', width: 100, render: (d: string) => d.slice(5) },
-    { title: '方向', dataIndex: 'direction', width: 80, render: (d: string) => {
-      if (d === 'up') return <Tag color="green"><RiseOutlined /> 看涨</Tag>;
-      if (d === 'down') return <Tag color="red"><FallOutlined /> 看跌</Tag>;
-      return <Tag>中性</Tag>;
-    }},
-    { title: '上涨概率', dataIndex: 'upProb', width: 100, render: (p: number) => <Progress percent={p} size="small" strokeColor={p >= 55 ? '#3fb950' : '#f85149'} format={(pct?: number) => `${pct ?? 0}%`} /> },
-    { title: '预测价', dataIndex: 'simPrice', width: 80, render: (p: number) => `¥${p.toFixed(2)}` },
-    { title: '价格区间', width: 120, render: (_: any, r: Prediction7Day) => `¥${r.priceLow.toFixed(2)} ~ ¥${r.priceHigh.toFixed(2)}` },
-  ];
-
-  // 历史明细表格
-  const histColumns = [
-    { title: '日期', dataIndex: 'date', width: 100, render: (d: string) => d.slice(5) },
-    { title: '预测次数', dataIndex: 'predCount', width: 80 },
-    { title: '正确次数', dataIndex: 'correctCount', width: 80 },
-    { title: '准确率', dataIndex: 'accuracy', width: 100, render: (a: number) => <Tag color={a >= 55 ? 'green' : 'red'}>{a}%</Tag> },
-    { title: '平均上涨概率', dataIndex: 'avgUpProb', width: 100, render: (p: number) => `${p}%` },
-  ];
-
-  // 历史柱状图
-  const historyBarData = historyData ? {
-    labels: historyData.dailyRecords.map(r => r.date.slice(5)),
-    datasets: [{ label: '准确率(%)', data: historyData.dailyRecords.map(r => r.accuracy), backgroundColor: historyData.dailyRecords.map(r => r.accuracy >= 55 ? 'rgba(63,185,80,0.6)' : 'rgba(248,81,73,0.6)') }],
   } : null;
 
-  const historyBarOpts = {
-    responsive: true,
-    plugins: { title: { display: true, text: '最近7天逐日准确率', color: TEXT_LIGHT, font: { size: 14 } }, legend: { labels: { color: TEXT_DIM } } },
-    scales: { x: { ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } }, y: { min: 0, max: 100, ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } } },
+  const oosOpts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { title: { display: true, text: `${symbol} 样本外(OOS) 预测 vs 实际 · 20日收益`, color: TEXT_LIGHT, font: { size: 14 } }, legend: { labels: { color: TEXT_DIM } } },
+    scales: { x: { ticks: { color: TEXT_DIM, maxTicksLimit: 14 }, grid: { color: CARD_BORDER } }, y: { ticks: { color: TEXT_DIM, callback: (v: any) => v + '%' }, grid: { color: CARD_BORDER } } },
   };
-
-  const trend = data7d.summary.trendDirection;
-  const trendTag = trend === 'up' ? <Tag color="green" style={{ fontSize: 14 }}><RiseOutlined /> 看涨趋势</Tag> : trend === 'down' ? <Tag color="red" style={{ fontSize: 14 }}><FallOutlined /> 看跌趋势</Tag> : <Tag style={{ fontSize: 14 }}>中性趋势</Tag>;
 
   return (
     <div>
-      {/* 核心指标 */}
-      <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, marginBottom: 16 }} styles={{ body: { padding: 14 } }}>
-        <Row gutter={16}>
-          <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>当前价</span>} value={data7d.currentPrice} prefix="¥" precision={2} valueStyle={{ color: TEXT_LIGHT, fontSize: 22 }} /></Col>
-          <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>趋势方向</span>} valueStyle={{ fontSize: 18 }} valueRender={() => trendTag} /></Col>
-          <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>预测终价</span>} value={data7d.summary.simFinalPrice} prefix="¥" precision={2} valueStyle={{ color: TEXT_LIGHT, fontSize: 22 }} /></Col>
-          <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>预测收益率</span>} value={data7d.summary.simReturn} suffix="%" precision={2} valueStyle={{ color: data7d.summary.simReturn >= 0 ? '#3fb950' : '#f85149', fontSize: 22 }} prefix={data7d.summary.simReturn >= 0 ? <RiseOutlined /> : <FallOutlined />} /></Col>
-          <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>平均上涨概率</span>} value={data7d.summary.avgUpProb} suffix="%" precision={1} valueStyle={{ color: data7d.summary.avgUpProb >= 55 ? '#3fb950' : '#f85149', fontSize: 22 }} /></Col>
-          {historyData && <>
-            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>历史准确率</span>} value={historyData.overallAccuracy} suffix="%" precision={1} valueStyle={{ color: historyData.overallAccuracy >= 55 ? '#3fb950' : '#f85149', fontSize: 22 }} prefix={historyData.overallAccuracy >= 55 ? <CheckCircleOutlined /> : <CloseCircleOutlined />} /></Col>
-            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>总预测次数</span>} value={historyData.totalPredictions} valueStyle={{ color: TEXT_LIGHT, fontSize: 22 }} /></Col>
-          </>}
-        </Row>
-      </Card>
+      {/* 诚实 caveat */}
+      <div style={{ background: 'rgba(226,176,74,0.08)', border: `1px solid ${GOLD}`, borderRadius: 6, padding: '10px 14px', marginBottom: 16, color: GOLD, fontSize: 13, lineHeight: 1.6 }}>
+        ⚠️ {data.caveat}
+      </div>
 
-      {/* 概率图 + 价格图 */}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={12}>
-          <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }} styles={{ body: { padding: 12 } }}>
-            <Line data={probData} options={probOpts} plugins={[darkChartPlugin]} />
+      {/* 当前 20 日信号 */}
+      {c ? (
+        <Card title={<span style={{ color: TEXT_LIGHT }}>当前 {data.horizon} 日预测信号 · 数据日 {c.dataDate}</span>} style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, marginBottom: 16 }} styles={{ body: { padding: 14 } }}>
+          <Row gutter={16}>
+            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>当前价</span>} value={c.lastPrice} prefix="¥" precision={2} valueStyle={{ color: TEXT_LIGHT, fontSize: 22 }} /></Col>
+            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>预测20日收益</span>} value={c.ret20Pred * 100} suffix="%" precision={2} valueStyle={{ color: c.ret20Pred >= 0 ? '#3fb950' : '#f85149', fontSize: 22 }} prefix={c.ret20Pred >= 0 ? <RiseOutlined /> : <FallOutlined />} /></Col>
+            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>上涨概率</span>} value={c.upProb * 100} suffix="%" precision={1} valueStyle={{ color: c.upProb >= 0.5 ? '#3fb950' : '#f85149', fontSize: 22 }} /></Col>
+            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>RSI14</span>} value={c.rsi} precision={0} valueStyle={{ color: c.rsi < 40 ? '#3fb950' : c.rsi > 70 ? '#f85149' : TEXT_LIGHT, fontSize: 22 }} /></Col>
+            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>止盈位</span>} value={c.tpPrice} prefix="¥" precision={2} valueStyle={{ color: '#3fb950', fontSize: 22 }} /></Col>
+            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>止损位</span>} value={c.slPrice} prefix="¥" precision={2} valueStyle={{ color: '#f85149', fontSize: 22 }} /></Col>
+            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>补仓候选态</span>} valueRender={() => c.candidate ? <Tag color="gold">候选(跌破MA20+超卖)</Tag> : <Tag>非候选</Tag>} /></Col>
+            <Col span={3}><Statistic title={<span style={{ color: TEXT_DIM }}>建议</span>} valueRender={() => verdictTag(c.verdict)} /></Col>
+          </Row>
+        </Card>
+      ) : (
+        <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, marginBottom: 16, textAlign: 'center', padding: 20 }}>
+          <span style={{ color: TEXT_DIM }}>该股数据不足, 无法出当前信号</span>
+        </Card>
+      )}
+
+      {/* OOS 历史命中率 + 预测vs实际 */}
+      {oos ? (
+        <>
+          <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, marginBottom: 16 }} styles={{ body: { padding: 14 } }}>
+            <Row gutter={16}>
+              <Col span={4}><Statistic title={<span style={{ color: TEXT_DIM }}>OOS 样本数</span>} value={oos.n} valueStyle={{ color: TEXT_LIGHT, fontSize: 22 }} /></Col>
+              <Col span={5}><Statistic title={<span style={{ color: TEXT_DIM }}>方向准确率</span>} value={oos.dir_acc * 100} suffix="%" precision={1} valueStyle={{ color: oos.dir_acc >= 0.5 ? '#3fb950' : '#f85149', fontSize: 22 }} /></Col>
+              <Col span={5}><Statistic title={<span style={{ color: TEXT_DIM }}>预测涨时实际上涨率</span>} value={oos.hit_rate_up != null ? oos.hit_rate_up * 100 : 0} suffix="%" precision={1} valueStyle={{ color: (oos.hit_rate_up ?? 0) >= 0.5 ? '#3fb950' : '#f85149', fontSize: 22 }} /></Col>
+              <Col span={6}><Statistic title={<span style={{ color: TEXT_DIM }}>预测涨时平均净收益(扣成本)</span>} value={oos.mean_ret_up_net != null ? oos.mean_ret_up_net * 100 : 0} suffix="%" precision={2} valueStyle={{ color: (oos.mean_ret_up_net ?? 0) >= 0 ? '#3fb950' : '#f85149', fontSize: 22 }} /></Col>
+            </Row>
           </Card>
-        </Col>
-        <Col span={12}>
-          <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }} styles={{ body: { padding: 12 } }}>
-            <Line data={priceData} options={priceOpts} plugins={[darkChartPlugin]} />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 预测明细 */}
-      <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, marginBottom: 16 }} styles={{ body: { padding: 12 } }}>
-        <Table columns={predColumns} dataSource={data7d.predictions} rowKey="day" pagination={false} size="small" />
-      </Card>
-
-      {/* 预测历史 */}
-      {historyData && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={12}>
+          {oosChart && (
             <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }} styles={{ body: { padding: 12 } }}>
-              {historyBarData && <Bar data={historyBarData} options={historyBarOpts} plugins={[darkChartPlugin]} />}
+              <div style={{ height: 320 }}><Line data={oosChart} options={oosOpts} plugins={[darkChartPlugin]} /></div>
             </Card>
-          </Col>
-          <Col span={12}>
-            <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }} styles={{ body: { padding: 12 } }}>
-              <Table columns={histColumns} dataSource={historyData.dailyRecords} rowKey="date" pagination={false} size="small" />
-            </Card>
-          </Col>
-        </Row>
+          )}
+        </>
+      ) : (
+        <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, textAlign: 'center', padding: 20 }}>
+          <span style={{ color: TEXT_DIM }}>该股不在回测池 (仅A股池有 OOS 历史), 无预测vs实际记录</span>
+        </Card>
       )}
     </div>
   );
