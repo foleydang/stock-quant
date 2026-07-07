@@ -10,6 +10,8 @@ interface Position {
   shares: number;
   cost: number;
   current: number;
+  profit?: number;      // 每股盈亏 (后端返回)
+  profit_pct?: number;  // 盈亏百分比 (后端返回)
 }
 
 interface Trade {
@@ -241,8 +243,10 @@ const TradeRecord: React.FC = () => {
       key: 'profit',
       width: 120,
       render: (_: any, record: Position) => {
-        const profit = (record.current - record.cost) * record.shares;
-        const profitPct = ((record.current - record.cost) / record.cost * 100);
+        // 优先用后端返回的每股盈亏; 缺失时兜底计算, cost=0 时避免除零
+        const perShare = record.profit ?? (record.current - record.cost);
+        const profit = perShare * record.shares;
+        const profitPct = record.profit_pct ?? (record.cost ? (record.current - record.cost) / record.cost * 100 : 0);
         return (
           <span style={{ color: profit >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>
             ¥{profit.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({profitPct?.toFixed(1) || 0}%)

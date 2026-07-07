@@ -237,13 +237,18 @@ def add_position():
         
         conn = sqlite3.connect(get_db_path())
         cursor = conn.cursor()
+        # 防止重复持仓: 同一 symbol 已存在则拒绝 (前端应走"编辑"), 否则会产生重复行撞 rowKey
+        cursor.execute("SELECT 1 FROM positions WHERE symbol=?", (data["symbol"],))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({"status": "error", "error": "该持仓已存在, 请用编辑修改"}), 409
         cursor.execute(
             "INSERT INTO positions (symbol, stock_name, shares, cost_price, current_price) VALUES (?, ?, ?, ?, ?)",
             (data["symbol"], data["name"], data["shares"], data["cost"], data["cost"])
         )
         conn.commit()
         conn.close()
-        
+
         return jsonify({"status": "success", "message": "添加成功"})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
