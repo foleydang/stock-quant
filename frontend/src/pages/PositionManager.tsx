@@ -122,21 +122,23 @@ const PositionManager: React.FC = () => {
     {
       title: '补仓顾问(ML)',
       key: 'advisor',
-      width: 320,
+      width: 460,
       render: (record: any) => {
         const a = advisor[record.symbol];
         if (!a || !a.ready) return <Tag>模型未就绪</Tag>;
         return (
-          <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, lineHeight: 1.7, color: 'rgba(255,255,255,0.88)' }}>
             <div>
               {a.candidate
                 ? <Tag color="orange">补仓候选态</Tag>
                 : <Tag>非候选态</Tag>}
-              <span>RSI {a.rsi}</span>
+              <span style={{ color: 'rgba(255,255,255,0.88)' }}>RSI {a.rsi}</span>
             </div>
             <div>方案2: 20日 {(a.ret20Pred * 100).toFixed(1)}% · 涨概率 {(a.upProb * 100).toFixed(0)}%</div>
             <div>方案3: P(止盈) {(a.tpProb * 100).toFixed(0)}% · 止盈 {a.tpPrice} / 止损 {a.slPrice}</div>
-            <div style={{ color: '#555', marginTop: 2 }}>{a.verdict}</div>
+            <div style={{ marginTop: 4, color: '#e2b04a', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+              建议: {a.verdict}
+            </div>
           </div>
         );
       }
