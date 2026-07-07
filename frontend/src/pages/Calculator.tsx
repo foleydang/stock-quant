@@ -1,15 +1,43 @@
 import React, { useMemo } from 'react';
-import { Card, InputNumber, Statistic, Row, Col, Tag, Divider } from 'antd';
+import { Card, InputNumber, Statistic, Row, Col, Tag, Divider, Select } from 'antd';
 import { CalculatorOutlined, RiseOutlined, FallOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 
 const GOLD = '#e2b04a';
+
+interface Position {
+  symbol: string;
+  name: string;
+  shares: number;
+  cost: number;
+  current: number;
+}
 
 export default function Calculator() {
   const [costPrice, setCostPrice] = React.useState<number>(100);
   const [shares, setShares] = React.useState<number>(1000);
   const [currentPrice, setCurrentPrice] = React.useState<number>(80);
   const [targetCost, setTargetCost] = React.useState<number>(90);
+  const [positions, setPositions] = React.useState<Position[]>([]);
+  const [selected, setSelected] = React.useState<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    axios.get('/api/positions')
+      .then(res => { if (res.data.status === 'success') setPositions(res.data.positions || []); })
+      .catch(() => {});
+  }, []);
+
+  // 选中持仓 → 自动填入成本价/持股/现价; 目标成本默认取 现价与成本价中点(便于直接算补仓降本), 均可再改
+  const handleSelectPosition = (symbol: string) => {
+    const p = positions.find(x => x.symbol === symbol);
+    if (!p) return;
+    setSelected(symbol);
+    setCostPrice(p.cost);
+    setShares(p.shares);
+    setCurrentPrice(p.current);
+    setTargetCost(p.cost > p.current ? +((p.cost + p.current) / 2).toFixed(2) : p.cost);
+  };
 
   // 补仓价格默认等于当前价格
   const addPrice = currentPrice;
@@ -88,6 +116,23 @@ export default function Calculator() {
         {/* 输入区域 - 四个参数同一行 */}
         <Card style={{ background: '#242830', border: '1px solid #3a3f4a', marginBottom: 20 }} styles={{ body: { padding: 20 } }}>
           <h3 style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 16 }}>输入参数</h3>
+          <Row gutter={16} style={{ marginBottom: 16 }}>
+            <Col span={12}>
+              <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>从我的持仓选择 <span style={{ opacity: 0.7 }}>(自动填入成本价 / 持股 / 现价, 下方仍可修改)</span></div>
+              <Select
+                value={selected}
+                onChange={handleSelectPosition}
+                onClear={() => setSelected(undefined)}
+                placeholder={positions.length ? '选择持仓股票' : '暂无持仓'}
+                style={{ width: '100%' }}
+                size="large"
+                showSearch
+                allowClear
+                optionFilterProp="label"
+                options={positions.map(p => ({ value: p.symbol, label: `${p.name} (${p.symbol})` }))}
+              />
+            </Col>
+          </Row>
           <Row gutter={16}>
             <Col span={6}>
               <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>成本价格</div>

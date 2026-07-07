@@ -475,6 +475,17 @@ def _forecast_history_legacy(symbol):
 
 @forecast_bp.route('/forecast/stats', methods=['GET'])
 def forecast_stats():
+    """[已退役] 基于泄漏的 lgb_hs300(v9血统)统计,已不可信。
+    诚实口径改用 add_advisor 的横截面回测: GET /api/advisor/backtest。"""
+    return jsonify({
+        'status': 'error',
+        'retired': True,
+        'message': '该统计已退役 (旧模型有数据泄漏)。请改用 /api/advisor/backtest 获取诚实的横截面回测口径。',
+        'redirect': '/api/advisor/backtest',
+    }), 410
+
+
+def _forecast_stats_legacy():
     """全局预测准确率统计"""
     model_data, feature_engineer, filtered_feature_names = _load_model()
     if model_data is None or feature_engineer is None:
