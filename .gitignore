@@ -60,3 +60,6 @@ mlruns/
 !models/
 !models/**
 python/python/
+
+# add_advisor OOS 缓存 (大, 只本地用, 勿提交)
+python/models/add_advisor/oos_cache.pkl

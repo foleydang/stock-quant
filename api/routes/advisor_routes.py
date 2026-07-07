@@ -29,6 +29,26 @@ _SCAN_CACHE = os.path.join(
     os.path.dirname(__file__), '../../python/data/advisor_scan.json')
 _SCAN_TTL = 6 * 3600
 
+# Mac 离线算好的诚实盈利回测 (backtest_advisor.py), 服务器只读, 不实时跑 walk-forward
+_BT_DIR = os.path.join(os.path.dirname(__file__), '../../python/models/add_advisor')
+_BT_PORTFOLIO = os.path.join(_BT_DIR, 'backtest_portfolio.json')
+_BT_SIGNALS = os.path.join(_BT_DIR, 'backtest_signals.json')
+_bt_signals_cache = None   # 懒加载, 全局缓存 (~300KB)
+
+
+def _load_bt_signals():
+    global _bt_signals_cache
+    if _bt_signals_cache is not None:
+        return _bt_signals_cache
+    if not os.path.exists(_BT_SIGNALS):
+        return {}
+    try:
+        with open(_BT_SIGNALS) as f:
+            _bt_signals_cache = json.load(f)
+    except Exception:
+        _bt_signals_cache = {}
+    return _bt_signals_cache
+
 
 def _load_advisor():
     """加载模型 + 构建 pipeline, 全局缓存 (与 forecast_routes 同范式)。
@@ -215,3 +235,80 @@ def advisor_scan():
         pass
     payload['cached'] = False
     return jsonify(payload)
+
+
+@advisor_bp.route('/advisor/backtest', methods=['GET'])
+def advisor_backtest():
+    """返回 Mac 离线算好的诚实盈利回测 (横截面 top-K / long-short / 基准)。
+
+    walk-forward 太重不在 1.8GB 服务器实时跑; 直接读 backtest_portfolio.json。
+    """
+    if not os.path.exists(_BT_PORTFOLIO):
+        return jsonify({
+            'status': 'error',
+            'message': '回测结果未就绪 (backtest_portfolio.json 缺失), '
+                       '请在 Mac 跑 python strategy/backtest_advisor.py 后提交',
+        }), 200
+    try:
+        with open(_BT_PORTFOLIO) as f:
+            portfolio = json.load(f)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'回测文件解析失败: {e}'}), 200
+    portfolio['status'] = 'success'
+    return jsonify(portfolio)
+
+
+@advisor_bp.route('/advisor/predict/<path:symbol>', methods=['GET'])
+def advisor_predict(symbol):
+    """单只 20 日预测: 当前信号 (score_holding) + OOS 历史摘要 (backtest_signals)。"""
+    adv = _load_advisor()
+    if adv is None:
+        return jsonify({
+            'status': 'error',
+            'message': '补仓顾问模型未就绪 (models/add_advisor/model.pkl 缺失)',
+        }), 200
+
+    data = adv['data']
+    pipeline = adv['pipeline']
+    a2_ok = data.get('a2_usable', False)
+    a3_ok = data.get('a3_usable', False)
+
+    conn = sqlite3.connect(get_db_path())
+    try:
+        s = score_holding(conn, pipeline, symbol, data['feat_names'],
+                          data['reg'], data['clf_s'], data['clf_tb'])
+    except Exception as e:
+        s = None
+        err = str(e)
+    finally:
+        conn.close()
+
+    current = None
+    if s is not None:
+        current = {
+            'dataDate': s['date'],
+            'lastPrice': round(s['last'], 3),
+            'rsi': round(s['rsi'], 0),
+            'candidate': bool(s['cand']),
+            'ret20Pred': round(s['reg'], 4),
+            'upProb': round(s['pup'], 3),
+            'tpProb': round(s['ptp'], 3),
+            'tpPrice': round(s['tp_price'], 3),
+            'slPrice': round(s['sl_price'], 3),
+            'verdict': _verdict(s, a2_ok, a3_ok),
+        }
+
+    oos = _load_bt_signals().get(symbol)
+
+    return jsonify({
+        'status': 'success',
+        'symbol': symbol,
+        'horizon': data.get('horizon'),
+        'trainDate': data.get('train_date'),
+        'a2Usable': a2_ok,
+        'a3Usable': a3_ok,
+        'current': current,
+        'oos': oos,   # {n, dir_acc, hit_rate_up, mean_ret_up_net, series:[{date,pred,actual}]}
+        'caveat': 'edge 薄(横截面 rank-IC≈0.05); 单只择时不如买入持有, 仅作方向参考。'
+                  '港股/ETF 无宏观情绪特征(填0), 置信度更低。已扣成本。',
+    })
