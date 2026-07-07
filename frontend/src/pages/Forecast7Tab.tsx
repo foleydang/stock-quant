@@ -28,20 +28,11 @@ interface CurrentSignal {
   slPrice: number;
   verdict: string;
 }
-interface OosSeriesPt { date: string; pred: number; actual: number; }
-interface Oos {
-  n: number;
-  dir_acc: number;
-  hit_rate_up: number | null;
-  mean_ret_up_net: number | null;
-  series: OosSeriesPt[];
-}
 interface PredictData {
   status: string;
   symbol: string;
   horizon: number;
   current: CurrentSignal | null;
-  oos: Oos | null;
   caveat: string;
 }
 
@@ -84,7 +75,6 @@ export default function Forecast7Tab({ symbol }: Props) {
   if (!data) return <Card style={{ textAlign: 'center', padding: 40, background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}><p style={{ color: TEXT_DIM }}>{msg || '暂无预测数据'}</p></Card>;
 
   const c = data.current;
-  const oos = data.oos;
 
   const verdictTag = (v: string) => {
     if (v.includes('补') && !v.includes('不')) return <Tag color="green" style={{ fontSize: 14 }}><RiseOutlined /> {v}</Tag>;
@@ -92,20 +82,27 @@ export default function Forecast7Tab({ symbol }: Props) {
     return <Tag color="gold" style={{ fontSize: 14 }}>{v}</Tag>;
   };
 
-  // OOS 预测 vs 实际 (月度采样序列)
-  const oosChart = oos && oos.series.length ? {
-    labels: oos.series.map((p) => p.date.slice(2)),
+  // 未来 HORIZON 个交易日的预测: 模型只给累计终点(目标价), 逐日波动无法诚实预测
+  // 画一条"到目标价的隐含平均漂移"直线 + 止盈/止损参考线, 只示意方向
+  const days = data.horizon;
+  const target = c ? c.lastPrice * (1 + c.ret20Pred) : 0;
+  const up = c ? c.ret20Pred >= 0 : true;
+  const fwdChart = c ? {
+    labels: Array.from({ length: days + 1 }, (_, i) => (i === 0 ? '今日' : `T+${i}`)),
     datasets: [
-      { label: '预测20日收益(%)', data: oos.series.map((p) => +(p.pred * 100).toFixed(2)), borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.08)', borderWidth: 2, pointRadius: 2, tension: 0.15, fill: true },
-      { label: '实际20日收益(%)', data: oos.series.map((p) => +(p.actual * 100).toFixed(2)), borderColor: GOLD, borderWidth: 2, pointRadius: 2, tension: 0.15 },
-      { label: '0 轴', data: oos.series.map(() => 0), borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderDash: [3, 3], pointRadius: 0 },
+      { label: '预测路径(隐含平均漂移)', data: Array.from({ length: days + 1 }, (_, i) => +(c.lastPrice + (target - c.lastPrice) * i / days).toFixed(2)), borderColor: up ? '#3fb950' : '#f85149', backgroundColor: up ? 'rgba(63,185,80,0.10)' : 'rgba(248,81,73,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true },
+      { label: '止盈位', data: Array.from({ length: days + 1 }, () => c.tpPrice), borderColor: '#3fb950', borderWidth: 1, borderDash: [5, 4], pointRadius: 0 },
+      { label: '止损位', data: Array.from({ length: days + 1 }, () => c.slPrice), borderColor: '#f85149', borderWidth: 1, borderDash: [5, 4], pointRadius: 0 },
     ],
   } : null;
 
-  const oosOpts = {
+  const fwdOpts = {
     responsive: true, maintainAspectRatio: false,
-    plugins: { title: { display: true, text: `${symbol} 样本外(OOS) 预测 vs 实际 · 20日收益`, color: TEXT_LIGHT, font: { size: 14 } }, legend: { labels: { color: TEXT_DIM } } },
-    scales: { x: { ticks: { color: TEXT_DIM, maxTicksLimit: 14 }, grid: { color: CARD_BORDER } }, y: { ticks: { color: TEXT_DIM, callback: (v: any) => v + '%' }, grid: { color: CARD_BORDER } } },
+    plugins: {
+      title: { display: true, text: `${symbol} 未来 ${days} 交易日预测 · 目标价 ¥${target.toFixed(2)} (${(c ? c.ret20Pred * 100 : 0).toFixed(2)}%)`, color: TEXT_LIGHT, font: { size: 14 } },
+      legend: { labels: { color: TEXT_DIM } },
+    },
+    scales: { x: { ticks: { color: TEXT_DIM, maxTicksLimit: 21 }, grid: { color: CARD_BORDER } }, y: { ticks: { color: TEXT_DIM, callback: (v: any) => '¥' + v }, grid: { color: CARD_BORDER } } },
   };
 
   return (
@@ -135,26 +132,15 @@ export default function Forecast7Tab({ symbol }: Props) {
         </Card>
       )}
 
-      {/* OOS 历史命中率 + 预测vs实际 */}
-      {oos ? (
-        <>
-          <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, marginBottom: 16 }} styles={{ body: { padding: 14 } }}>
-            <Row gutter={16}>
-              <Col span={4}><Statistic title={<span style={{ color: TEXT_DIM }}>OOS 样本数</span>} value={oos.n} valueStyle={{ color: TEXT_LIGHT, fontSize: 22 }} /></Col>
-              <Col span={5}><Statistic title={<span style={{ color: TEXT_DIM }}>方向准确率</span>} value={oos.dir_acc * 100} suffix="%" precision={1} valueStyle={{ color: oos.dir_acc >= 0.5 ? '#3fb950' : '#f85149', fontSize: 22 }} /></Col>
-              <Col span={5}><Statistic title={<span style={{ color: TEXT_DIM }}>预测涨时实际上涨率</span>} value={oos.hit_rate_up != null ? oos.hit_rate_up * 100 : 0} suffix="%" precision={1} valueStyle={{ color: (oos.hit_rate_up ?? 0) >= 0.5 ? '#3fb950' : '#f85149', fontSize: 22 }} /></Col>
-              <Col span={6}><Statistic title={<span style={{ color: TEXT_DIM }}>预测涨时平均净收益(扣成本)</span>} value={oos.mean_ret_up_net != null ? oos.mean_ret_up_net * 100 : 0} suffix="%" precision={2} valueStyle={{ color: (oos.mean_ret_up_net ?? 0) >= 0 ? '#3fb950' : '#f85149', fontSize: 22 }} /></Col>
-            </Row>
-          </Card>
-          {oosChart && (
-            <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }} styles={{ body: { padding: 12 } }}>
-              <div style={{ height: 320 }}><Line data={oosChart} options={oosOpts} plugins={[darkChartPlugin]} /></div>
-            </Card>
-          )}
-        </>
-      ) : (
-        <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, textAlign: 'center', padding: 20 }}>
-          <span style={{ color: TEXT_DIM }}>该股不在回测池 (仅A股池有 OOS 历史), 无预测vs实际记录</span>
+      {/* 未来 N 交易日预测走势 (前瞻, 不含历史) */}
+      {fwdChart && (
+        <Card style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }} styles={{ body: { padding: 12 } }}>
+          <div style={{ height: 320 }}><Line data={fwdChart} options={fwdOpts} plugins={[darkChartPlugin]} /></div>
+          <div style={{ color: TEXT_DIM, fontSize: 12, marginTop: 10, lineHeight: 1.7 }}>
+            ⚠️ 模型只预测<b style={{ color: GOLD }}>未来 {days} 个交易日的累计涨跌</b>(方向 + 幅度 + 概率), <b>并不预测每一天的具体涨跌</b>。
+            上图直线是"到达目标价的隐含平均漂移", 仅示意方向与目标位; 真实走势必然上下波动。
+            逐日涨跌路径无法诚实预测(编造的逐日价格已删除)。请结合止盈/止损位与纪律执行。
+          </div>
         </Card>
       )}
     </div>
