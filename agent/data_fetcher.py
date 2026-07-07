@@ -231,8 +231,7 @@ def get_signals_data() -> Dict:
         all_symbols = [row[0] for row in conn.execute(
             "SELECT symbol FROM kline_30m GROUP BY symbol HAVING COUNT(*) >= 200 ORDER BY symbol"
         ).fetchall()]
-        # 取前200只做截面（限制计算量）
-        all_symbols = all_symbols[:200]
+        # 全量参与截面排名 (原 [:200] 硬截断会让信号塌缩到 ~50 只)
 
         # 获取股票名称
         name_map = {}
