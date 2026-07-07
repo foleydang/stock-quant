@@ -11,7 +11,7 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
-import { Button, Select, Card, Statistic, Row, Col, Tag, Spin, message, Tabs, Slider, Space } from 'antd';
+import { Button, Select, Card, Statistic, Row, Col, Tag, Spin, message, Space } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, RiseOutlined, FallOutlined, AimOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -20,47 +20,42 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 import { stockList } from '../constants/stocks';
 
-interface DailyItem {
-  date: string;
-  actualClose: number;
-  predictedClose: number;
-  avgProb: number;
-  directionAccuracy: number;
+interface SeriesPt { date: string; pred: number; actual: number; }
+interface Oos {
+  n: number;
+  dir_acc: number;
+  hit_rate_up: number | null;
+  mean_ret_up_net: number | null;
+  series: SeriesPt[];
 }
-
-interface ForecastData {
+interface Current {
+  dataDate: string;
+  lastPrice: number;
+  rsi: number;
+  candidate: boolean;
+  ret20Pred: number;
+  upProb: number;
+  tpProb: number;
+  tpPrice: number;
+  slPrice: number;
+  verdict: string;
+}
+interface PredictData {
+  status: string;
   symbol: string;
-  stockName: string;
-  summary: {
-    totalBars: number;
-    overallAccuracy: number;
-    upPrecision: number;
-    downPrecision: number;
-    avgUpProb: number;
-    finalDeviation: number;
-    finalActualPrice: number;
-    finalPredictedPrice: number;
-    months: number;
-    avgUpChange: number;
-    avgDownChange: number;
-  };
-  dailyComparison: DailyItem[];
-  rawPredictions: {
-    dates: string[];
-    probs: number[];
-    actualDirs: number[];
-    actualPrices: number[];
-    predictedPrices: number[];
-  };
+  horizon: number;
+  trainDate: string;
+  a2Usable: boolean;
+  a3Usable: boolean;
+  current: Current | null;
+  oos: Oos | null;
+  caveat: string;
 }
 
 const chartPosition = 'top' as const;
-
-// 金融深色风格主题色
 const CARD_BG = '#242830';
 const CARD_BORDER = '#3a3f4a';
 const GOLD = '#e2b04a';
-const GOLD_DIM = 'rgba(226,176,74,0.15)';
 const TEXT_DIM = 'rgba(255,255,255,0.5)';
 const TEXT_LIGHT = 'rgba(255,255,255,0.85)';
 
@@ -70,23 +65,20 @@ const darkCardStyle: React.CSSProperties = {
   borderRadius: 8,
 };
 
-
+const pct = (x: number | null | undefined, d = 1) =>
+  x === null || x === undefined ? '—' : `${x >= 0 ? '+' : ''}${(x * 100).toFixed(d)}%`;
 
 export default function ForecastAccuracy() {
   const [symbol, setSymbol] = useState('300124.SZ');
-  const [months, setMonths] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ForecastData | null>(null);
+  const [data, setData] = useState<PredictData | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`/api/forecast/accuracy/${symbol}`, {
-        params: { months },
-      });
+      const res = await axios.get(`/api/advisor/predict/${symbol}`);
       if (res.data.status === 'success') {
-        setData(res.data as ForecastData);
-        message.success(`${res.data.stockName} 预测验证完成`);
+        setData(res.data as PredictData);
       } else {
         message.error(res.data.message || '加载失败');
         setData(null);
@@ -100,60 +92,34 @@ export default function ForecastAccuracy() {
 
   useEffect(() => {
     fetchData();
-  }, [symbol, months]);
+  }, [symbol]);
 
-  // 日线对比图
-  const dailyChartData = data?.dailyComparison ? {
-    labels: data.dailyComparison.map((d: DailyItem) => d.date.slice(5)),
+  const oos = data?.oos ?? null;
+  const cur = data?.current ?? null;
+  const dirAcc = oos ? oos.dir_acc * 100 : 0;
+
+  // 预测 20 日收益 vs 实际 20 日收益 (样本外, 月度下采样)
+  const seriesChart = oos && oos.series.length ? {
+    labels: oos.series.map((p) => p.date.slice(0, 7)),
     datasets: [
       {
-        label: '真实价格',
-        data: data.dailyComparison.map((d: DailyItem) => d.actualClose),
+        label: '预测 20 日收益',
+        data: oos.series.map((p) => p.pred * 100),
+        borderColor: '#f0883e',
+        backgroundColor: 'rgba(240,136,62,0.08)',
+        fill: false,
+        pointRadius: 1.5,
+        borderWidth: 2,
+        borderDash: [4, 2],
+      },
+      {
+        label: '实际 20 日收益',
+        data: oos.series.map((p) => p.actual * 100),
         borderColor: '#58a6ff',
         backgroundColor: 'rgba(88,166,255,0.08)',
         fill: true,
         pointRadius: 1.5,
-        pointBackgroundColor: '#58a6ff',
         borderWidth: 2,
-      },
-      {
-        label: '预测价格',
-        data: data.dailyComparison.map((d: DailyItem) => d.predictedClose),
-        borderColor: '#f0883e',
-        backgroundColor: 'rgba(240,136,62,0.08)',
-        fill: true,
-        pointRadius: 1.5,
-        pointBackgroundColor: '#f0883e',
-        borderWidth: 2,
-        borderDash: [4, 2],
-      },
-    ],
-  } : null;
-
-  // 预测概率分布图
-  const probChartData = data?.rawPredictions ? {
-    labels: data.rawPredictions.dates.map((d: string) => {
-      const dt = new Date(d);
-      return `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-    }),
-    datasets: [
-      {
-        label: '上涨概率',
-        data: data.rawPredictions.probs.map((p: number) => p * 100),
-        borderColor: '#3fb950',
-        backgroundColor: 'rgba(63,185,80,0.15)',
-        fill: true,
-        pointRadius: 2,
-        borderWidth: 1.5,
-      },
-      {
-        label: '50%阈值',
-        data: data.rawPredictions.probs.map(() => 50),
-        borderColor: GOLD,
-        borderWidth: 1,
-        borderDash: [3, 3],
-        pointRadius: 0,
-        fill: false,
       },
     ],
   } : null;
@@ -170,38 +136,26 @@ export default function ForecastAccuracy() {
     },
   };
 
-  const dailyChartOptions = {
+  const seriesChartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
-      title: { display: true, text: `预测 vs 真实 — ${data?.stockName || symbol}`, color: TEXT_LIGHT, font: { size: 14 } },
+      title: { display: true, text: `样本外 预测 vs 实际 20 日收益 — ${symbol}`, color: TEXT_LIGHT, font: { size: 14 } },
       legend: { position: chartPosition, labels: { color: TEXT_DIM } },
     },
     scales: {
-      x: { ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } },
-      y: { title: { display: true, text: '价格 (¥)', color: TEXT_DIM }, ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } },
-    },
-  };
-
-  const probChartOptions = {
-    responsive: true,
-    plugins: {
-      title: { display: true, text: '上涨概率分布 (最近40条K线)', color: TEXT_LIGHT, font: { size: 14 } },
-      legend: { position: chartPosition, labels: { color: TEXT_DIM } },
-    },
-    scales: {
-      x: { ticks: { color: TEXT_DIM, maxTicksLimit: 15 }, grid: { color: CARD_BORDER } },
-      y: { title: { display: true, text: '概率 (%)', color: TEXT_DIM }, min: 0, max: 100, ticks: { color: TEXT_DIM }, grid: { color: CARD_BORDER } },
+      x: { ticks: { color: TEXT_DIM, maxTicksLimit: 14 }, grid: { color: CARD_BORDER } },
+      y: { title: { display: true, text: '收益 (%)', color: TEXT_DIM }, ticks: { color: TEXT_DIM, callback: (v: any) => v + '%' }, grid: { color: CARD_BORDER } },
     },
   };
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #1e2229 0%, #1a1e25 100%)' }}>
-      {/* 导航栏 */}
       <div style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', padding: '14px 32px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: 1 }}>
             <AimOutlined style={{ marginRight: 10, color: GOLD }} />
-            LGBM 预测准确性验证
+            预测准确性验证 (样本外 walk-forward)
           </h2>
         </div>
         <Space>
@@ -211,10 +165,18 @@ export default function ForecastAccuracy() {
       </div>
 
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 48px' }}>
-        {/* 控制栏 - 紧凑 */}
-        <Card style={{ ...darkCardStyle, marginBottom: 20, padding: '4px 16px' }} styles={{ body: { padding: '12px 16px' } }}>
+        {/* 诚实 caveat */}
+        <div style={{ background: 'rgba(226,176,74,0.08)', border: `1px solid ${GOLD}`, borderRadius: 6, padding: '10px 14px', marginBottom: 16, color: GOLD, fontSize: 13, lineHeight: 1.6 }}>
+          ⚠️ {data?.caveat || 'edge 薄(横截面 rank-IC≈0.05); 单只择时不如买入持有, 仅作方向参考。已扣成本。'}
+          <div style={{ color: TEXT_DIM, marginTop: 4, fontSize: 12 }}>
+            这里展示的是【样本外(OOS)】真实预测 vs 实际, 非拟合训练集。方向准确率略高于 50% 即为薄 edge, 别期待高胜率。
+          </div>
+        </div>
+
+        {/* 控制栏 */}
+        <Card style={{ ...darkCardStyle, marginBottom: 20 }} styles={{ body: { padding: '12px 16px' } }}>
           <Row gutter={24} align="middle">
-            <Col span={6}>
+            <Col span={8}>
               <div style={{ color: TEXT_DIM, fontSize: 12, marginBottom: 4 }}>选择股票</div>
               <Select
                 value={symbol}
@@ -222,152 +184,149 @@ export default function ForecastAccuracy() {
                 options={stockList}
                 style={{ width: '100%' }}
                 size="middle"
+                showSearch
+                filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
               />
             </Col>
-            <Col span={5}>
-              <div style={{ color: TEXT_DIM, fontSize: 12, marginBottom: 4 }}>验证周期</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Slider min={1} max={6} value={months} onChange={(v: number) => setMonths(v)} style={{ flex: 1, margin: 0 }} />
-                <Tag style={{ background: GOLD_DIM, border: `1px solid ${GOLD}`, color: GOLD, margin: 0 }}>{months}月</Tag>
-              </div>
-            </Col>
-            <Col span={3}>
+            <Col span={4}>
               <Button type="primary" onClick={fetchData} loading={loading} icon={<RiseOutlined />} style={{ background: GOLD, borderColor: GOLD, marginTop: 16 }}>
                 验证
               </Button>
             </Col>
-            <Col span={10}>
+            <Col span={12}>
               {data && (
                 <div style={{ color: TEXT_DIM, fontSize: 12, marginTop: 16 }}>
-                  {data.stockName} · {data.summary.totalBars}条K线 · 终点偏离 {data.summary.finalDeviation > 0 ? '+' : ''}{data.summary.finalDeviation}%
+                  {oos ? `${oos.n} 条 OOS 样本 · 预测周期 ${data.horizon} 交易日` : '该标的不在 A 股训练池 (港股/ETF 无 OOS 历史)'}
                 </div>
               )}
             </Col>
           </Row>
         </Card>
 
-        {loading && <Spin tip="模型验证中..." style={{ display: 'block', margin: '60px auto' }} />}
+        {loading && <Spin tip="加载样本外验证..." style={{ display: 'block', margin: '60px auto' }} />}
 
         {data && !loading && (
           <>
-            {/* 核心指标 - 4列紧凑 */}
-            <Row gutter={12} style={{ marginBottom: 20 }}>
-              <Col span={6}>
-                <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
-                  <Statistic
-                    title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>方向准确率</span>}
-                    value={data.summary.overallAccuracy}
-                    suffix="%"
-                    valueStyle={{ color: data.summary.overallAccuracy >= 55 ? '#3fb950' : '#f85149', fontSize: 28, fontWeight: 700 }}
-                    prefix={data.summary.overallAccuracy >= 55 ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
-                  <Statistic
-                    title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>看涨精确率</span>}
-                    value={data.summary.upPrecision}
-                    suffix="%"
-                    valueStyle={{ color: '#58a6ff', fontSize: 28, fontWeight: 700 }}
-                    prefix={<RiseOutlined />}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
-                  <Statistic
-                    title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>看跌精确率</span>}
-                    value={data.summary.downPrecision}
-                    suffix="%"
-                    valueStyle={{ color: '#f85149', fontSize: 28, fontWeight: 700 }}
-                    prefix={<FallOutlined />}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
-                  <Statistic
-                    title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>终点偏离度</span>}
-                    value={data.summary.finalDeviation}
-                    suffix="%"
-                    valueStyle={{ color: Math.abs(data.summary.finalDeviation) < 5 ? '#3fb950' : GOLD, fontSize: 28, fontWeight: 700 }}
-                  />
-                </Card>
-              </Col>
-            </Row>
+            {/* OOS 核心指标 */}
+            {oos ? (
+              <Row gutter={12} style={{ marginBottom: 20 }}>
+                <Col span={6}>
+                  <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                    <Statistic
+                      title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>方向准确率 (OOS)</span>}
+                      value={dirAcc}
+                      precision={1}
+                      suffix="%"
+                      valueStyle={{ color: dirAcc >= 52 ? '#3fb950' : dirAcc >= 50 ? GOLD : '#f85149', fontSize: 28, fontWeight: 700 }}
+                      prefix={dirAcc >= 50 ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                    />
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                    <Statistic
+                      title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>看涨命中率 (实际涨)</span>}
+                      value={oos.hit_rate_up === null ? 0 : oos.hit_rate_up * 100}
+                      precision={1}
+                      suffix="%"
+                      valueStyle={{ color: '#58a6ff', fontSize: 28, fontWeight: 700 }}
+                      prefix={<RiseOutlined />}
+                    />
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                    <Statistic
+                      title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>预测涨·平均净收益/笔</span>}
+                      value={oos.mean_ret_up_net === null ? 0 : oos.mean_ret_up_net * 100}
+                      precision={2}
+                      suffix="%"
+                      valueStyle={{ color: (oos.mean_ret_up_net ?? 0) >= 0 ? '#3fb950' : '#f85149', fontSize: 28, fontWeight: 700 }}
+                    />
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card style={darkCardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                    <Statistic
+                      title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>OOS 样本数</span>}
+                      value={oos.n}
+                      valueStyle={{ color: TEXT_LIGHT, fontSize: 28, fontWeight: 700 }}
+                    />
+                  </Card>
+                </Col>
+              </Row>
+            ) : (
+              <Card style={{ ...darkCardStyle, marginBottom: 20 }} styles={{ body: { padding: 24, textAlign: 'center' } }}>
+                <span style={{ color: TEXT_DIM }}>该标的不在 A 股训练池, 无样本外历史。下方仅显示当前信号 (若模型可打分)。</span>
+              </Card>
+            )}
 
-            {/* 图表 Tabs */}
-            <Tabs
-              items={[
-                {
-                  key: 'daily',
-                  label: <span style={{ color: TEXT_LIGHT }}>📊 日线对比</span>,
-                  children: dailyChartData ? (
-                    <Card style={darkCardStyle} styles={{ body: { padding: '12px 16px' } }}>
-                      <Line data={dailyChartData} options={dailyChartOptions} plugins={[darkChartPlugin]} />
-                      <div style={{ color: TEXT_DIM, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
-                        蓝=真实 · 橙虚线=预测模拟 · 偏离越小模型越准
-                      </div>
-                    </Card>
-                  ) : null,
-                },
-                {
-                  key: 'prob',
-                  label: <span style={{ color: TEXT_LIGHT }}>📈 概率分布</span>,
-                  children: probChartData ? (
-                    <Card style={darkCardStyle} styles={{ body: { padding: '12px 16px' } }}>
-                      <Line data={probChartData} options={probChartOptions} plugins={[darkChartPlugin]} />
-                      <div style={{ color: TEXT_DIM, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
-                        概率{'>'}50%=看涨 · 金线=分界线
-                      </div>
-                    </Card>
-                  ) : null,
-                },
-                {
-                  key: 'table',
-                  label: <span style={{ color: TEXT_LIGHT }}>📋 逐日明细</span>,
-                  children: (
-                    <Card style={darkCardStyle} styles={{ body: { padding: '8px 12px' } }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: TEXT_LIGHT }}>
-                        <thead>
-                          <tr style={{ borderBottom: `2px solid ${GOLD}` }}>
-                            <th style={{ padding: 8, textAlign: 'left' }}>日期</th>
-                            <th style={{ padding: 8 }}>真实</th>
-                            <th style={{ padding: 8 }}>预测</th>
-                            <th style={{ padding: 8 }}>偏离</th>
-                            <th style={{ padding: 8 }}>概率</th>
-                            <th style={{ padding: 8 }}>准确率</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.dailyComparison.map((d: DailyItem) => {
-                            const dev = ((d.predictedClose - d.actualClose) / d.actualClose * 100).toFixed(2);
-                            const devNum = Math.abs(parseFloat(dev));
-                            return (
-                              <tr key={d.date} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}>
-                                <td style={{ padding: 6 }}>{d.date.slice(5)}</td>
-                                <td style={{ padding: 6, textAlign: 'center' }}>¥{d.actualClose.toFixed(2)}</td>
-                                <td style={{ padding: 6, textAlign: 'center' }}>¥{d.predictedClose.toFixed(2)}</td>
-                                <td style={{ padding: 6, textAlign: 'center' }}>
-                                  <span style={{ color: devNum < 3 ? '#3fb950' : devNum < 8 ? GOLD : '#f85149' }}>{dev}%</span>
-                                </td>
-                                <td style={{ padding: 6, textAlign: 'center' }}>
-                                  <span style={{ color: d.avgProb >= 0.5 ? '#58a6ff' : '#f85149' }}>{(d.avgProb * 100).toFixed(0)}%</span>
-                                </td>
-                                <td style={{ padding: 6, textAlign: 'center' }}>
-                                  <span style={{ color: d.directionAccuracy >= 55 ? '#3fb950' : '#f85149' }}>{d.directionAccuracy.toFixed(0)}%</span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </Card>
-                  ),
-                },
-              ]}
-            />
+            {/* 当前信号 */}
+            {cur && (
+              <Card
+                title={<span style={{ color: GOLD }}>当前 {data.horizon} 日信号 · 数据截至 {cur.dataDate}</span>}
+                style={{ ...darkCardStyle, marginBottom: 20 }}
+                styles={{ body: { padding: '14px 16px' } }}
+              >
+                <Row gutter={16}>
+                  <Col span={5}><Statistic title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>预测 20 日收益</span>} value={cur.ret20Pred * 100} precision={2} suffix="%" valueStyle={{ color: cur.ret20Pred >= 0 ? '#3fb950' : '#f85149', fontSize: 20 }} prefix={cur.ret20Pred >= 0 ? <RiseOutlined /> : <FallOutlined />} /></Col>
+                  <Col span={4}><Statistic title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>上涨概率</span>} value={cur.upProb * 100} precision={0} suffix="%" valueStyle={{ color: '#58a6ff', fontSize: 20 }} /></Col>
+                  <Col span={4}><Statistic title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>P(先触止盈)</span>} value={cur.tpProb * 100} precision={0} suffix="%" valueStyle={{ color: TEXT_LIGHT, fontSize: 20 }} /></Col>
+                  <Col span={4}><Statistic title={<span style={{ color: TEXT_DIM, fontSize: 12 }}>止盈 / 止损</span>} value={cur.tpPrice} precision={2} suffix={` / ${cur.slPrice}`} valueStyle={{ color: TEXT_LIGHT, fontSize: 16 }} /></Col>
+                  <Col span={7}>
+                    <div style={{ color: TEXT_DIM, fontSize: 12, marginBottom: 4 }}>建议</div>
+                    <div>
+                      {cur.candidate ? <Tag color="orange">补仓候选态</Tag> : <Tag>非候选态</Tag>}
+                      <span style={{ color: TEXT_LIGHT, fontSize: 13 }}>RSI {cur.rsi}</span>
+                    </div>
+                    <div style={{ color: TEXT_LIGHT, fontSize: 12, marginTop: 4 }}>{cur.verdict}</div>
+                  </Col>
+                </Row>
+              </Card>
+            )}
+
+            {/* 预测 vs 实际曲线 */}
+            {seriesChart && (
+              <Card style={{ ...darkCardStyle, marginBottom: 20 }} styles={{ body: { padding: '12px 16px' } }}>
+                <div style={{ height: 320 }}>
+                  <Line data={seriesChart} options={seriesChartOptions} plugins={[darkChartPlugin]} />
+                </div>
+                <div style={{ color: TEXT_DIM, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
+                  橙虚线=模型预测的 20 日收益 · 蓝=实际实现的 20 日收益 · 两线同向多即方向 edge 成立 (月度下采样)
+                </div>
+              </Card>
+            )}
+
+            {/* 逐条明细 */}
+            {oos && oos.series.length > 0 && (
+              <Card style={darkCardStyle} styles={{ body: { padding: '8px 12px' } }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: TEXT_LIGHT }}>
+                  <thead>
+                    <tr style={{ borderBottom: `2px solid ${GOLD}` }}>
+                      <th style={{ padding: 8, textAlign: 'left' }}>日期</th>
+                      <th style={{ padding: 8 }}>预测 20 日</th>
+                      <th style={{ padding: 8 }}>实际 20 日</th>
+                      <th style={{ padding: 8 }}>方向</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {oos.series.map((p) => {
+                      const same = (p.pred >= 0) === (p.actual >= 0);
+                      return (
+                        <tr key={p.date} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}>
+                          <td style={{ padding: 6 }}>{p.date}</td>
+                          <td style={{ padding: 6, textAlign: 'center', color: p.pred >= 0 ? '#3fb950' : '#f85149' }}>{pct(p.pred, 2)}</td>
+                          <td style={{ padding: 6, textAlign: 'center', color: p.actual >= 0 ? '#3fb950' : '#f85149' }}>{pct(p.actual, 2)}</td>
+                          <td style={{ padding: 6, textAlign: 'center' }}>
+                            {same ? <Tag color="green">✓</Tag> : <Tag color="red">✗</Tag>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Card>
+            )}
           </>
         )}
       </div>

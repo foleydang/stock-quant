@@ -192,16 +192,37 @@ def get_positions():
         cursor = conn.cursor()
         cursor.execute('SELECT symbol, stock_name, shares, cost_price, current_price FROM positions')
         rows = cursor.fetchall()
+
+        # 用 kline_daily 最新收盘价刷新现价 (存表里的 current_price 只是最后一次成交价, 会失真)
+        def _latest_close(sym):
+            try:
+                cursor.execute(
+                    'SELECT close FROM kline_daily WHERE symbol=? ORDER BY date DESC LIMIT 1', (sym,)
+                )
+                row = cursor.fetchone()
+                return float(row[0]) if row and row[0] is not None else None
+            except Exception:
+                return None
+
+        positions = []
+        for r in rows:
+            cost = float(r[3]) if r[3] is not None else 0.0
+            stored_current = float(r[4]) if r[4] is not None else cost
+            live = _latest_close(r[0])
+            current = live if live is not None else stored_current
+            profit = current - cost  # 每股盈亏 (前端汇总用 profit*shares)
+            profit_pct = (profit / cost * 100) if cost else 0.0
+            positions.append({
+                'symbol': r[0],
+                'name': r[1],
+                'shares': int(r[2]),
+                'cost': cost,
+                'current': current,
+                'profit': round(profit, 3),
+                'profit_pct': round(profit_pct, 2),
+            })
+
         conn.close()
-        
-        positions = [{
-            'symbol': r[0],
-            'name': r[1],
-            'shares': int(r[2]),
-            'cost': float(r[3]),
-            'current': float(r[4])
-        } for r in rows]
-        
         return jsonify({'status': 'success', 'positions': positions})
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 500
