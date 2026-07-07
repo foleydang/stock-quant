@@ -196,80 +196,31 @@ def run_backtest(symbol):
 
 @strategy_bp.route("/select", methods=["GET"])
 def select_stocks():
-    """股票筛选 - 添加缓存优化"""
-    # 检查缓存
-    cached = get_cache('select_stocks', ttl=300)  # 5分钟缓存
-    if cached:
-        return jsonify(cached)
-    
-    try:
-        import sqlite3
-        from config_loader import get_db_path
-        
-        conn = sqlite3.connect(get_db_path())
-        cursor = conn.cursor()
-        
-        # 获取有足够数据的股票
-        cursor.execute("""
-            SELECT symbol, COUNT(*) as cnt, 
-                   AVG(close) as avg_price,
-                   MAX(close) as max_price,
-                   MIN(close) as min_price
-            FROM kline_30m 
-            GROUP BY symbol 
-            HAVING cnt > 50
-            ORDER BY cnt DESC
-            LIMIT 20
-        """)
-        rows = cursor.fetchall()
-        
-        stocks = []
-        for r in rows:
-            symbol = r[0]
-            cnt = r[1]
-            avg_price = float(r[2])
-            volatility = (r[3] - r[4]) / avg_price * 100 if avg_price > 0 else 0
-            
-            # 获取股票名称
-            cursor.execute("SELECT name FROM stock_info WHERE symbol=?", (symbol,))
-            row_name = cursor.fetchone()
-            name = row_name[0] if row_name and row_name[0] else symbol
-            
-            # 获取最新价格
-            cursor.execute("SELECT close FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 1", (symbol,))
-            row_price = cursor.fetchone()
-            current_price = float(row_price[0]) if row_price else 0
-            
-            stocks.append({
-                "symbol": symbol,
-                "name": name,
-                "current_price": round(current_price, 2),
-                "data_count": cnt,
-                "avg_price": round(avg_price, 2),
-                "volatility": round(volatility, 2),
-                "trend": "up" if volatility > 5 else "stable",
-            "maxDrawdown": 0,
-            "tradeCount": 0,
-            "winRate": 0,
-            "profitRate": 0,
-            "predicted_return": round((current_price - avg_price) / avg_price * 100, 2) if avg_price > 0 else 0,
-            })
-        
-        conn.close()
-        
-        result = {
-            "status": "success",
-            "stocks": stocks,
-            "selected_stocks": stocks[:5]
-        }
-        set_cache('select_stocks', result)  # 保存缓存
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
+    """[已退役] 旧"选股"的 predicted_return 实为 (现价-历史均价)/历史均价, 与预测无关;
+    "选股"仅按数据条数取前若干只, 非真实信号。诚实口径改用 add_advisor 横截面排名:
+    GET /api/advisor/scan (?refresh=1 手动重算)。"""
+    return jsonify({
+        'status': 'error', 'retired': True,
+        'message': '该选股接口已退役 (predicted_return 实为价格偏离历史均价, 并非模型预测)。'
+                   '请改用 /api/advisor/scan 获取 add_advisor 的诚实横截面排名。',
+        'redirect': '/api/advisor/scan',
+    }), 410
+
 
 @strategy_bp.route("/lgbm_backtest/<symbol>", methods=["GET"])
 def lgbm_backtest(symbol):
-    """LGBM回测 - 使用真实训练模型"""
+    """[已退役] 依赖存在数据泄漏的 LGBMBacktesterOptimized(lgb_30m 血统), 结果不可信。
+    诚实盈利口径改用 add_advisor 横截面回测: GET /api/advisor/backtest。"""
+    return jsonify({
+        'status': 'error', 'retired': True,
+        'message': '该回测接口已退役 (底层 lgb 模型有数据泄漏)。'
+                   '请改用 /api/advisor/backtest 获取诚实的横截面回测口径。',
+        'redirect': '/api/advisor/backtest',
+    }), 410
+
+
+def _lgbm_backtest_legacy(symbol):
+    """[dead code, 保留仅供参考] 原泄漏回测实现, 已不服务化。"""
     try:
         import sys
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "python"))
