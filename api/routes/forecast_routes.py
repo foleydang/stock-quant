@@ -607,7 +607,19 @@ def forecast_stats():
 
 @forecast_bp.route('/forecast/accuracy/<symbol>', methods=['GET'])
 def forecast_accuracy(symbol):
-    """预测准确性验证"""
+    """已退役: 旧准确性验证基于泄漏的 lgb_hs300(v9)模型 + kline_30m, 上线特征名
+    0/56 匹配→全零输入→恒定输出, 非诚实。前端 预测验证 页已改指向
+    /api/advisor/predict/<symbol>(add_advisor 的样本外 OOS 验证)。"""
+    return jsonify({
+        'status': 'error',
+        'gone': True,
+        'message': '该接口已退役 (旧模型泄漏且上线特征不匹配)。'
+                   '请改用 /api/advisor/predict/%s 查看诚实的样本外验证。' % symbol,
+    }), 410
+
+
+def _forecast_accuracy_legacy(symbol):
+    """预测准确性验证 (泄漏, 保留仅供参考, 未注册路由)"""
     months = int(request.args.get('months', 1))
     step = int(request.args.get('step', 1))
 

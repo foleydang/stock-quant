@@ -146,10 +146,11 @@ const PositionManager: React.FC = () => {
     }
   ];
 
-  // 计算汇总
-  const totalProfit = positions.reduce((sum, p) => sum + p.profit * p.shares, 0);
-  const totalCost = positions.reduce((sum, p) => sum + p.cost * p.shares, 0);
-  const totalValue = positions.reduce((sum, p) => sum + p.current * p.shares, 0);
+  // 计算汇总 (后端已返回每股 profit; 用 ?? 0 兜底避免 NaN)
+  const totalProfit = positions.reduce((sum, p) => sum + (p.profit ?? 0) * (p.shares ?? 0), 0);
+  const totalCost = positions.reduce((sum, p) => sum + (p.cost ?? 0) * (p.shares ?? 0), 0);
+  const totalValue = positions.reduce((sum, p) => sum + (p.current ?? 0) * (p.shares ?? 0), 0);
+  const totalReturnPct = totalCost ? (totalProfit / totalCost) * 100 : 0;
 
   return (
     <Card title="持仓管理">
@@ -170,9 +171,9 @@ const PositionManager: React.FC = () => {
           />
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Statistic 
-            title="收益率" 
-            value={totalProfit / totalCost * 100} 
+          <Statistic
+            title="收益率"
+            value={totalReturnPct}
             precision={1}
             suffix="%"
             valueStyle={{ color: totalProfit >= 0 ? '#3f8600' : '#cf1322' }}
