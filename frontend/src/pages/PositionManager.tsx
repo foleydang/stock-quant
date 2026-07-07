@@ -205,7 +205,7 @@ const PositionManager: React.FC = () => {
 
       {advisorMeta && (
         <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fffbe6',
-                      border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12 }}>
+                      border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12, color: '#614700' }}>
           {advisorMeta.error
             ? <span>⚠️ 补仓顾问: {advisorMeta.error}</span>
             : <span>
