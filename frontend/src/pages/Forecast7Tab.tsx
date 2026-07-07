@@ -85,12 +85,14 @@ export default function Forecast7Tab({ symbol }: Props) {
   // 未来 HORIZON 个交易日的预测: 模型只给累计终点(目标价), 逐日波动无法诚实预测
   // 画一条"到目标价的隐含平均漂移"直线 + 止盈/止损参考线, 只示意方向
   const days = data.horizon;
+  // ETF(15/16/51/56/58 开头) 报价 3 位小数, 普通股票 2 位
+  const priceDecimals = /^(15|16|51|56|58)/.test(symbol) ? 3 : 2;
   const target = c ? c.lastPrice * (1 + c.ret20Pred) : 0;
   const up = c ? c.ret20Pred >= 0 : true;
   const fwdChart = c ? {
     labels: Array.from({ length: days + 1 }, (_, i) => (i === 0 ? '今日' : `T+${i}`)),
     datasets: [
-      { label: '预测路径(隐含平均漂移)', data: Array.from({ length: days + 1 }, (_, i) => +(c.lastPrice + (target - c.lastPrice) * i / days).toFixed(2)), borderColor: up ? '#3fb950' : '#f85149', backgroundColor: up ? 'rgba(63,185,80,0.10)' : 'rgba(248,81,73,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true },
+      { label: '预测路径(隐含平均漂移)', data: Array.from({ length: days + 1 }, (_, i) => +(c.lastPrice + (target - c.lastPrice) * i / days).toFixed(priceDecimals)), borderColor: up ? '#3fb950' : '#f85149', backgroundColor: up ? 'rgba(63,185,80,0.10)' : 'rgba(248,81,73,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true },
       { label: '止盈位', data: Array.from({ length: days + 1 }, () => c.tpPrice), borderColor: '#3fb950', borderWidth: 1, borderDash: [5, 4], pointRadius: 0 },
       { label: '止损位', data: Array.from({ length: days + 1 }, () => c.slPrice), borderColor: '#f85149', borderWidth: 1, borderDash: [5, 4], pointRadius: 0 },
     ],
@@ -99,10 +101,10 @@ export default function Forecast7Tab({ symbol }: Props) {
   const fwdOpts = {
     responsive: true, maintainAspectRatio: false,
     plugins: {
-      title: { display: true, text: `${symbol} 未来 ${days} 交易日预测 · 目标价 ¥${target.toFixed(2)} (${(c ? c.ret20Pred * 100 : 0).toFixed(2)}%)`, color: TEXT_LIGHT, font: { size: 14 } },
+      title: { display: true, text: `${symbol} 未来 ${days} 交易日预测 · 目标价 ¥${target.toFixed(priceDecimals)} (${(c ? c.ret20Pred * 100 : 0).toFixed(2)}%)`, color: TEXT_LIGHT, font: { size: 14 } },
       legend: { labels: { color: TEXT_DIM } },
     },
-    scales: { x: { ticks: { color: TEXT_DIM, maxTicksLimit: 21 }, grid: { color: CARD_BORDER } }, y: { ticks: { color: TEXT_DIM, callback: (v: any) => '¥' + v }, grid: { color: CARD_BORDER } } },
+    scales: { x: { ticks: { color: TEXT_DIM, maxTicksLimit: 21 }, grid: { color: CARD_BORDER } }, y: { ticks: { color: TEXT_DIM, callback: (v: any) => '¥' + Number(v).toFixed(priceDecimals) }, grid: { color: CARD_BORDER } } },
   };
 
   return (
