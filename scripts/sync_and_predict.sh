@@ -10,7 +10,7 @@ echo "=== $(date '+%Y-%m-%d %H:%M:%S') 盘后同步开始 ==="
 
 # 1. A股日线数据同步 (Tushare)
 echo "📡 拉取A股日线 (Tushare)..."
-cd python && python3 strategy/data_sync.py --daily-only && cd ..
+cd python && /root/miniconda3/bin/python strategy/data_sync.py --daily-only && cd ..
 echo ""
 
 # 2. 港股+ETF数据同步 (yfinance, 需要 miniconda python)
@@ -20,7 +20,7 @@ echo ""
 
 # 3. 跑预测
 echo "📊 跑预测..."
-cd python && python3 strategy/predict_today_batched.py --batch 500 && cd ..
+cd python && /root/miniconda3/bin/python strategy/predict_today_batched.py --batch 500 && cd ..
 echo ""
 
 # 4. 上传 OSS
