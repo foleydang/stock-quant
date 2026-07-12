@@ -42,6 +42,15 @@ try:
 except ImportError:
     EMAIL_AVAILABLE = False
 
+# 飞书 Bot API 通知
+try:
+    sys.path.insert(0, os.path.join(BASE_DIR, 'agent'))
+    from feishu_client import send_text as _feishu_send_text
+    from config import FEISHU_TARGET_CHAT_ID
+    FEISHU_AVAILABLE = bool(FEISHU_TARGET_CHAT_ID)
+except Exception:
+    FEISHU_AVAILABLE = False
+
 try:
     from strategy.features import FeaturePipeline, rename_features_for_model
     FEATURE_ENGINEER_AVAILABLE = True
@@ -65,6 +74,19 @@ try:
     T_STRATEGY_AVAILABLE = True
 except ImportError:
     T_STRATEGY_AVAILABLE = False
+
+
+def _json_default(obj):
+    """JSON 序列化：处理 numpy 类型"""
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    raise TypeError(f'Object of type {type(obj).__name__} not serializable')
 
 
 @dataclass
@@ -352,7 +374,7 @@ class TradingMonitor:
         conn.close()
         return t_suggestions
 
-    def run(self, send_email: bool = True):
+    def run(self, send_email: bool = True, send_feishu: bool = False):
         """执行监控"""
         print("\n" + "=" * 70)
         print(f"交易监控 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -450,6 +472,10 @@ class TradingMonitor:
         # 发送邮件
         if send_email and self.email_notifier:
             self._send_email(positions, suggestions, total_cost, total_value, total_profit, t_suggestions)
+
+        # 发送飞书
+        if send_feishu and FEISHU_AVAILABLE:
+            self._send_feishu(positions, suggestions, total_cost, total_value, total_profit, t_suggestions)
 
         # 保存结果
         self._save_result(positions, suggestions, total_cost, total_value, total_profit)
@@ -710,6 +736,77 @@ class TradingMonitor:
 
         self.email_notifier.send(subject, text, html)
 
+    def _send_feishu(self, positions, suggestions, total_cost, total_value, total_profit, t_suggestions=None):
+        """通过飞书 Bot API 发送持仓日报"""
+        if t_suggestions is None:
+            t_suggestions = []
+
+        # 获取关注股票价格
+        conn = self._get_conn()
+        watchlist_prices = []
+        for stock in self.watchlist:
+            df = pd.read_sql_query('SELECT close FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 1', conn, params=(stock['symbol'],))
+            if not df.empty:
+                price = float(df['close'].iloc[0])
+                watchlist_prices.append({'symbol': stock['symbol'], 'name': stock['name'], 'price': price})
+        conn.close()
+
+        total_profit_pct = total_profit / total_cost * 100 if total_cost > 0 else 0
+
+        NL = '\n'
+        lines = []
+        lines.append(f"📊 持仓日报 - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"{'='*40}")
+        lines.append(f"投入本金: ¥{total_cost:,.0f}")
+        lines.append(f"持仓市值: ¥{total_value:,.0f}")
+        lines.append(f"浮动盈亏: ¥{total_profit:,.0f} ({total_profit_pct:+.1f}%)")
+        lines.append(f"可用现金: ¥{self.available_cash:,.0f}")
+        lines.append('')
+
+        lines.append('【持仓明细】')
+        for s in sorted(suggestions, key=lambda x: x['profit_pct'], reverse=True):
+            emoji = '📈' if s['profit'] > 0 else '📉'
+            pred = f"30m:{s['up_prob']:+.3f}"
+            if s.get('daily_pred') is not None:
+                pred += f" 日线:{s['daily_pred']:+.3f}"
+            lines.append(f"{emoji} {s['stock_name']}: {s['shares']}股 @ ¥{s['cost_price']:.2f} → ¥{s['current_price']:.2f}")
+            lines.append(f"   盈亏: ¥{s['profit']:,.0f} ({s['profit_pct']:+.1f}%) | {pred}")
+            action_emoji = {'补仓': '🟢', '减仓': '🔴', '持有': '⚪', '观望': '⚠️'}.get(s['action'], '⚪')
+            lines.append(f"   {action_emoji} {s['action']}: {s['reason']}")
+
+        if watchlist_prices:
+            lines.append('')
+            lines.append('【关注股票】')
+            for w in watchlist_prices:
+                lines.append(f"👀 {w['name']}: ¥{w['price']:.2f}")
+
+        if t_suggestions:
+            lines.append('')
+            lines.append('【做T建议】')
+            for t in t_suggestions:
+                action_emoji = {'适合做T': '🟢', '可减仓': '🔵', '观望': '⚠️', '不建议': '❌'}.get(t['action'], '⚪')
+                support_str = f"¥{t['support_price']:.2f}" if t['support_price'] else "-"
+                resistance_str = f"¥{t['resistance_price']:.2f}" if t['resistance_price'] else "-"
+                lines.append(f"{action_emoji} {t['stock_name']}: 现价¥{t['current_price']:.2f} 支撑{support_str} 阻力{resistance_str}")
+                lines.append(f"   {t['reason']}")
+                if t['buy_price'] and t['buy_shares']:
+                    lines.append(f"   💰 买入: ¥{t['buy_price']:.2f} × {t['buy_shares']}股")
+                if t['sell_price'] and t['sell_shares']:
+                    lines.append(f"   💵 卖出: ¥{t['sell_price']:.2f} × {t['sell_shares']}股")
+
+        lines.append('')
+        lines.append(f"熊市策略：不割肉、坚持做T、逢低补仓")
+
+        text = NL.join(lines)
+        try:
+            ok = _feishu_send_text(FEISHU_TARGET_CHAT_ID, text)
+            if ok:
+                print(f"✓ 飞书消息已发送")
+            else:
+                print(f"✗ 飞书消息发送失败")
+        except Exception as e:
+            print(f"✗ 飞书消息发送异常: {e}")
+
     def _save_result(self, positions, suggestions, total_cost, total_value, total_profit):
         """保存结果"""
         os.makedirs(LOGS_DIR, exist_ok=True)
@@ -726,7 +823,7 @@ class TradingMonitor:
         }
         result_file = os.path.join(LOGS_DIR, f'monitor_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json')
         with open(result_file, 'w', encoding='utf-8') as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
+            json.dump(result, f, ensure_ascii=False, indent=2, default=_json_default)
         print(f"✓ 结果已保存")
 
 
@@ -735,6 +832,7 @@ def main():
     parser = argparse.ArgumentParser(description='交易监控')
     parser.add_argument('--update', action='store_true', help='仅更新数据')
     parser.add_argument('--no-email', action='store_true', help='不发送邮件')
+    parser.add_argument('--feishu', action='store_true', help='发送飞书消息')
     args = parser.parse_args()
 
     monitor = TradingMonitor()
@@ -742,7 +840,7 @@ def main():
     if args.update:
         monitor.update_prices()
     else:
-        monitor.run(send_email=not args.no_email)
+        monitor.run(send_email=not args.no_email, send_feishu=args.feishu)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Statistic, Row, Col, Tag, Button, Modal, Form, InputNumber, Input, message, Space } from 'antd';
-import { RiseOutlined, FallOutlined, PlusOutlined, EditOutlined, DeleteOutlined, StockOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, StockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -93,33 +93,24 @@ const PositionManager: React.FC = () => {
   };
 
   const columns = [
-    { title: '股票代码', dataIndex: 'symbol', key: 'symbol', width: 100 },
-    { title: '名称', dataIndex: 'name', key: 'name', width: 120, ellipsis: true },
-    { title: '股数', dataIndex: 'shares', key: 'shares', width: 90, render: (v: number) => v.toLocaleString() },
-    { title: '成本价', dataIndex: 'cost', key: 'cost', width: 90, render: (v: number) => `¥${v?.toFixed(2) || 0}` },
-    { title: '现价', dataIndex: 'current', key: 'current', width: 90, render: (v: number) => `¥${v?.toFixed(2) || 0}` },
-    {
-      title: '盈亏',
-      dataIndex: 'profit',
+    { title: '股票代码', dataIndex: 'symbol', key: 'symbol', width: 120 },
+    { title: '名称', dataIndex: 'name', key: 'name', width: 140 },
+    { title: '股数', dataIndex: 'shares', key: 'shares', render: (v: number) => v.toLocaleString() },
+    { title: '成本价', dataIndex: 'cost', key: 'cost', render: (v: number) => `¥${v?.toFixed(2) || 0}` },
+    { title: '现价', dataIndex: 'current', key: 'current', render: (v: number) => `¥${v?.toFixed(2) || 0}` },
+    { 
+      title: '盈亏', 
       key: 'profit',
       width: 130,
-      // 后端 profit 是"每股盈亏"(现价-成本); 这里 ×股数 才是该股的实际持仓盈亏
-      render: (v: number, record: any) => {
-        const total = (v ?? 0) * (record.shares ?? 0);
+      render: (_: any, record: any) => {
+        const totalPnl = (record.profit ?? record.current - record.cost) * record.shares;
+        const pct = record.profit_pct ?? (record.cost ? (record.current - record.cost) / record.cost * 100 : 0);
         return (
-          <span style={{ color: total >= 0 ? '#3fb950' : '#f85149', fontWeight: 600, whiteSpace: 'nowrap' }}>
-            {total >= 0 ? <RiseOutlined /> : <FallOutlined />} {total >= 0 ? '+' : '-'}¥{Math.abs(total).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          <span style={{ color: totalPnl >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>
+            ¥{totalPnl.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({pct?.toFixed(1) || 0}%)
           </span>
         );
       }
-    },
-    { 
-      title: '盈亏%', 
-      dataIndex: 'profit_pct', 
-      key: 'profit_pct',
-      render: (v: number) => (
-        <Tag color={v >= 0 ? 'green' : 'red'}>{v?.toFixed(1) || 0}%</Tag>
-      )
     },
     {
       title: '补仓顾问(ML)',

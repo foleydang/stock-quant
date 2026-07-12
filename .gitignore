@@ -59,7 +59,13 @@ mlruns/
 # 模型文件直接提交,方便服务器pull即用
 !models/
 !models/**
-python/python/
+!python/models/
+!python/models/**
 
 # add_advisor OOS 缓存 (大, 只本地用, 勿提交)
 python/models/add_advisor/oos_cache.pkl
+# 预测CSV (每日生成, 不入库)
+models/**/prediction_*.csv
+# 旧模型备份
+*_old.pkl
+*_backup.pkl

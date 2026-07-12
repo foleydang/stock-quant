@@ -205,12 +205,68 @@ def get_t_suggestions() -> List[Dict]:
 # ========== 交易信号 ==========
 
 def get_signals_data() -> Dict:
-    """获取交易信号 - LGBM 模型 window=3 预测均值 + 截面排名信号
-
-    修复：使用全市场截面排名判断信号，而非绝对阈值。
-    模型预测值分布偏正 (base ~0.011)，绝对阈值 0.0005 会让所有股票都触发买入。
-    改为：Top 30% → 买入，Bottom 30% → 卖出，中间 40% → 持有。
+    """获取交易信号 - 优先用 predict_today_batched.py 的 CSV 结果,
+    剩余股票用 kline_30m 旧模型补充, 最大化股票池覆盖。
     """
+    import os
+    import csv
+    from datetime import datetime, timedelta
+
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        # 1. 先读 CSV (lgb_hs300_enhanced 日线模型, 341只)
+        csv_signals = {}
+        for days_back in range(3):
+            target_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y%m%d')
+            csv_path = os.path.join(base_dir, 'models', 'lgb_hs300_enhanced',
+                                    f'prediction_{target_date}.csv')
+            if os.path.exists(csv_path):
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        score = float(row.get('score', 0))
+                        rt = get_stock_data(row['symbol'])
+                        current_price = rt.get('current_price', 0) if rt else 0
+                        csv_signals[row['symbol']] = {
+                            'stock_name': row.get('name', row['symbol']),
+                            'symbol': row['symbol'],
+                            'current_price': current_price,
+                            'signal': row.get('signal', '持有'),
+                            'up_prob': 1.0 / (1.0 + 2.718281828459045 ** (-score * 100)),
+                            'reason': f"score={score:+.4f} rank={row.get('rank', '?')}",
+                        }
+                break
+
+        csv_count = len(csv_signals)
+
+        # 2. kline_30m 旧模型补充 (补充 CSV 没有的股票)
+        legacy = _get_signals_data_legacy()
+        legacy_signals = legacy.get('signals', [])
+        added = 0
+        for s in legacy_signals:
+            if s['symbol'] not in csv_signals:
+                csv_signals[s['symbol']] = s
+                added += 1
+
+        signals = list(csv_signals.values())
+        signals.sort(key=lambda x: x['up_prob'], reverse=True)
+
+        buy_count = sum(1 for s in signals if '买入' in s['signal'])
+        sell_count = sum(1 for s in signals if '卖出' in s['signal'])
+        logger.info(f"LGBM信号: {len(signals)}只 (CSV:{csv_count} + 补充:{added}) "
+                    f"买入{buy_count}/卖出{sell_count}/持有{len(signals)-buy_count-sell_count}")
+        return {'signals': signals}
+
+    except Exception as e:
+        logger.error(f"信号获取失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'signals': []}
+
+
+def _get_signals_data_legacy() -> Dict:
+    """旧版信号获取 - 仅作为 CSV 不可用时的回退"""
     try:
         from lgbm_backtest import LGBMBacktesterOptimized
         import numpy as np
@@ -224,8 +280,8 @@ def get_signals_data() -> Dict:
             return {'signals': []}
 
         # 从数据库获取更多股票（不只是WATCHLIST），做截面排名
-        db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                               'data/stock_data.db')
+        from config_loader import get_db_path
+        db_path = get_db_path()
         conn = sqlite3.connect(db_path)
         # 获取所有有足够数据的股票（至少200条30分钟K线）
         all_symbols = [row[0] for row in conn.execute(

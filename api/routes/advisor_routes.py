@@ -10,6 +10,11 @@ import os
 import json
 import time
 import sqlite3
+import logging
+import threading
+import tempfile
+
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../python'))
 
@@ -28,6 +33,117 @@ _advisor = None       # {model dict, pipeline}
 _SCAN_CACHE = os.path.join(
     os.path.dirname(__file__), '../../python/data/advisor_scan.json')
 _SCAN_TTL = 6 * 3600
+
+# 异步扫描状态 (文件共享, 跨 gunicorn worker)
+_SCAN_STATUS_FILE = os.path.join(tempfile.gettempdir(), 'advisor_scan_status.json')
+
+
+def _read_scan_status():
+    try:
+        with open(_SCAN_STATUS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _write_scan_status(data):
+    try:
+        with open(_SCAN_STATUS_FILE, 'w') as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+def _run_scan_sync(board, limit, cache_key):
+    """同步执行扫描(首次/无缓存时)"""
+    adv = _load_advisor()
+    if adv is None:
+        return {
+            'status': 'error',
+            'message': '补仓顾问模型未就绪 (models/add_advisor/model.pkl 缺失)',
+        }
+    data = adv['data']
+    pipeline = adv['pipeline']
+
+    conn = sqlite3.connect(get_db_path())
+    try:
+        symbols = _get_symbols_for_board(conn, board, limit)
+        if not symbols:
+            return {'status': 'error', 'message': f'板块 {board} 无符合条件的股票'}
+        batch_size = 50
+        all_scored = []
+        for i in range(0, len(symbols), batch_size):
+            batch = symbols[i:i + batch_size]
+            scored = scan_universe(conn, pipeline, data['feat_names'],
+                                   data['reg'], data['clf_s'], data['clf_tb'],
+                                   symbols=batch)
+            all_scored.extend(scored)
+    finally:
+        conn.close()
+
+    payload = _build_scan_payload(all_scored, data)
+    payload['_cacheKey'] = cache_key
+    payload['board'] = board
+    try:
+        os.makedirs(os.path.dirname(_SCAN_CACHE), exist_ok=True)
+        with open(_SCAN_CACHE, 'w') as f:
+            json.dump(payload, f, ensure_ascii=False)
+    except Exception:
+        pass
+    payload['cached'] = False
+    payload['scanning'] = False
+    return payload
+
+
+def _start_scan_async(board, limit, cache_key):
+    """启动后台异步扫描(文件状态, 跨 worker 共享)"""
+    _write_scan_status({'key': cache_key, 'board': board, 'limit': limit,
+                        'progress': '0/0', 'started_at': time.time()})
+
+    def _run():
+        try:
+            adv = _load_advisor()
+            if adv is None:
+                _write_scan_status(None)
+                return
+            data = adv['data']
+            pipeline = adv['pipeline']
+
+            conn = sqlite3.connect(get_db_path())
+            try:
+                symbols = _get_symbols_for_board(conn, board, limit)
+                batch_size = 50
+                all_scored = []
+                total_batches = (len(symbols) + batch_size - 1) // batch_size
+                for i in range(0, len(symbols), batch_size):
+                    batch = symbols[i:i + batch_size]
+                    scored = scan_universe(conn, pipeline, data['feat_names'],
+                                           data['reg'], data['clf_s'], data['clf_tb'],
+                                           symbols=batch)
+                    all_scored.extend(scored)
+                    batch_num = i // batch_size + 1
+                    _write_scan_status({'key': cache_key, 'board': board, 'limit': limit,
+                                        'progress': f'{batch_num}/{total_batches}',
+                                        'started_at': time.time()})
+            finally:
+                conn.close()
+
+            payload = _build_scan_payload(all_scored, data)
+            payload['_cacheKey'] = cache_key
+            payload['board'] = board
+            try:
+                os.makedirs(os.path.dirname(_SCAN_CACHE), exist_ok=True)
+                with open(_SCAN_CACHE, 'w') as f:
+                    json.dump(payload, f, ensure_ascii=False)
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error(f"async scan failed: {e}")
+        finally:
+            _write_scan_status(None)
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
 
 # Mac 离线算好的诚实盈利回测 (backtest_advisor.py), 服务器只读, 不实时跑 walk-forward
 _BT_DIR = os.path.join(os.path.dirname(__file__), '../../python/models/add_advisor')
@@ -158,14 +274,13 @@ def _build_scan_payload(scored, data):
     n = len(items)
 
     dist = {'strong_buy': 0, 'buy': 0, 'hold': 0, 'sell': 0, 'strong_sell': 0}
-    signals = {'strong_buy': [], 'buy': [], 'sell': [], 'strong_sell': []}
+    signals = {'strong_buy': [], 'buy': [], 'hold': [], 'sell': [], 'strong_sell': []}
     pred_date = ''
     for i, s in enumerate(items):
         key, label = _bucket_by_rank(i, n)
         dist[key] += 1
         pred_date = max(pred_date, s.get('date', '') or '')
-        if key in signals:
-            signals[key].append({
+        signals[key].append({
                 'rank': i + 1,
                 'symbol': s['sym'],
                 'name': s.get('name', s['sym']),
@@ -192,49 +307,99 @@ def _build_scan_payload(scored, data):
 
 @advisor_bp.route('/advisor/scan', methods=['GET'])
 def advisor_scan():
-    """对全 A 股票池用 add_advisor 模型打分, 供每日信号页扫描 (~50+ 只)。
+    """对指定股票池用 add_advisor 模型打分, 截面排名分桶。
 
-    结果磁盘缓存 6 小时; ?refresh=1 强制重算。
+    参数: ?board=all|sh|sz|cyb|kcb (默认all)
+          ?limit=300 (默认300)
+          ?refresh=1 强制重算(后台异步, 立刻返回缓存 + scanning flag)
+    结果磁盘缓存 6 小时。
     """
     refresh = request.args.get('refresh') in ('1', 'true', 'yes')
-    if not refresh and os.path.exists(_SCAN_CACHE):
+    board = request.args.get('board', 'all')
+    limit = int(request.args.get('limit', 100))
+
+    cache_key = f'{board}_{limit}'
+
+    # 返回缓存(如果有)
+    cached_payload = None
+    if os.path.exists(_SCAN_CACHE):
+        try:
+            with open(_SCAN_CACHE) as f:
+                cached_payload = json.load(f)
+            if cached_payload.get('_cacheKey') != cache_key:
+                cached_payload = None
+        except Exception:
+            cached_payload = None
+
+    # 非 refresh 且缓存有效 → 直接返回
+    if not refresh and cached_payload:
         age = time.time() - os.path.getmtime(_SCAN_CACHE)
         if age < _SCAN_TTL:
-            try:
-                with open(_SCAN_CACHE) as f:
-                    payload = json.load(f)
-                payload['cached'] = True
-                payload['cacheAgeMin'] = int(age / 60)
-                return jsonify(payload)
-            except Exception:
-                pass
+            cached_payload['cached'] = True
+            cached_payload['cacheAgeMin'] = int(age / 60)
+            cached_payload['scanning'] = _scanning is not None
+            return jsonify(cached_payload)
 
-    adv = _load_advisor()
-    if adv is None:
-        return jsonify({
-            'status': 'error',
-            'message': '补仓顾问模型未就绪 (models/add_advisor/model.pkl 缺失)',
-        }), 200
+    # 已经在扫描中 → 返回缓存 + scanning
+    status = _read_scan_status()
+    if status and status.get('key') == cache_key:
+        if cached_payload:
+            cached_payload['cached'] = True
+            cached_payload['scanning'] = True
+            cached_payload['scanProgress'] = status.get('progress', '')
+        return jsonify(cached_payload or {'status': 'scanning', 'scanning': True, 'totalStocks': 0, 'distribution': {}, 'signals': {}})
 
-    data = adv['data']
-    pipeline = adv['pipeline']
-    conn = sqlite3.connect(get_db_path())
-    try:
-        scored = scan_universe(
-            conn, pipeline, data['feat_names'],
-            data['reg'], data['clf_s'], data['clf_tb'])
-    finally:
-        conn.close()
+    # refresh=1 → 启动后台扫描, 立刻返回缓存
+    if refresh:
+        _start_scan_async(board, limit, cache_key)
+        if cached_payload:
+            cached_payload['cached'] = True
+            cached_payload['scanning'] = True
+        return jsonify(cached_payload or {'status': 'scanning', 'scanning': True, 'totalStocks': 0, 'distribution': {}, 'signals': {}})
 
-    payload = _build_scan_payload(scored, data)
-    try:
-        os.makedirs(os.path.dirname(_SCAN_CACHE), exist_ok=True)
-        with open(_SCAN_CACHE, 'w') as f:
-            json.dump(payload, f, ensure_ascii=False)
-    except Exception:
-        pass
-    payload['cached'] = False
-    return jsonify(payload)
+    # 无缓存 → 同步扫描(首次)
+    return jsonify(_run_scan_sync(board, limit, cache_key))
+
+
+@advisor_bp.route('/advisor/scan/status', methods=['GET'])
+def advisor_scan_status():
+    """轮询扫描状态: {scanning: bool, progress: '3/6 batches', done: bool}"""
+    status = _read_scan_status()
+    if status is None:
+        return jsonify({'scanning': False, 'done': True})
+    return jsonify({
+        'scanning': True,
+        'done': False,
+        'progress': status.get('progress', ''),
+        'board': status.get('board', ''),
+        'limit': status.get('limit', 0),
+    })
+
+
+def _get_symbols_for_board(conn, board, limit):
+    """根据板块筛选股票池"""
+    if board == 'cyb':
+        # 创业板: 300xxx, 301xxx
+        pattern = "symbol LIKE '300%' OR symbol LIKE '301%'"
+    elif board == 'kcb':
+        # 科创板: 688xxx
+        pattern = "symbol LIKE '688%'"
+    elif board == 'sh':
+        # 上海主板: 600xxx, 601xxx, 603xxx, 605xxx
+        pattern = "symbol LIKE '600%' OR symbol LIKE '601%' OR symbol LIKE '603%' OR symbol LIKE '605%'"
+    elif board == 'sz':
+        # 深圳主板: 000xxx, 001xxx, 002xxx, 003xxx
+        pattern = "symbol LIKE '000%' OR symbol LIKE '001%' OR symbol LIKE '002%' OR symbol LIKE '003%'"
+    else:
+        # all = 沪深主板 + 创业板 + 科创板
+        pattern = "(symbol LIKE '%.SZ' OR symbol LIKE '%.SH')"
+
+    rows = conn.execute(
+        f"SELECT symbol, COUNT(*) c FROM kline_daily "
+        f"WHERE {pattern} "
+        f"GROUP BY symbol HAVING c>=120 ORDER BY c DESC LIMIT ?",
+        (limit,)).fetchall()
+    return [r[0] for r in rows]
 
 
 @advisor_bp.route('/advisor/backtest', methods=['GET'])

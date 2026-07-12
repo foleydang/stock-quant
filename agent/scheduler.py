@@ -576,12 +576,12 @@ def _cleanup_old_alerts():
 def _is_alert_duplicate(symbol: str, alert_type: str, change_pct: float) -> bool:
     """判断是否重复异动
     规则：
-    1. 同方向每天最多推3次
+    1. 同一股票每天最多推3次（不限方向/类型）
     2. 跌幅/涨幅须比上次推送加深1%以上才再推
     """
     import time
     _cleanup_old_alerts()  # 先清理过期记录
-    key = (symbol, alert_type)
+    key = symbol  # 按股票去重，不再按 (symbol, alert_type)
     records = _recent_alerts.get(key, [])
 
     # 规则1：次数上限
@@ -815,7 +815,7 @@ def intraday_alert_monitor():
         if not merged:
             return
 
-        for a in merged[:5]:  # 每次最多推5条
+        for a in merged[:5]:  # 每次最多推5条（不同股票不重复）
             if _is_alert_duplicate(a['symbol'], a['type'], a.get('change_pct', 0)):
                 logger.debug(f"异动去重: {a['name']} {a['type']} {a.get('change_pct', 0):.2f}% 已推送或跌幅未加深")
                 continue
@@ -1307,28 +1307,13 @@ def setup_scheduler():
         misfire_grace_time=60
     )
 
-    # 盘中异动轮询（每5分钟，交易时段）- 内部按分时段频率控制
+    # 盘中异动轮询（每10分钟，交易时段）- 内部按分时段频率控制
+    # 注：已移除 intraday_check (9:30/13:00)，避免与轮询重复推送
     scheduler.add_job(
         intraday_alert_monitor,
-        CronTrigger(hour='9-11,13-14', minute='*/5', day_of_week='mon-fri'),
+        CronTrigger(hour='9-11,13-14', minute='*/10', day_of_week='mon-fri'),
         id='intraday_alert_monitor',
         name='盘中异动轮询',
-        misfire_grace_time=120
-    )
-
-    # 盘中开盘推送 —— 9:30上午开盘 + 13:00下午开盘
-    scheduler.add_job(
-        intraday_check,
-        CronTrigger(hour='9', minute='30', day_of_week='mon-fri'),
-        id='intraday_check_0930',
-        name='上午开盘监控(9:30)',
-        misfire_grace_time=120
-    )
-    scheduler.add_job(
-        intraday_check,
-        CronTrigger(hour='13', minute='0', day_of_week='mon-fri'),
-        id='intraday_check_1300',
-        name='下午开盘监控(13:00)',
         misfire_grace_time=120
     )
 
@@ -1373,20 +1358,20 @@ def setup_scheduler():
         misfire_grace_time=120
     )
 
-    # qlib 30min模型预测推送 — 盘前9:25（用昨天数据预测今天）
+    # qlib 30min模型预测推送 — 盘前9:26（用昨天数据预测今天）
     scheduler.add_job(
         qlib_intraday_push,
-        CronTrigger(hour=9, minute=25, day_of_week='mon-fri'),
-        id='qlib_intraday_0925',
-        name='qlib盘前预测(9:25)',
+        CronTrigger(hour=9, minute=26, day_of_week='mon-fri'),
+        id='qlib_intraday_0926',
+        name='qlib盘前预测(9:26)',
         misfire_grace_time=300
     )
 
-    # LGBM 模型信号推送 — 盘前9:25 + 盘中14:00
+    # LGBM 模型信号推送 — 盘前9:27 + 盘中14:00
     scheduler.add_job(
         lgbm_signal_push,
-        CronTrigger(hour=9, minute=25, day_of_week='mon-fri'),
-        id='lgbm_signal_0925',
+        CronTrigger(hour=9, minute=27, day_of_week='mon-fri'),
+        id='lgbm_signal_0927',
         name='LGBM信号推送(盘前)',
         misfire_grace_time=120
     )
@@ -1407,9 +1392,9 @@ def setup_scheduler():
         misfire_grace_time=600
     )
 
-    logger.info("定时任务已配置: 盘前9:25(含qlib+LGBM预测), 开盘9:30/13:00, 盘后15:05, "
-               "晚间18:00, 异动轮询(分时段频率), v8预测(10:00/14:30/15:00), "
-               "LGBM信号(9:25/14:00), 30min数据保存(15:10)")
+    logger.info("定时任务已配置: 盘前9:25(morning)+9:26(qlib)+9:27(LGBM), 盘后15:05, "
+               "晚间18:00, 异动轮询(每10分钟), v8预测(10:00/14:30/15:00), "
+               "LGBM信号(9:27/14:00), 30min数据保存(15:10)")
 
 
 def start_scheduler():
