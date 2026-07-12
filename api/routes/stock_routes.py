@@ -209,13 +209,19 @@ def get_positions():
         cursor.execute('SELECT symbol, stock_name, shares, cost_price, current_price FROM positions')
         rows = cursor.fetchall()
 
-        # 用 kline_daily 最新收盘价刷新现价 (存表里的 current_price 只是最后一次成交价, 会失真)
+        # 现价策略: 优先用30分钟线最新价(盘中实时), 兜底用日线收盘价
         def _latest_close(sym):
             try:
-                cursor.execute(
+                # 1. 先查30分钟线 (盘中实时, 最新到当前时刻)
+                row = cursor.execute(
+                    'SELECT close FROM kline_30m WHERE symbol=? ORDER BY date DESC LIMIT 1', (sym,)
+                ).fetchone()
+                if row and row[0] is not None:
+                    return float(row[0])
+                # 2. 兜底查日线
+                row = cursor.execute(
                     'SELECT close FROM kline_daily WHERE symbol=? ORDER BY date DESC LIMIT 1', (sym,)
-                )
-                row = cursor.fetchone()
+                ).fetchone()
                 return float(row[0]) if row and row[0] is not None else None
             except Exception:
                 return None

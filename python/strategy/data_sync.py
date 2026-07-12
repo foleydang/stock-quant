@@ -235,19 +235,20 @@ def main():
     new_30min = 0
     new_daily = 0
 
-    # 30分钟K线 (盘中或强制)
-    if args.daily_only:
-        pass
-    elif args.force or is_trading_time() or args.__dict__.get('30min_only'):
-        print("\n📡 拉取30分钟K线 (新浪API)...")
-        new_30min = fetch_30min_kline(conn, force=args.force)
+    do_30min = getattr(args, '30min_only', False)
+    do_daily = args.daily_only
 
-    # 日线K线 (盘后或强制)
-    if args.__dict__.get('30min_only'):
-        pass
-    elif args.force or is_after_market():
-        print("\n📡 拉取日线K线 (Tushare)...")
-        new_daily = fetch_daily_kline(conn)
+    # 30分钟K线 (盘中或强制)
+    if not do_daily and not args.upload_only:
+        if args.force or do_30min or is_trading_time():
+            print("\n📡 拉取30分钟K线 (新浪API)...")
+            new_30min = fetch_30min_kline(conn, force=args.force)
+
+    # 日线K线 (盘后/daily-only/强制)
+    if not do_30min and not args.upload_only:
+        if args.force or do_daily or is_after_market():
+            print("\n📡 拉取日线K线 (Tushare)...")
+            new_daily = fetch_daily_kline(conn)
 
     conn.close()
 

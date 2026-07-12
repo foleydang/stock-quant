@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3.11
 """
 增量数据拉取器 - 每小时执行一次，逐步补充缺失数据
 
