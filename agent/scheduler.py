@@ -1383,18 +1383,19 @@ def setup_scheduler():
         misfire_grace_time=120
     )
 
-    # 收盘后保存全部30min数据 + 重建qlib bin（15:10）
-    scheduler.add_job(
-        save_and_rebuild_qlib_data,
-        CronTrigger(hour=15, minute=10, day_of_week='mon-fri'),
-        id='save_qlib_data_1510',
-        name='30min数据保存+qlib重建(15:10)',
-        misfire_grace_time=600
-    )
+    # 收盘后30min数据保存+qlib重建 — 已废弃(qlib模型目录为空, 连续超时)
+    # 数据同步已由 OpenClaw cron stock-data-sync / stock-eod-predict 接管
+    # scheduler.add_job(
+    #     save_and_rebuild_qlib_data,
+    #     CronTrigger(hour=15, minute=10, day_of_week='mon-fri'),
+    #     id='save_qlib_data_1510',
+    #     name='30min数据保存+qlib重建(15:10)',
+    #     misfire_grace_time=600
+    # )
 
     logger.info("定时任务已配置: 盘前9:25(morning)+9:26(qlib)+9:27(LGBM), 盘后15:05, "
                "晚间18:00, 异动轮询(每10分钟), v8预测(10:00/14:30/15:00), "
-               "LGBM信号(9:27/14:00), 30min数据保存(15:10)")
+               "LGBM信号(9:27/14:00)")
 
 
 def start_scheduler():

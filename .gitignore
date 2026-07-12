@@ -69,3 +69,5 @@ models/**/prediction_*.csv
 # 旧模型备份
 *_old.pkl
 *_backup.pkl
+# 一次性脚本 (不追踪)
+scripts/backfill_*.py
