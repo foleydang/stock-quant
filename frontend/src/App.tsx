@@ -24,6 +24,7 @@ import DailySignals from './pages/DailySignals';
 import StockSelection from './pages/StockSelection';
 import Calculator from './pages/Calculator';
 import PositionManager from './pages/PositionManager';
+import PaperTrading from './pages/PaperTrading';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
@@ -205,6 +206,9 @@ const App: React.FC = () => {
         <Route path="/positions" element={
           <PositionManager />
         } />
+        <Route path="/paper" element={
+          <PaperTrading />
+        } />
         <Route path="/" element={
           <div style={{ minHeight: '100vh', backgroundColor: '#1e2229' }}>
             {/* 顶部标题栏 - 深色金融风格 */}
@@ -242,6 +246,10 @@ const App: React.FC = () => {
                 <Link to="/positions" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
                   <StockOutlined />
                   持仓管理
+                </Link>
+                <Link to="/paper" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', padding: '8px 16px', background: 'rgba(226,176,74,0.15)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(226,176,74,0.3)' }}>
+                  <FundOutlined />
+                  纸面交易
                 </Link>
               </div>
             </div>
