@@ -39,9 +39,15 @@ sys.path.insert(0, os.path.join(ROOT, 'python'))
 from strategy.features import FeaturePipeline
 from strategy.add_advisor_ml import (
     build_pool, run_walkforward, load_symbols,
-    HORIZON, PURGE_DAYS, COST_A, OUT_DIR,
+    HORIZON, PURGE_DAYS, OUT_DIR,
     REG_PARAMS, QUICK_PARAMS,
 )
+from strategy.costs import roundtrip_frac
+
+# 回测池是 A 股个股(见 caveat "仅A股"),往返成本用真实费率分数
+# (佣金万2.5双边 + 印花0.05%卖出 + 过户0.001%双边 = 0.102%),
+# 取代旧的粗略 flat 0.13%,与纸面引擎 costs.py 同源。
+COST_A = roundtrip_frac(etf=False)
 
 PORTFOLIO_JSON = os.path.join(OUT_DIR, 'backtest_portfolio.json')
 SIGNALS_JSON = os.path.join(OUT_DIR, 'backtest_signals.json')
