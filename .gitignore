@@ -71,3 +71,6 @@ models/**/prediction_*.csv
 *_backup.pkl
 # 一次性脚本 (不追踪)
 scripts/backfill_*.py
+
+# 第三方模型仓库 (Kronos, 本地 clone, 勿入库)
+third_party/
