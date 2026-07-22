@@ -16,13 +16,17 @@ fi
 
 echo "=== $(date '+%F %T') hkserver 盘后开始 ==="
 
-echo "📡 1/3 A股日线 (Tushare)..."
+echo "📡 1/4 A股日线 (Tushare)..."
 cd "$PROJECT_DIR/python" && $PY strategy/data_sync.py --daily-only --no-upload
 
-echo "📡 2/3 港股/ETF (yfinance)..."
+echo "📡 2/4 港股/ETF + 南向资金 (sina + akshare)..."
+# update_etf_data.py 抓 south_flow(港股通净流入, ETF 模型核心特征) + ETF/A股日线
+cd "$PROJECT_DIR/python" && $PY update_etf_data.py
+
+echo "📡 3/4 港股成分股 (yfinance)..."
 $PY "$PROJECT_DIR/scripts/sync_hk_etf.py"
 
-echo "📊 3/3 跑预测..."
+echo "📊 4/4 跑预测..."
 cd "$PROJECT_DIR/python" && $PY strategy/predict_today_batched.py --batch 500
 
 echo "=== $(date '+%T') hkserver 盘后完成 ==="
