@@ -23,9 +23,9 @@ echo "📊 跑预测..."
 cd python && /root/miniconda3/bin/python strategy/predict_today_batched.py --batch 500 && cd ..
 echo ""
 
-# 4. 上传 OSS
-echo "📤 上传 OSS..."
-bash scripts/upload_to_oss.sh 2>&1 | tail -3
+# 4. 上传 OSS (服务器产出的表: 大表按月分片 + 小表快照, 不再整库覆盖)
+echo "📤 上传 OSS (增量)..."
+cd python && /root/miniconda3/bin/python strategy/oss_incr.py upload --producer server --days 3 && cd ..
 echo ""
 
 echo "=== $(date '+%H:%M:%S') 盘后任务完成 ==="
