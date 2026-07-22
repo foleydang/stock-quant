@@ -190,7 +190,9 @@ def main():
             sina_sym = to_sina_symbol(sym)
             rows = fetch_sina_daily(sina_sym)
             if rows:
-                n = upsert_daily(conn, sym, rows, replace_all=True)
+                # replace_all=False: 只 INSERT OR REPLACE 各日期, 不 DELETE —
+                # 否则新浪 datalen 上限(800)会把更长的历史(如159792 的1165根)截断。
+                n = upsert_daily(conn, sym, rows, replace_all=False)
                 print(f"  {sym}: {len(rows)} bars ({rows[0]['date']}~{rows[-1]['date']})")
             else:
                 print(f"  {sym}: 无数据")
@@ -205,7 +207,7 @@ def main():
             try:
                 rows = fetch_hk_klines(sym)
                 if rows:
-                    n = upsert_daily(conn, sym, rows, replace_all=True)
+                    n = upsert_daily(conn, sym, rows, replace_all=False)
                     print(f"  {sym}: {len(rows)} bars ({rows[0]['date']}~{rows[-1]['date']})")
             except Exception as e:
                 print(f"  {sym}: 错误 {e}")
