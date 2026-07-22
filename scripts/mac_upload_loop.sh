@@ -18,6 +18,8 @@ if [ "$HOUR" -lt 9 ] || [ "$HOUR" -gt 15 ] || ([ "$HOUR" -eq 9 ] && [ "$MINUTE" 
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-echo "[$(date)] 📤 Mac 上传数据到 OSS..."
-bash "$SCRIPT_DIR/upload_to_oss.sh"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+echo "[$(date)] 📤 Mac 上传 30m 增量到 OSS..."
+# Mac/香港机只产 kline_30m; 按月分片, 只重传当月, 不再整库覆盖
+cd "$PROJECT_DIR/python" && python3 strategy/oss_incr.py upload --producer mac --days 2
 echo "[$(date)] ✅ 上传完成"

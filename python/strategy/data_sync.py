@@ -194,23 +194,15 @@ def fetch_daily_kline(conn, force=False):
     return total_new
 
 
-def upload_to_oss():
-    """上传数据库到OSS"""
-    script = os.path.join(ROOT, '..', 'scripts', 'upload_to_oss.sh')
-    if os.path.exists(script):
-        try:
-            result = subprocess.run(['bash', script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=300)
-            if '上传完成' in result.stdout or 'Succeed' in result.stdout:
-                print("✅ OSS上传成功")
-                return True
-            else:
-                print(f"⚠️ OSS上传: {result.stdout[-200:]}")
-                return False
-        except subprocess.TimeoutExpired:
-            print("⚠️ OSS上传超时")
-            return False
-    else:
-        print("⚠️ upload_to_oss.sh 不存在")
+def upload_to_oss(tables=None):
+    """按交易日增量上传到 OSS (不再整库覆盖, 见 strategy/oss_incr.py)"""
+    try:
+        sys.path.insert(0, os.path.join(ROOT, 'strategy'))
+        import oss_incr
+        oss_incr.upload(tables=tables or ['kline_30m', 'kline_daily'], days=5)
+        return True
+    except Exception as e:
+        print(f"⚠️ OSS 增量上传失败: {e}")
         return False
 
 
@@ -221,6 +213,8 @@ def main():
     parser.add_argument('--upload-only', action='store_true')
     parser.add_argument('--30min-only', action='store_true')
     parser.add_argument('--daily-only', action='store_true')
+    parser.add_argument('--no-upload', action='store_true',
+                        help='抓完不上传 OSS (hkserver 是真身库, 无需上传)')
     args = parser.parse_args()
 
     conn = sqlite3.connect(DB_PATH)
@@ -252,10 +246,17 @@ def main():
 
     conn.close()
 
-    # 有新增数据则上传OSS
-    if new_30min > 0 or new_daily > 0:
+    # 有新增数据则上传OSS (hkserver 全包架构下用 --no-upload 跳过: 它是真身库)
+    if args.no_upload:
+        print(f"\n✅ 抓取完成 (30min:{new_30min}, daily:{new_daily}), --no-upload 跳过上传")
+    elif new_30min > 0 or new_daily > 0:
         print(f"\n📤 有新增数据 (30min:{new_30min}, daily:{new_daily}), 上传OSS...")
-        upload_to_oss()
+        tbls = []
+        if new_30min > 0:
+            tbls.append('kline_30m')
+        if new_daily > 0:
+            tbls.append('kline_daily')
+        upload_to_oss(tables=tbls)
     else:
         print("\n✅ 无新增数据, 跳过OSS上传")
 
