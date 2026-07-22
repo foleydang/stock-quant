@@ -69,8 +69,18 @@ models/**/prediction_*.csv
 # 旧模型备份
 *_old.pkl
 *_backup.pkl
+*.orig
+*.orig.*
 # 一次性脚本 (不追踪)
 scripts/backfill_*.py
+
+# 模型实验产物 (walk-forward 回测/缓存, 可再生, 大, 勿入库)
+models/lgb_hs300_walkforward/
+models/lgb_hs300_walkforward_v2/
+python/models/.cache/
+# add_advisor walk-forward 汇总 (实验输出, 可再生)
+python/models/add_advisor/walkforward_summary_*.json
+python/models/add_advisor/holdings_report.txt
 
 # 第三方模型仓库 (Kronos, 本地 clone, 勿入库)
 third_party/
