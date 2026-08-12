@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 PY_DIR="$PROJECT_DIR/python"
 LOG_DIR="$PROJECT_DIR/logs"
-REPORT_DIR="$PROJECT_DIR/models/add_advisor"
+REPORT_DIR="$PY_DIR/models/add_advisor"
 mkdir -p "$LOG_DIR"
 
 # 周末跳过
@@ -20,8 +20,10 @@ if [ "$(date +%u)" -ge 6 ]; then
     exit 0
 fi
 
-# 选择 python: 优先项目虚拟环境
-if [ -f "$PROJECT_DIR/.venv/bin/python" ]; then
+# 选择 python: 优先 python3.11 (兼容新版 lightgbm/sklearn 模型)
+if command -v python3.11 &>/dev/null; then
+    PY="python3.11"
+elif [ -f "$PROJECT_DIR/.venv/bin/python" ]; then
     PY="$PROJECT_DIR/.venv/bin/python"
 elif [ -f "$PY_DIR/.venv/bin/python" ]; then
     PY="$PY_DIR/.venv/bin/python"

@@ -340,8 +340,13 @@ def build_features(conn):
 
     # 成分股自下而上特征 —— 比 ETF 价格更早感知拐点
     comp_feats = build_component_features(conn, df['date'].values)
-    for k, v in comp_feats.items():
-        f[k] = v
+    # 如果成分股数据为空(如HK股票未同步), 跳过成分特征, 避免全NaN
+    comp_feats_ok = {k: v for k, v in comp_feats.items() if not np.all(np.isnan(v))}
+    if comp_feats_ok:
+        for k, v in comp_feats_ok.items():
+            f[k] = v
+    else:
+        print("   ⚠️ 成分股数据缺失, 跳过成分股特征")
 
     # 南向资金特征 —— 港股通互联网ETF 最直接的资金面驱动(因果 t-1)
     sf = load_south_flow(conn)

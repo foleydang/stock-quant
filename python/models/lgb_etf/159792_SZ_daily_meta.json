@@ -1,0 +1,13 @@
+{
+  "symbol": "159792.SZ",
+  "model_type": "etf_daily_cls",
+  "horizon": 5,
+  "n_features": 86,
+  "n_models": 5,
+  "n_train": 980,
+  "n_test": 110,
+  "test_acc": 0.5,
+  "test_f1": 0.433,
+  "trained_at": "2026-07-22T10:34:51.749918",
+  "size_mb": 2.3
+}

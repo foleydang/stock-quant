@@ -1,0 +1,13 @@
+{
+  "symbol": "159792.SZ",
+  "model_type": "etf_intraday_cls",
+  "horizon": 6,
+  "n_features": 77,
+  "n_models": 5,
+  "n_train": 513,
+  "n_test": 56,
+  "test_acc": 0.4643,
+  "test_f1": 0.1667,
+  "trained_at": "2026-07-22T10:32:25.468987",
+  "size_mb": 0.2
+}

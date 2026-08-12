@@ -1155,7 +1155,7 @@ def v8_intraday_push():
         try:
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
-            cursor.execute("SELECT symbol, name, shares, cost_price, current_price FROM positions WHERE shares > 0")
+            cursor.execute("SELECT symbol, stock_name, shares, cost_price, current_price FROM positions WHERE shares > 0")
             for row in cursor.fetchall():
                 positions.append({
                     'symbol': row[0],

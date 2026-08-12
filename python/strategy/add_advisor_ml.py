@@ -171,7 +171,7 @@ def build_pool(conn, symbols, pipeline, quick):
             if len(df) < 200:
                 continue
             df['date'] = pd.to_datetime(df['date'].astype(str).str.strip(),
-                                        format='mixed')
+                                        )
             df = (df.drop_duplicates('date', keep='last')
                     .sort_values('date').reset_index(drop=True))
 
@@ -446,7 +446,7 @@ def score_holding(conn, pipeline, sym, feat_names, reg, clf_s, clf_tb, tail=0):
             "WHERE symbol=? ORDER BY date", conn, params=(sym,))
     if len(df) < 120:
         return None
-    df['date'] = pd.to_datetime(df['date'].astype(str).str.strip(), format='mixed')
+    df['date'] = pd.to_datetime(df['date'].astype(str).str.strip())
     df = df.drop_duplicates('date', keep='last').sort_values('date').reset_index(drop=True)
     c = df['close'].values.astype(float)
     h = df['high'].values.astype(float)

@@ -1,0 +1,1 @@
+/root/github/stock-quant/python/models/add_advisor/model.pkl
