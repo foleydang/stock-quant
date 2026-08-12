@@ -58,7 +58,7 @@ echo "[$(date)] ✅ 持仓体检完成, 报告: $REPORT_DIR/holdings_report.txt"
 # ================================================================
 echo "[$(date)] 📝 纸面交易推进"
 
-if $PY strategy/scan_advisor.py --board all --limit 500; then
+if $PY strategy/scan_advisor.py --board all --limit 200; then
     echo "  ✅ 全票池扫描完成 (advisor_scan.json 已刷新)"
 else
     echo "  ⚠️ 全票池扫描失败, 账户A本日将跳过调仓"
